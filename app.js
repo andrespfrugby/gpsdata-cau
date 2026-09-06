@@ -4,25 +4,29 @@ const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
    las que traen datos: si una viene entera a cero (Hr Load, por ejemplo), se oculta. */
+/* Lo que va en gráficos de barras: volumen y distancias por zona. */
 const CATALOGO = [
   ["Volumen", [
     "Distance (metres)", "Sprint Distance (m)", "Player Load", "Power Plays",
-    "Energy (kcal)", "Impacts", "Hr Load", "Time In Red Zone (min)"
+    "Energy (kcal)", "Impacts", "Hr Load", "Time In Red Zone (min)", "Distance Per Min (m/min)"
   ]],
-  ["Intensidad", [
-    "Distance Per Min (m/min)", "Top Speed (m/s)", "Power Score (w/kg)", "Work Ratio",
-    "Max Acceleration (m/s/s)", "Max Deceleration (m/s/s)"
-  ]],
-  ["Zonas de velocidad", [
+  ["Distancia por zona de velocidad", [
     "Distance in Speed Zone 1  (metres)", "Distance in Speed Zone 2  (metres)",
     "Distance in Speed Zone 3  (metres)", "Distance in Speed Zone 4  (metres)",
     "Distance in Speed Zone 5  (metres)"
-  ]],
+  ]]
+];
+
+/* Lo que va en la tabla de abajo, sin barras ni medias por jugador. */
+const TABLA = [
+  ["Velocidad", ["Top Speed (m/s)", "Distance Per Min (m/min)", "Power Score (w/kg)", "Work Ratio"]],
   ["Aceleraciones", [
+    "Max Acceleration (m/s/s)",
     "Accelerations Zone Count: 1 - 2 m/s/s", "Accelerations Zone Count: 2 - 3 m/s/s",
     "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s"
   ]],
   ["Deceleraciones", [
+    "Max Deceleration (m/s/s)",
     "Deceleration Zone Count: 0 - 1 m/s/s", "Deceleration Zone Count: 1 - 2 m/s/s",
     "Deceleration Zone Count: 2 - 3 m/s/s", "Deceleration Zone Count: 3 - 4 m/s/s",
     "Deceleration Zone Count: > 4 m/s/s"
@@ -33,6 +37,7 @@ const CATALOGO = [
     "Impact Zones: > 20 G (Impacts)"
   ]]
 ];
+const TODAS_COLUMNAS = () => CATALOGO.concat(TABLA).flatMap(([, c]) => c);
 
 /* Nombres más cortos para que quepan en el desplegable y en el título del panel. */
 const ALIAS_METRICA = {
@@ -65,7 +70,7 @@ let MOTES = {}, POSICIONES = {};   // maestro que llega del Sheets
 let EQUIPO_CARGA = "";             // equipo elegido al arrastrar un CSV sin columna Squad
 const F = { squad:"", fecha:"", pestana:"reporte",
   // Cuatro paneles, como los cuatro selectores del Session Report de Power BI.
-  metricas:["Distance (metres)", "Player Load", "Distance Per Min (m/min)", "Top Speed (m/s)"] };
+  metricas:["Distance (metres)", "Distance in Speed Zone 4  (metres)"] };
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -185,9 +190,7 @@ function normaliza(brutas) {
 
     // Guardamos las columnas del catálogo tal cual vienen, sin recalcular nada.
     const crudo = {};
-    for (const [, cols] of CATALOGO) {
-      for (const col of cols) if (clave(col) in m) crudo[col] = num(m[clave(col)]);
-    }
+    for (const col of TODAS_COLUMNAS()) if (clave(col) in m) crudo[col] = num(m[clave(col)]);
 
     salida.push({
       crudo,
@@ -197,12 +200,16 @@ function normaliza(brutas) {
       minutos
     });
   }
-  // Si de la misma sesión llega el split completo y además "all", nos quedamos con el completo.
+  // Una fila por jugador y evento. Si llegan el split completo y el "all",
+  // se queda el completo; el "all" solo sirve cuando no hay nada mejor.
   const porSesion = new Map();
   for (const r of salida) {
-    const k = r.jugador + "|" + r.fechaISO + "|" + r.sesion + (clave(r.split) === "all" ? "" : "|" + r.split);
+    const k = r.jugador + "|" + r.fechaISO + "|" + r.sesion;
     const previa = porSesion.get(k);
-    if (!previa || (clave(previa.split) === "all" && clave(r.split) !== "all")) porSesion.set(k, r);
+    if (!previa) { porSesion.set(k, r); continue; }
+    const previaEsAll = clave(previa.split) === "all";
+    const nuevaEsAll = clave(r.split) === "all";
+    if (previaEsAll && !nuevaEsAll) porSesion.set(k, r);
   }
   salida = [...porSesion.values()];
   salida.sort((a, b) => a.fecha - b.fecha);
@@ -230,9 +237,14 @@ async function cargar() {
     let brutas;
     if (txt.trim().startsWith("[") || txt.trim().startsWith("{")) {
       const j = JSON.parse(txt);
-      brutas = Array.isArray(j) ? j : (j.datos || j.data || j.filas || []);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      if (j.cabeceras && j.filas) {
+        // Formato compacto: cabeceras aparte y filas como listas.
+        brutas = j.filas.map(f => Object.fromEntries(j.cabeceras.map((c, i) => [c, f[i]])));
+      } else {
+        brutas = Array.isArray(j) ? j : (j.datos || j.data || []);
+      }
     } else brutas = parseCSV(txt);
     DATOS = normaliza(brutas);
     detectarMetricas();
@@ -240,7 +252,7 @@ async function cargar() {
       setEstado("Conectado · histórico vacío, arrastra tu CSV", true);
       return;
     }
-    setEstado("Conectado · " + DATOS.length + " sesiones", true);
+    setEstado("Conectado · " + DATOS.length + " filas", true);
   } catch (e) {
     DATOS = normaliza(demo());
     detectarMetricas();
@@ -338,6 +350,7 @@ let ULTIMO = null;   // resultado del último fichero leído
 function vistaCargar() {
   $("#cab").innerHTML = "";
   $("#selectores").innerHTML = "";
+  $("#tabla").innerHTML = "";
   $("#paneles").innerHTML = `<div class="solo">
     <div class="zona" id="zona">
       <h3>Arrastra aquí el CSV de Catapult</h3>
@@ -402,6 +415,8 @@ async function leerFichero(file) {
     fusionar(nuevas);
     ULTIMO = { nombre:file.name, brutas:valores.length - 1, validas:nuevas.length, valores:recorte,
                equipos:[...new Set(nuevas.map(r => r.squad))], guardado:null,
+               jugadores:new Set(nuevas.map(r => r.jugador)).size,
+               sesiones:[...new Set(nuevas.map(r => r.fechaISO + " · " + r.sesion))],
                fechas:[...new Set(nuevas.map(r => r.fechaISO))].sort() };
     poblarFiltros();
     mostrarResumen(ULTIMO);
@@ -420,7 +435,7 @@ function fusionar(nuevas) {
   for (const r of nuevas) mapa.set(llave(r), r);
   DATOS = [...mapa.values()].sort((a, b) => a.fecha - b.fecha);
   detectarMetricas();
-  setEstado(DATOS.length + " sesiones cargadas", true);
+  setEstado(DATOS.length + " filas cargadas", true);
 }
 
 function mostrarResumen(u) {
@@ -428,18 +443,18 @@ function mostrarResumen(u) {
   $("#salida").innerHTML = `<div class="resumen">
     <dl>
       <dt>Archivo</dt><dd>${esc(u.nombre)}</dd>
-      <dt>Filas leídas</dt><dd>${nf(u.brutas)}</dd>
-      <dt>Sesiones válidas</dt><dd>${nf(u.validas)}</dd>
-      <dt>Descartadas por split parcial o pocos minutos</dt><dd>${nf(u.brutas - u.validas)}</dd>
-      <dt>Equipos</dt><dd>${u.equipos.map(esc).join(", ")}</dd>
-      <dt>Fechas</dt><dd>${f.length === 1 ? esc(f[0]) : esc(f[0]) + " → " + esc(f[f.length-1])}</dd>
-      <dt>Total en memoria</dt><dd>${nf(DATOS.length)}</dd>
+      <dt>Sesiones</dt><dd>${nf(u.sesiones.length)}</dd>
+      <dt>Jugadores</dt><dd>${nf(u.jugadores)}</dd>
+      <dt>Fecha</dt><dd>${f.length === 1 ? esc(f[0]) : esc(f[0]) + " → " + esc(f[f.length-1])}</dd>
+      <dt>Equipo</dt><dd>${u.equipos.map(esc).join(", ")}</dd>
+      <dt>Filas del archivo</dt><dd>${nf(u.brutas)}</dd>
+      <dt>Filas usadas</dt><dd>${nf(u.validas)} · el resto son splits parciales</dd>
     </dl>
   </div>
   ${u.guardado === null ? (C.fuente ? `<div class="aviso espera" id="estadoGuardado">Guardando en el Sheets…</div>` : "")
-    : u.guardado.ok ? `<div class="aviso ok" id="estadoGuardado">Guardado. ${nf(u.guardado.nuevas)} nuevas y ${nf(u.guardado.actualizadas)} actualizadas · ${nf(u.guardado.total)} sesiones en el histórico.</div>`
+    : u.guardado.ok ? `<div class="aviso ok" id="estadoGuardado">Guardado en Import Data. ${nf(u.guardado.nuevas)} filas nuevas y ${nf(u.guardado.actualizadas)} sustituidas · ${nf(u.guardado.total)} filas en total.</div>`
     : `<div class="aviso error" id="estadoGuardado">No se pudo guardar: ${esc(u.guardado.error)}. Los datos se ven igual, pero se perderán al cerrar.</div>`}
-  <p class="pasos">Ya puedes ir a <b>Volumen</b> o <b>Intensidad</b> y elegir la fecha.</p>`;
+  <p class="pasos">Ya puedes ir a <b>Reporte</b> y elegir la fecha.</p>`;
 }
 
 /** Manda la tabla al Apps Script, troceada para no pasarse de tamaño. */
@@ -476,6 +491,51 @@ function selectorMetrica(i) {
   return `<select class="selMet" data-i="${i}" aria-label="Métrica ${i + 1}">${grupos}</select>`;
 }
 
+/** Tabla compacta: valores por jugador y, al final, la media de cada posición. */
+function tabla(filas) {
+  const cols = TABLA.map(([g, c]) => [g, c.filter(x => filas.some(r => Math.abs(r.crudo[x] || 0) > 0))])
+                    .filter(([, c]) => c.length);
+  if (!cols.length) return "";
+  const planas = cols.flatMap(([, c]) => c);
+  const dec = {};
+  for (const c of planas) dec[c] = decimales(filas.map(r => Math.abs(r.crudo[c] || 0)));
+
+  const jugadores = filas.slice().sort((a, b) => a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador));
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+
+  const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
+  const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
+
+  const cuerpo = jugadores.map(r => `<tr>
+      <td>${esc(r.jugador)}</td><td class="pos">${esc(r.posicion)}</td>
+      ${planas.map(c => `<td class="n">${nf(Math.abs(r.crudo[c] || 0), dec[c])}</td>`).join("")}
+    </tr>`).join("");
+
+  const medias = puestos.map(p => {
+    const suyos = filas.filter(r => r.posicion === p);
+    return `<tr class="media">
+      <td>Media</td><td class="pos">${esc(p)}</td>
+      ${planas.map(c => {
+        const v = suyos.reduce((t, r) => t + Math.abs(r.crudo[c] || 0), 0) / suyos.length;
+        return `<td class="n">${nf(v, dec[c])}</td>`;
+      }).join("")}
+    </tr>`;
+  }).join("");
+
+  return `<section class="panel tablon">
+    <h3>Velocidad, aceleraciones e impactos</h3>
+    <p class="sub">Valor de cada jugador y media por posición al final</p>
+    <div class="scroll"><table class="datos">
+      <thead>
+        <tr><th></th><th></th>${grupos}</tr>
+        <tr><th>Jugador</th><th>Posición</th>${sub}</tr>
+      </thead>
+      <tbody>${cuerpo}</tbody>
+      <tfoot>${medias}</tfoot>
+    </table></div>
+  </section>`;
+}
+
 function pintar() {
   if (F.pestana === "cargar") return vistaCargar();
   cabecera();
@@ -484,6 +544,14 @@ function pintar() {
     // Diagnóstico: si no hay filas, di por qué, que si no es imposible saberlo.
     const delEquipo = DATOS.filter(r => r.squad === F.squad);
     const fechas = [...new Set(delEquipo.map(r => r.fechaISO))];
+    $("#selectores").innerHTML = "";
+    $("#tabla").innerHTML = "";
+    if (!DATOS.length) {
+      $("#paneles").innerHTML = `<div class="empty">
+        <p style="font-size:15px;color:var(--text-2)">Todavía no hay datos guardados.</p>
+        <p>Ve a <b>Cargar datos</b>, elige el equipo y arrastra el CSV de Catapult.</p></div>`;
+      return;
+    }
     $("#paneles").innerHTML = `<div class="empty">
       <p>No hay filas para <b>${esc(F.squad)}</b> en <b>${esc(F.fecha)}</b>.</p>
       <p style="font-family:'IBM Plex Mono';font-size:12px;margin-top:10px">
@@ -507,6 +575,7 @@ function pintar() {
     pintar();
   });
   $("#paneles").innerHTML = F.metricas.map(m => panel(m, filas)).join("");
+  $("#tabla").innerHTML = tabla(filas);
 }
 
 /* ---------- eventos ---------- */
