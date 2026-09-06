@@ -45,6 +45,26 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .md{font-family:'Space Grotesk';font-size:12px;letter-spacing:.06em;background:var(--ink-700);color:var(--lav);padding:3px 10px;border-radius:99px}
 .md.partido{background:rgba(239,181,185,.16);color:var(--pink)}
 
+.selectores{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.selectores select{width:100%;height:36px}
+@media(max-width:900px){.selectores{grid-template-columns:1fr 1fr}}
+
+@media print{
+  @page{margin:12mm}
+  body{background:#fff;color:#111}
+  header,nav,.selectores select{display:none}
+  .selectores{display:none}
+  .wrap{max-width:none;padding:0}
+  .panel{background:#fff;border:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}
+  .panel h3,.cab h2{color:#111}
+  .pista{background:#eee}
+  .pista i{background:#6E9A9B !important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .pista i.alta{background:#4a5aa0 !important}
+  .pista i.baja{background:#bbb !important}
+  .fila .nom,.panel .res,.leyenda{color:#444}
+  .cab .meta{color:#444}
+}
+
 .paneles{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:900px){.paneles{grid-template-columns:1fr}}
 .panel{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
@@ -95,11 +115,12 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 
 <div class="wrap">
   <nav role="tablist">
-    <button class="tab" role="tab" id="tab-volumen" aria-selected="true">Volumen</button>
-    <button class="tab" role="tab" id="tab-intensidad" aria-selected="false">Intensidad</button>
-    <button class="tab" role="tab" id="tab-cargar" aria-selected="false" style="margin-left:auto">Cargar datos</button>
+    <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Reporte</button>
+    <button class="tab" role="tab" id="tab-cargar" aria-selected="false">Cargar datos</button>
+    <button id="btnPdf" style="margin-left:auto;align-self:center">Exportar PDF</button>
   </nav>
   <div class="cab" id="cab"></div>
+  <div class="selectores" id="selectores"></div>
   <div class="paneles" id="paneles"></div>
 </div>
 
