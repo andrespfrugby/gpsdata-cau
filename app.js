@@ -675,8 +675,12 @@ function tabla(filas) {
         // Sin variación en la columna no se tiñe: un bloque uniforme no informa.
         const rango = tope[c] - suelo[c];
         const t = rango > 0 ? (v - suelo[c]) / rango : 0;
-        const fondo = rango > 0 && v > 0 ? `background:rgba(160,167,216,${(0.05 + t * 0.4).toFixed(3)})` : "";
-        return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
+        let fondo = rango > 0 && v > 0 ? `background:rgba(160,167,216,${(0.05 + t * 0.4).toFixed(3)})` : "";
+        // Exposición: verde a partir del umbral, porque ahí sí hubo estímulo.
+        const esPct = c === PCTVEL || c === PCTACC;
+        const expuesto = esPct && v >= (C.umbralExposicion ?? 85);
+        if (esPct) fondo = expuesto ? "background:rgba(110,154,155,.28)" : "";
+        return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}${expuesto ? " verde" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
       }).join("")}
     </tr>`;
   }).join("");
