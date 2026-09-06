@@ -301,16 +301,31 @@ function normaliza(brutas) {
  * cuanto más histórico tengas, más fiable es la referencia.
  */
 function recalcularExposicion() {
-  const techo = {};
+  const registros = {};
   for (const r of DATOS) {
-    const t = techo[r.jugador] || (techo[r.jugador] = { vel:0, acc:0 });
-    t.vel = Math.max(t.vel, Math.abs(r.crudo["Top Speed (m/s)"] || 0));
-    t.acc = Math.max(t.acc, Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0));
+    const t = registros[r.jugador] || (registros[r.jugador] = { vel:[], acc:[] });
+    const v = Math.abs(r.crudo["Top Speed (m/s)"] || 0);
+    const a = Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0);
+    if (v) t.vel.push(v);
+    if (a) t.acc.push(a);
   }
+
+  // Un pico aislado del sensor no debería marcar el techo de todo el año.
+  // Con "segundo" se usa el segundo mejor registro, que ya es repetible.
+  const modo = C.techo || "segundo";
+  const techoDe = lista => {
+    if (!lista.length) return 0;
+    const orden = lista.slice().sort((a, b) => b - a);
+    if (modo === "max" || orden.length < 3) return orden[0];
+    if (modo === "p95") return orden[Math.floor(orden.length * 0.05)];
+    return orden[1];
+  };
+
   for (const r of DATOS) {
-    const t = techo[r.jugador];
-    if (t.vel) r.crudo[PCTVEL] = Math.abs(r.crudo["Top Speed (m/s)"] || 0) / t.vel * 100;
-    if (t.acc) r.crudo[PCTACC] = Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0) / t.acc * 100;
+    const t = registros[r.jugador];
+    const tv = techoDe(t.vel), ta = techoDe(t.acc);
+    if (tv) r.crudo[PCTVEL] = Math.min(100, Math.abs(r.crudo["Top Speed (m/s)"] || 0) / tv * 100);
+    if (ta) r.crudo[PCTACC] = Math.min(100, Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0) / ta * 100);
   }
 }
 
