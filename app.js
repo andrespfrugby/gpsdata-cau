@@ -65,13 +65,11 @@ const TABLA = [
   // Solo las acciones de alta intensidad: por debajo de 3 m/s² no aporta.
   ["Aceleraciones de alta intensidad", [
     "Max Acceleration (m/s/s)", PCTACC,
-    "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s",
-    ACC3, ACC3MIN
+    "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s", ACC3MIN
   ]],
   ["Deceleraciones de alta intensidad", [
     "Max Deceleration (m/s/s)",
-    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s",
-    DEC3, DEC3MIN
+    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s", DEC3MIN
   ]],
   ["Impactos", [
     "Impacts",
@@ -101,8 +99,17 @@ const nombreMetrica = c => {
   if (c === "Impacts" && C.umbralImpacto) return "Impacts  ·  > " + C.umbralImpacto + " G";
   return c;
 };
-/* Versión corta para las cabeceras de la tabla, donde no cabe el nombre entero. */
-const nombreCorto = c => CALCULADAS.includes(c) ? c : c
+/* Versión corta para las cabeceras de la tabla. */
+const CORTOS = {
+  "Top Speed (m/s)": "Top speed (m/s)", [PCTVEL]: "% top speed",
+  "Max Acceleration (m/s/s)": "ACC máx", [PCTACC]: "% ACC máx",
+  "Max Deceleration (m/s/s)": "DECC máx",
+  "Accelerations Zone Count: 3 - 4 m/s/s": "ACC 3-4", "Accelerations Zone Count: > 4 m/s/s": "ACC > 4",
+  "Deceleration Zone Count: 3 - 4 m/s/s": "DECC 3-4", "Deceleration Zone Count: > 4 m/s/s": "DECC > 4",
+  [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min",
+  "Impacts": "Impactos", [HMLD]: "HMLD", [ACC3]: "ACC > 3", [DEC3]: "DECC > 3"
+};
+const nombreCorto = c => CORTOS[c] || (CALCULADAS.includes(c) ? c : c)
   .replace(/Accelerations Zone Count: (.*) m\/s\/s/, "ACC $1 m/s²")
   .replace(/Deceleration Zone Count: (.*) m\/s\/s/, "DECC $1 m/s²")
   .replace(/Max Acceleration.*/, "ACC máx m/s²")
@@ -500,8 +507,13 @@ function panel(col, filas, indice) {
   const tope = alto;
   const suelo = met.escala === "rango" ? Math.max(0, bajo - margen) : 0;
   const ancho = v => Math.max(2, Math.min(100, ((v - suelo) / (tope - suelo || 1)) * 100));
+  // Verde si llega a la media de su propio puesto, morado si no.
+  const mediaPuesto = {};
+  for (const p of [...new Set(filas.map(r => r.posicion))]) {
+    mediaPuesto[p] = mediaDe(filas.filter(r => r.posicion === p), col);
+  }
   const cuerpo = datos.map(d => {
-    const clase = d.v >= media ? "alta" : "";
+    const clase = d.v >= (mediaPuesto[d.pos] || 0) ? "cumple" : "";
     return `<div class="fila">
       <span class="nom" title="${esc(d.pos)}">${esc(d.nom)}</span>
       <span class="pista"><i class="${clase}" style="width:${ancho(d.v).toFixed(1)}%"></i><u style="left:${ancho(media).toFixed(1)}%"></u></span>
@@ -510,15 +522,8 @@ function panel(col, filas, indice) {
   }).join("");
 
   const puestos = [...new Set(filas.map(r => r.posicion))].sort();
-  const pie = puestos.length < 2 ? "" : `<div class="pie">
-    ${puestos.map(p => {
-      const v = mediaDe(filas.filter(r => r.posicion === p), col);
-      return `<div class="fila mini">
-        <span class="nom">${esc(puestoCorto(p))}</span>
-        <span class="pista"><i style="width:${ancho(v).toFixed(1)}%"></i><u style="left:${ancho(media).toFixed(1)}%"></u></span>
-        <span class="val">${nf(v, decMedia(met.dec))}</span>
-      </div>`;
-    }).join("")}
+  const pie = puestos.length < 2 ? "" : `<div class="pie cajas">
+    ${puestos.map(p => `<span class="caja"><b>${nf(mediaPuesto[p], decMedia(met.dec))}</b>${esc(puestoCorto(p))}</span>`).join("")}
   </div>`;
 
   return `<section class="panel">
@@ -692,7 +697,10 @@ function tabla(filas) {
   const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
   const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
 
-  // El mejor valor de cada columna va en negrita, para que la tabla se lea de un vistazo.
+  // El gradiente solo tiñe recuentos y ritmos, no velocidades ni porcentajes.
+  const conGradiente = c => /Zone Count|Impact Zones/.test(c) || c === "Impacts"
+    || c === ACC3MIN || c === DEC3MIN;
+
   const tope = {}, suelo = {};
   for (const c of planas) {
     const v = filas.map(r => Math.abs(r.crudo[c] || 0));
@@ -711,40 +719,29 @@ function tabla(filas) {
         // Sin variación en la columna no se tiñe: un bloque uniforme no informa.
         const rango = tope[c] - suelo[c];
         const t = rango > 0 ? (v - suelo[c]) / rango : 0;
-        let fondo = rango > 0 && v > 0 ? `background:rgba(160,167,216,${(0.05 + t * 0.4).toFixed(3)})` : "";
+        let fondo = conGradiente(c) && rango > 0 && v > 0
+          ? `background:rgba(160,167,216,${(0.05 + t * 0.4).toFixed(3)})` : "";
         // Exposición: verde a partir del umbral, porque ahí sí hubo estímulo.
         const esPct = c === PCTVEL || c === PCTACC;
         const expuesto = esPct && v >= (C.umbralExposicion ?? 85);
         if (esPct) fondo = expuesto ? "background:rgba(110,154,155,.28)" : "";
-        return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}${expuesto ? " verde" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
+        return `<td class="n${expuesto ? " verde" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
       }).join("")}
     </tr>`;
   }).join("");
 
-  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
-  const medias = puestos.map(p => {
-    const suyos = filas.filter(r => r.posicion === p);
-    return `<tr class="media">
-      <td>Media</td><td class="pos">${esc(p)}</td>
-      ${planas.map(c => `<td class="n">${nf(mediaDe(suyos, c), decMedia(dec[c]))}</td>`).join("")}
-    </tr>`;
-  }).join("");
-  const total = `<tr class="media global">
-      <td>Media</td><td class="pos">equipo</td>
-      ${planas.map(c => `<td class="n">${nf(mediaDe(filas, c), decMedia(dec[c]))}</td>`).join("")}
-    </tr>`;
+
 
 
   return `<section class="panel tablon">
     <h3>Velocidad, aceleraciones e impactos</h3>
-    <p class="sub">En negrita el mejor de cada columna · medias por posición al final</p>
+    <p class="sub">Color según el valor dentro de su columna · verde si llega al ${C.umbralExposicion ?? 85}% de su techo</p>
     <div class="scroll"><table class="datos">
       <thead>
         <tr><th></th><th></th>${grupos}</tr>
         <tr><th>Jugador</th><th>Posición</th>${sub}</tr>
       </thead>
       <tbody>${cuerpo}</tbody>
-      <tfoot>${medias}${total}</tfoot>
     </table></div>
   </section>`;
 }
