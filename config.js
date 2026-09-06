@@ -18,6 +18,15 @@ window.CAU_CONFIG = {
     "_defecto": 50
   },
 
+  // Cómo se calcula el techo de cada jugador para los porcentajes de exposición.
+  //   "segundo" -> su segundo mejor registro. Inmune a un pico falso del sensor.
+  //   "max"     -> su mejor registro, sin más.
+  //   "p95"     -> el percentil 95 de sus registros.
+  techo: "segundo",
+
+  // A partir de este % de su techo, la celda de exposición se pinta en verde.
+  umbralExposicion: 85,
+
   // Umbral en G de la columna "Impacts" de Catapult, para etiquetarla bien.
   // Déjalo vacío si no lo sabes: no cambia ningún cálculo, solo el título.
   umbralImpacto: 6,
