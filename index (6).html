@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAU · Reporte de sesión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink-900:#0E1524; --ink-850:#151F33; --ink-800:#1B263B; --ink-700:#26344F; --ink-600:#33445F;
+  --teal:#6E9A9B; --pink:#EFB5B9; --lav:#A0A7D8; --purple:#C7B8E7; --peach:#F5C4AF; --sand:#F0E199; --red:#E63946;
+  --text:#E9EEF7; --text-2:#9EABC2; --text-3:#6B7A94;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--ink-900);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;font-weight:500;margin:0;letter-spacing:-.01em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 64px}
+
+header{border-bottom:1px solid var(--ink-700);background:var(--ink-900);position:sticky;top:0;z-index:20}
+.hd{max-width:1180px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--teal);color:var(--ink-900);display:grid;place-items:center;font-family:'Space Grotesk';font-weight:700;font-size:13px}
+.brand b{font-family:'Space Grotesk';font-weight:500;font-size:16px;display:block;line-height:1.2}
+.brand span{font-size:12px;color:var(--text-3)}
+select,button{font-family:inherit;font-size:13px;color:var(--text);background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--r);padding:7px 10px;height:34px}
+select:hover,button:hover{border-color:var(--ink-600);cursor:pointer}
+select:focus-visible,button:focus-visible,.tab:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.field{display:flex;align-items:center;gap:7px}
+.field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--sand);flex:none}
+.dot.live{background:var(--teal)}
+#estado{font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:7px}
+
+nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700);margin-bottom:22px}
+.tab{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;height:38px;padding:0 16px;color:var(--text-3);font-size:14px}
+.tab[aria-selected=true]{color:var(--text);border-bottom-color:var(--teal)}
+
+.cab{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 20px}
+.cab h2{font-size:20px}
+.cab .meta{font-size:13px;color:var(--text-2)}
+.md{font-family:'Space Grotesk';font-size:12px;letter-spacing:.06em;background:var(--ink-700);color:var(--lav);padding:3px 10px;border-radius:99px}
+.md.partido{background:rgba(239,181,185,.16);color:var(--pink)}
+
+.paneles{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.paneles{grid-template-columns:1fr}}
+.panel{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
+.panel h3{font-size:15px}
+.panel .res{font-size:12px;color:var(--text-3);margin:3px 0 14px;font-family:'IBM Plex Mono'}
+.fila{display:grid;grid-template-columns:104px 1fr 66px;align-items:center;gap:10px;padding:3px 0}
+.fila .nom{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pista{position:relative;height:18px;background:var(--ink-800);border-radius:4px}
+.pista i{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:4px}
+.pista i.alta{background:var(--lav)}
+.pista i.baja{background:var(--ink-600)}
+.pista u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--pink);text-decoration:none}
+.fila .val{font-family:'IBM Plex Mono';font-size:13px;text-align:right}
+.fila:hover .nom{color:var(--text)}
+.leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin-top:12px;padding-top:10px;border-top:1px solid var(--ink-800)}
+.leyenda span{display:flex;align-items:center;gap:6px}
+.sw{width:9px;height:9px;border-radius:2px;display:inline-block}
+.empty{padding:36px 20px;text-align:center;color:var(--text-3);font-size:13px;grid-column:1/-1}
+
+.solo{grid-column:1/-1;max-width:720px}
+.zona{border:2px dashed var(--ink-700);border-radius:14px;padding:38px 24px;text-align:center;background:var(--ink-850);transition:border-color .15s,background .15s}
+.zona.encima{border-color:var(--teal);background:var(--ink-800)}
+.zona h3{font-size:16px;margin-bottom:6px}
+.zona p{font-size:13px;color:var(--text-3);margin:0 0 18px}
+.zona button{background:var(--teal);border-color:var(--teal);color:var(--ink-900);height:38px;padding:0 18px;font-weight:500}
+.resumen{margin-top:18px;background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
+.resumen dl{display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin:0;font-size:13px}
+.resumen dt{color:var(--text-2)}
+.resumen dd{margin:0;font-family:'IBM Plex Mono';text-align:right}
+.aviso{margin-top:14px;padding:10px 14px;border-radius:10px;font-size:13px}
+.aviso.ok{background:rgba(110,154,155,.14);color:var(--teal)}
+.aviso.error{background:rgba(230,57,70,.14);color:#F08A90}
+.aviso.espera{background:var(--ink-800);color:var(--text-2)}
+.pasos{font-size:13px;color:var(--text-3);margin-top:16px;line-height:1.7}
+.pasos code{background:var(--ink-800);padding:1px 6px;border-radius:4px;font-family:'IBM Plex Mono';font-size:12px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd">
+    <div class="brand"><div class="mark">CAU</div><div><b>Reporte de sesión</b><span>GPS · rugby</span></div></div>
+    <div class="field"><label for="fSquad">Equipo</label><select id="fSquad"></select></div>
+    <div class="field"><label for="fFecha">Fecha</label><select id="fFecha" style="max-width:320px"></select></div>
+    <div id="estado"><span class="dot"></span><span id="estadoTxt">Cargando…</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav role="tablist">
+    <button class="tab" role="tab" id="tab-volumen" aria-selected="true">Volumen</button>
+    <button class="tab" role="tab" id="tab-intensidad" aria-selected="false">Intensidad</button>
+    <button class="tab" role="tab" id="tab-cargar" aria-selected="false" style="margin-left:auto">Cargar datos</button>
+  </nav>
+  <div class="cab" id="cab"></div>
+  <div class="paneles" id="paneles"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
