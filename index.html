@@ -58,11 +58,12 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .panel h3{font-size:15px}
 .panel .uni{color:var(--text-3);font-size:12px;font-family:Inter}
 .tit{margin-bottom:14px}
-.cajas{display:flex;gap:8px;margin-top:8px}
-.caja{display:inline-flex;align-items:baseline;gap:8px;background:var(--ink-800);border:1px solid var(--ink-700);
-  border-radius:99px;padding:5px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3)}
-.caja b{font-family:'IBM Plex Mono';font-weight:500;font-size:17px;color:var(--text);letter-spacing:-.01em}
-.caja.destacada{background:rgba(239,181,185,.14)}
+.cajas{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.caja{display:inline-flex;align-items:baseline;gap:6px;background:var(--ink-800);border:1px solid var(--ink-700);
+  border-radius:99px;padding:4px 11px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
+.caja b{font-family:'IBM Plex Mono';font-weight:500;font-size:14px;color:var(--text-2);letter-spacing:-.01em}
+.caja.destacada b{font-size:17px;color:var(--pink)}
+.caja.destacada{background:rgba(239,181,185,.14);border-color:rgba(239,181,185,.3)}
 .caja.destacada b{color:var(--pink)}
 .fila{display:grid;grid-template-columns:110px 1fr 72px;align-items:center;gap:10px;padding:4px 0}
 .fila .nom{font-size:14px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -86,7 +87,10 @@ table.datos td{padding:6px 8px;border-bottom:1px solid var(--ink-800)}
 table.datos td.n{text-align:right;font-family:'IBM Plex Mono'}
 table.datos td.pos{color:var(--text-3)}
 table.datos tbody tr:hover{background:var(--ink-800)}
+table.datos tbody tr.corte td{border-top:1px solid var(--ink-700)}
+table.datos td.n.top{color:var(--pink);font-weight:500}
 table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:none;color:var(--lav);background:rgba(160,167,216,.06)}
+table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,216,.14);font-weight:500}
 .empty{padding:36px 20px;text-align:center;color:var(--text-3);font-size:13px;grid-column:1/-1}
 
 .solo{grid-column:1/-1;max-width:720px}
@@ -132,6 +136,9 @@ table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:
   table.datos{font-size:9.5px}
   table.datos th,table.datos td{color:#111;border-color:#ddd;padding:3px 5px}
   table.datos th.grupo{color:#333;background:#eee}
+  table.datos td.n.top{color:#a3444d;font-weight:600}
+  table.datos tfoot tr.media td{background:#f4f4f4;color:#333}
+  table.datos tfoot tr.media.global td{background:#e8e8e8;color:#111;font-weight:600}
   table.datos td.pos{color:#555}
 }
 </style>
