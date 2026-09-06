@@ -70,7 +70,7 @@ let METRICAS = [];        // catálogo filtrado a lo que hay en los datos
 /* Puestos abreviados, que "Primera línea" no cabe en una pastilla. */
 const ABREV_PUESTO = {
   "Primera línea": "1ª línea", "Segunda línea": "2ª línea",
-  "Tercera línea": "3ª línea", "Tres cuartos": "3/4", "Sin posición": "s/p"
+  "Tercera línea": "3ª línea", "Tres cuartos": "3/4", "Sin posición": "sin puesto"
 };
 const puestoCorto = p => ABREV_PUESTO[p] || p;
 /** Media de una columna para un conjunto de filas. */
