@@ -105,7 +105,12 @@ function parseFecha(v) {
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
   m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-  if (m) return new Date(+m[3] < 100 ? 2000 + +m[3] : +m[3], +m[2] - 1, +m[1]);
+  if (m) {
+    const a = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+    // La hoja está en inglés, así que 9/5/2026 es 5 de septiembre.
+    // Si el primer número pasa de 12 solo puede ser el día.
+    return +m[1] > 12 ? new Date(a, +m[2] - 1, +m[1]) : new Date(a, +m[1] - 1, +m[2]);
+  }
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
@@ -285,7 +290,9 @@ function poblarFechas() {
   for (const r of DATOS.filter(x => x.squad === F.squad)) {
     if (!vistas.has(idSesion(r))) vistas.set(idSesion(r), r);
   }
-  const claves = [...vistas.keys()].sort().reverse();
+  // De la sesión más reciente a la más antigua, por fecha real y no por texto.
+  const claves = [...vistas.keys()].sort((a, b) => vistas.get(b).fecha - vistas.get(a).fecha
+    || vistas.get(a).sesion.localeCompare(vistas.get(b).sesion));
   if (!claves.includes(F.fecha)) F.fecha = claves[0] || "";
   $("#fFecha").innerHTML = claves.map(id => {
     const r = vistas.get(id);
@@ -313,7 +320,8 @@ function decimales(vals) {
   // Recuentos (impactos, aceleraciones) son enteros: no tiene sentido "35,0".
   if (vals.every(v => Number.isInteger(v))) return 0;
   const max = Math.max(...vals.map(Math.abs), 0);
-  return max >= 100 ? 0 : max >= 10 ? 1 : 2;
+  // Distancias con un decimal, como en Catapult; velocidades y ratios con dos.
+  return max >= 100 ? 1 : 2;
 }
 
 function panel(col, filas) {
@@ -344,7 +352,7 @@ function panel(col, filas) {
     <div class="tit">
       <h3>${met.lbl}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
       <div class="cajas">
-        <span class="caja destacada"><b>${nf(media, met.dec)}</b>media del grupo</span>
+        <span class="caja destacada"><b>${nf(media, met.dec)}</b>avg</span>
       </div>
     </div>
     ${cuerpo}
