@@ -38,25 +38,24 @@ const TABLA = [
 ];
 const TODAS_COLUMNAS = () => CATALOGO.concat(TABLA).flatMap(([, c]) => c);
 
-/* Nombres más cortos para que quepan en el desplegable y en el título del panel. */
-const ALIAS_METRICA = {
-  "Impacts": (window.CAU_CONFIG && window.CAU_CONFIG.umbralImpacto)
-    ? "Total (>" + window.CAU_CONFIG.umbralImpacto + " G)" : "Total",
-  "Distance (metres)": "Distancia", "Sprint Distance (m)": "HSR / sprint",
-  "Distance Per Min (m/min)": "Distancia por min", "Top Speed (m/s)": "Velocidad máxima",
-  "Max Acceleration (m/s/s)": "Aceleración máxima", "Max Deceleration (m/s/s)": "Deceleración máxima",
-  "Energy (kcal)": "Energía", "Power Plays": "Power plays",
-  "Power Score (w/kg)": "Power score", "Work Ratio": "Work ratio", "Player Load": "Player load",
-  "Time In Red Zone (min)": "Tiempo en zona roja", "Hr Load": "Carga cardiaca"
+/* Los nombres se dejan tal cual salen en el Sheets, para que no haya dudas
+   de qué columna es cada cosa. Solo se les añade el rango cuando lo tienes
+   configurado, porque el export no lo trae. */
+const RANGOS_ZONA = (C.zonasVelocidad) || {};
+const nombreMetrica = c => {
+  const z = c.match(/Speed Zone (\d)/);
+  if (z && RANGOS_ZONA[z[1]]) return c + "  ·  " + RANGOS_ZONA[z[1]];
+  if (c === "Impacts" && C.umbralImpacto) return "Impacts  ·  > " + C.umbralImpacto + " G";
+  return c;
 };
-const RANGOS_ZONA = (window.CAU_CONFIG && window.CAU_CONFIG.zonasVelocidad) || {};
-const nombreCorto = c => ALIAS_METRICA[c]
-  || c.replace(/Distance in Speed Zone (\d).*/, (_, z) =>
-       "Zona " + z + (RANGOS_ZONA[z] ? " · " + RANGOS_ZONA[z] : ""))
-      .replace(/Accelerations Zone Count: /, "ACC ")
-      .replace(/Deceleration Zone Count: /, "DECC ")
-      .replace(/Impact Zones: /, "").replace(/ \(Impacts\)/, "")
-      .replace(/ m\/s\/s/, "").trim();
+/* Versión corta para las cabeceras de la tabla, donde no cabe el nombre entero. */
+const nombreCorto = c => c
+  .replace(/Accelerations Zone Count: /, "ACC ")
+  .replace(/Deceleration Zone Count: /, "DECC ")
+  .replace(/Impact Zones: /, "").replace(/ \(Impacts\)/, "")
+  .replace(/ m\/s\/s/, "").replace(/Max Acceleration.*/, "Max ACC")
+  .replace(/Max Deceleration.*/, "Max DECC").replace(/Top Speed \(m\/s\)/, "Top speed")
+  .trim();
 
 const UNIDADES = {
   "Distance (metres)":"m", "Sprint Distance (m)":"m", "Distance Per Min (m/min)":"m/min",
@@ -277,21 +276,24 @@ function poblarFiltros() {
   $("#fSquad").innerHTML = squads.map(s => `<option${s === F.squad ? " selected" : ""}>${esc(s)}</option>`).join("");
   poblarFechas();
 }
+/** Cada opción es una sesión concreta: un mismo día puede tener dos eventos. */
+const idSesion = r => r.fechaISO + "|" + r.sesion;
+
 function poblarFechas() {
   if (!$("#fFecha")) return;
   const vistas = new Map();
   for (const r of DATOS.filter(x => x.squad === F.squad)) {
-    if (!vistas.has(r.fechaISO)) vistas.set(r.fechaISO, r);
+    if (!vistas.has(idSesion(r))) vistas.set(idSesion(r), r);
   }
-  const fechas = [...vistas.keys()].sort().reverse();
-  if (!fechas.includes(F.fecha)) F.fecha = fechas[0] || "";
-  $("#fFecha").innerHTML = fechas.map(f => {
-    const r = vistas.get(f);
+  const claves = [...vistas.keys()].sort().reverse();
+  if (!claves.includes(F.fecha)) F.fecha = claves[0] || "";
+  $("#fFecha").innerHTML = claves.map(id => {
+    const r = vistas.get(id);
     const mdTxt = etiquetaMD(r.md);
-    return `<option value="${f}"${f === F.fecha ? " selected" : ""}>${esc(fechaLarga(r.fecha))}${mdTxt ? " · " + mdTxt : ""} · ${esc(r.sesion || r.split)}</option>`;
+    return `<option value="${esc(id)}"${id === F.fecha ? " selected" : ""}>${esc(fechaLarga(r.fecha))}${mdTxt ? " · " + mdTxt : ""} · ${esc(r.sesion || r.split)}</option>`;
   }).join("");
 }
-const sesion = () => DATOS.filter(r => r.squad === F.squad && r.fechaISO === F.fecha);
+const sesion = () => DATOS.filter(r => r.squad === F.squad && idSesion(r) === F.fecha);
 
 /* ---------- pintado ---------- */
 function cabecera() {
@@ -320,7 +322,7 @@ function panel(col, filas) {
   const vals = datos.map(d => d.v);
   const media = vals.reduce((t, v) => t + v, 0) / (vals.length || 1);
   // Rangos estrechos (velocidad, power score) no arrancan en cero o no se distingue nada.
-  const met = { dec: decimales(vals), uni: unidad(col), lbl: nombreCorto(col),
+  const met = { dec: decimales(vals), uni: unidad(col), lbl: nombreMetrica(col),
                 escala: (Math.min(...vals) > 0 && Math.max(...vals) / Math.min(...vals) < 2) ? "rango" : "" };
   const alto = Math.max(...vals), bajo = Math.min(...vals);
   // En intensidad el rango útil es estrecho: si todas las barras arrancan en cero
@@ -342,9 +344,7 @@ function panel(col, filas) {
     <div class="tit">
       <h3>${met.lbl}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
       <div class="cajas">
-        <span class="caja destacada"><b>${nf(media, met.dec)}</b>media</span>
-        <span class="caja"><b>${nf(alto, met.dec)}</b>máx</span>
-        <span class="caja"><b>${nf(bajo, met.dec)}</b>mín</span>
+        <span class="caja destacada"><b>${nf(media, met.dec)}</b>media del grupo</span>
       </div>
     </div>
     ${cuerpo}
@@ -493,7 +493,7 @@ async function guardarEnSheets(u) {
 
 function selectorMetrica(i) {
   const grupos = METRICAS.map(([g, cols]) => `<optgroup label="${esc(g)}">` +
-    cols.map(c => `<option value="${esc(c)}"${c === F.metricas[i] ? " selected" : ""}>${esc(nombreCorto(c))}</option>`).join("") +
+    cols.map(c => `<option value="${esc(c)}"${c === F.metricas[i] ? " selected" : ""}>${esc(nombreMetrica(c))}</option>`).join("") +
     `</optgroup>`).join("");
   return `<select class="selMet" data-i="${i}" aria-label="Métrica ${i + 1}">${grupos}</select>`;
 }
@@ -548,7 +548,7 @@ function pintar() {
       return;
     }
     $("#paneles").innerHTML = `<div class="empty">
-      <p>No hay filas para <b>${esc(F.squad)}</b> en <b>${esc(F.fecha)}</b>.</p>
+      <p>No hay filas para <b>${esc(F.squad)}</b> en <b>${esc(String(F.fecha).replace("|", " · "))}</b>.</p>
       <p style="font-family:'IBM Plex Mono';font-size:12px;margin-top:10px">
         ${DATOS.length} filas cargadas en total · ${delEquipo.length} de este equipo · ${fechas.length} fechas distintas<br>
         equipos detectados: ${[...new Set(DATOS.map(r => r.squad))].map(esc).join(", ") || "ninguno"}
