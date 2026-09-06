@@ -8,7 +8,7 @@ const C = window.CAU_CONFIG || {};
 const CATALOGO = [
   ["Volumen", [
     "Distance (metres)", "Sprint Distance (m)", "Player Load", "Power Plays",
-    "Energy (kcal)", "Impacts", "Hr Load", "Time In Red Zone (min)", "Distance Per Min (m/min)"
+    "Energy (kcal)", "Hr Load", "Time In Red Zone (min)", "Distance Per Min (m/min)"
   ]],
   ["Distancia por zona de velocidad", [
     "Distance in Speed Zone 1  (metres)", "Distance in Speed Zone 2  (metres)",
@@ -19,19 +19,18 @@ const CATALOGO = [
 
 /* Lo que va en la tabla de abajo, sin barras ni medias por jugador. */
 const TABLA = [
-  ["Velocidad", ["Top Speed (m/s)", "Distance Per Min (m/min)", "Power Score (w/kg)", "Work Ratio"]],
+  ["Velocidad", ["Top Speed (m/s)"]],
+  // Solo las acciones de alta intensidad: por debajo de 3 m/s² no aporta.
   ["Aceleraciones", [
     "Max Acceleration (m/s/s)",
-    "Accelerations Zone Count: 1 - 2 m/s/s", "Accelerations Zone Count: 2 - 3 m/s/s",
     "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s"
   ]],
   ["Deceleraciones", [
     "Max Deceleration (m/s/s)",
-    "Deceleration Zone Count: 0 - 1 m/s/s", "Deceleration Zone Count: 1 - 2 m/s/s",
-    "Deceleration Zone Count: 2 - 3 m/s/s", "Deceleration Zone Count: 3 - 4 m/s/s",
-    "Deceleration Zone Count: > 4 m/s/s"
+    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s"
   ]],
-  ["Impactos por G", [
+  ["Impactos", [
+    "Impacts",
     "Impact Zones: 3 - 5 G (Impacts)", "Impact Zones: 5 - 10 G (Impacts)",
     "Impact Zones: 10 - 15 G (Impacts)", "Impact Zones: 15 - 20 G (Impacts)",
     "Impact Zones: > 20 G (Impacts)"
@@ -41,15 +40,19 @@ const TODAS_COLUMNAS = () => CATALOGO.concat(TABLA).flatMap(([, c]) => c);
 
 /* Nombres más cortos para que quepan en el desplegable y en el título del panel. */
 const ALIAS_METRICA = {
+  "Impacts": (window.CAU_CONFIG && window.CAU_CONFIG.umbralImpacto)
+    ? "Total (>" + window.CAU_CONFIG.umbralImpacto + " G)" : "Total",
   "Distance (metres)": "Distancia", "Sprint Distance (m)": "HSR / sprint",
   "Distance Per Min (m/min)": "Distancia por min", "Top Speed (m/s)": "Velocidad máxima",
   "Max Acceleration (m/s/s)": "Aceleración máxima", "Max Deceleration (m/s/s)": "Deceleración máxima",
-  "Energy (kcal)": "Energía", "Impacts": "Impactos", "Power Plays": "Power plays",
+  "Energy (kcal)": "Energía", "Power Plays": "Power plays",
   "Power Score (w/kg)": "Power score", "Work Ratio": "Work ratio", "Player Load": "Player load",
   "Time In Red Zone (min)": "Tiempo en zona roja", "Hr Load": "Carga cardiaca"
 };
+const RANGOS_ZONA = (window.CAU_CONFIG && window.CAU_CONFIG.zonasVelocidad) || {};
 const nombreCorto = c => ALIAS_METRICA[c]
-  || c.replace(/Distance in Speed Zone (\d).*/, "Zona de velocidad $1")
+  || c.replace(/Distance in Speed Zone (\d).*/, (_, z) =>
+       "Zona " + z + (RANGOS_ZONA[z] ? " · " + RANGOS_ZONA[z] : ""))
       .replace(/Accelerations Zone Count: /, "ACC ")
       .replace(/Deceleration Zone Count: /, "DECC ")
       .replace(/Impact Zones: /, "").replace(/ \(Impacts\)/, "")
@@ -70,7 +73,9 @@ let MOTES = {}, POSICIONES = {};   // maestro que llega del Sheets
 let EQUIPO_CARGA = "";             // equipo elegido al arrastrar un CSV sin columna Squad
 const F = { squad:"", fecha:"", pestana:"reporte",
   // Cuatro paneles, como los cuatro selectores del Session Report de Power BI.
-  metricas:["Distance (metres)", "Distance in Speed Zone 4  (metres)"] };
+  metricas:["Distance (metres)", "Sprint Distance (m)", "Player Load",
+            "Distance in Speed Zone 3  (metres)", "Distance in Speed Zone 4  (metres)",
+            "Distance in Speed Zone 5  (metres)"] };
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -303,6 +308,8 @@ function cabecera() {
 
 /** Decimales según el tamaño del número, para no enseñar 2569,68 ni 6 pelado. */
 function decimales(vals) {
+  // Recuentos (impactos, aceleraciones) son enteros: no tiene sentido "35,0".
+  if (vals.every(v => Number.isInteger(v))) return 0;
   const max = Math.max(...vals.map(Math.abs), 0);
   return max >= 100 ? 0 : max >= 10 ? 1 : 2;
 }
@@ -323,7 +330,7 @@ function panel(col, filas) {
   const suelo = met.escala === "rango" ? Math.max(0, bajo - margen) : 0;
   const ancho = v => Math.max(2, Math.min(100, ((v - suelo) / (tope - suelo || 1)) * 100));
   const cuerpo = datos.map(d => {
-    const clase = d.v >= media * 1.1 ? "alta" : d.v <= media * 0.9 ? "baja" : "";
+    const clase = d.v >= media ? "alta" : "";
     return `<div class="fila">
       <span class="nom" title="${esc(d.pos)}">${esc(d.nom)}</span>
       <span class="pista"><i class="${clase}" style="width:${ancho(d.v).toFixed(1)}%"></i><u style="left:${ancho(media).toFixed(1)}%"></u></span>
@@ -332,15 +339,15 @@ function panel(col, filas) {
   }).join("");
 
   return `<section class="panel">
-    <h3>${met.lbl}${met.uni ? ` <span style="color:var(--text-3);font-size:12px">${met.uni}</span>` : ""}</h3>
-    <p class="res">media ${nf(media, met.dec)} · máx ${nf(Math.max(...vals), met.dec)} · mín ${nf(Math.min(...vals), met.dec)}</p>
-    ${cuerpo}
-    <div class="leyenda">
-      <span><i class="sw" style="background:var(--lav)"></i>+10% sobre la media</span>
-      <span><i class="sw" style="background:var(--teal)"></i>en la media</span>
-      <span><i class="sw" style="background:var(--ink-600)"></i>−10% por debajo</span>
-      <span><i class="sw" style="background:var(--pink);width:2px;height:12px;border-radius:0"></i>media del grupo</span>
+    <div class="tit">
+      <h3>${met.lbl}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
+      <div class="cajas">
+        <span class="caja destacada"><b>${nf(media, met.dec)}</b>media</span>
+        <span class="caja"><b>${nf(alto, met.dec)}</b>máx</span>
+        <span class="caja"><b>${nf(bajo, met.dec)}</b>mín</span>
+      </div>
     </div>
+    ${cuerpo}
   </section>`;
 }
 
@@ -501,7 +508,6 @@ function tabla(filas) {
   for (const c of planas) dec[c] = decimales(filas.map(r => Math.abs(r.crudo[c] || 0)));
 
   const jugadores = filas.slice().sort((a, b) => a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador));
-  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
 
   const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
   const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
@@ -511,27 +517,16 @@ function tabla(filas) {
       ${planas.map(c => `<td class="n">${nf(Math.abs(r.crudo[c] || 0), dec[c])}</td>`).join("")}
     </tr>`).join("");
 
-  const medias = puestos.map(p => {
-    const suyos = filas.filter(r => r.posicion === p);
-    return `<tr class="media">
-      <td>Media</td><td class="pos">${esc(p)}</td>
-      ${planas.map(c => {
-        const v = suyos.reduce((t, r) => t + Math.abs(r.crudo[c] || 0), 0) / suyos.length;
-        return `<td class="n">${nf(v, dec[c])}</td>`;
-      }).join("")}
-    </tr>`;
-  }).join("");
 
   return `<section class="panel tablon">
     <h3>Velocidad, aceleraciones e impactos</h3>
-    <p class="sub">Valor de cada jugador y media por posición al final</p>
+    <p class="sub">Valor de cada jugador, ordenado por posición</p>
     <div class="scroll"><table class="datos">
       <thead>
         <tr><th></th><th></th>${grupos}</tr>
         <tr><th>Jugador</th><th>Posición</th>${sub}</tr>
       </thead>
       <tbody>${cuerpo}</tbody>
-      <tfoot>${medias}</tfoot>
     </table></div>
   </section>`;
 }
