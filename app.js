@@ -21,11 +21,11 @@ const CATALOGO = [
 const TABLA = [
   ["Velocidad", ["Top Speed (m/s)"]],
   // Solo las acciones de alta intensidad: por debajo de 3 m/s² no aporta.
-  ["Aceleraciones", [
+  ["Aceleraciones de alta intensidad", [
     "Max Acceleration (m/s/s)",
     "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s"
   ]],
-  ["Deceleraciones", [
+  ["Deceleraciones de alta intensidad", [
     "Max Deceleration (m/s/s)",
     "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s"
   ]],
@@ -50,11 +50,12 @@ const nombreMetrica = c => {
 };
 /* Versión corta para las cabeceras de la tabla, donde no cabe el nombre entero. */
 const nombreCorto = c => c
-  .replace(/Accelerations Zone Count: /, "ACC ")
-  .replace(/Deceleration Zone Count: /, "DECC ")
+  .replace(/Accelerations Zone Count: (.*) m\/s\/s/, "ACC $1 m/s²")
+  .replace(/Deceleration Zone Count: (.*) m\/s\/s/, "DECC $1 m/s²")
+  .replace(/Max Acceleration.*/, "ACC máx m/s²")
+  .replace(/Max Deceleration.*/, "DECC máx m/s²")
+  .replace(/Top Speed \(m\/s\)/, "Top speed m/s")
   .replace(/Impact Zones: /, "").replace(/ \(Impacts\)/, "")
-  .replace(/ m\/s\/s/, "").replace(/Max Acceleration.*/, "Max ACC")
-  .replace(/Max Deceleration.*/, "Max DECC").replace(/Top Speed \(m\/s\)/, "Top speed")
   .trim();
 
 const UNIDADES = {
@@ -65,6 +66,16 @@ const UNIDADES = {
 const unidad = c => UNIDADES[c] || (/Speed Zone/.test(c) ? "m" : /Zone Count|Impact Zones/.test(c) ? "nº" : "");
 
 let METRICAS = [];        // catálogo filtrado a lo que hay en los datos
+
+/* Puestos abreviados, que "Primera línea" no cabe en una pastilla. */
+const ABREV_PUESTO = {
+  "Primera línea": "1ª línea", "Segunda línea": "2ª línea",
+  "Tercera línea": "3ª línea", "Tres cuartos": "3/4", "Sin posición": "s/p"
+};
+const puestoCorto = p => ABREV_PUESTO[p] || p;
+/** Media de una columna para un conjunto de filas. */
+const mediaDe = (filas, col) => filas.length
+  ? filas.reduce((t, r) => t + Math.abs(r.crudo[col] || 0), 0) / filas.length : 0;
 
 
 let DATOS = [];
@@ -327,6 +338,7 @@ function decimales(vals) {
 function panel(col, filas) {
   const datos = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[col] || 0) }))
     .sort((a, b) => b.v - a.v);
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
   const vals = datos.map(d => d.v);
   const media = vals.reduce((t, v) => t + v, 0) / (vals.length || 1);
   // Rangos estrechos (velocidad, power score) no arrancan en cero o no se distingue nada.
@@ -353,6 +365,7 @@ function panel(col, filas) {
       <h3>${met.lbl}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
       <div class="cajas">
         <span class="caja destacada"><b>${nf(media, met.dec)}</b>avg</span>
+        ${puestos.map(p => `<span class="caja"><b>${nf(mediaDe(filas.filter(r => r.posicion === p), col), met.dec)}</b>${esc(puestoCorto(p))}</span>`).join("")}
       </div>
     </div>
     ${cuerpo}
@@ -520,21 +533,47 @@ function tabla(filas) {
   const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
   const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
 
-  const cuerpo = jugadores.map(r => `<tr>
+  // El mejor valor de cada columna va en negrita, para que la tabla se lea de un vistazo.
+  const tope = {};
+  for (const c of planas) tope[c] = Math.max(...filas.map(r => Math.abs(r.crudo[c] || 0)));
+
+  let puestoPrevio = null;
+  const cuerpo = jugadores.map(r => {
+    const cambia = r.posicion !== puestoPrevio;
+    puestoPrevio = r.posicion;
+    return `<tr${cambia ? ' class="corte"' : ""}>
       <td>${esc(r.jugador)}</td><td class="pos">${esc(r.posicion)}</td>
-      ${planas.map(c => `<td class="n">${nf(Math.abs(r.crudo[c] || 0), dec[c])}</td>`).join("")}
-    </tr>`).join("");
+      ${planas.map(c => {
+        const v = Math.abs(r.crudo[c] || 0);
+        return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}">${nf(v, dec[c])}</td>`;
+      }).join("")}
+    </tr>`;
+  }).join("");
+
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const medias = puestos.map(p => {
+    const suyos = filas.filter(r => r.posicion === p);
+    return `<tr class="media">
+      <td>Media</td><td class="pos">${esc(p)}</td>
+      ${planas.map(c => `<td class="n">${nf(mediaDe(suyos, c), dec[c])}</td>`).join("")}
+    </tr>`;
+  }).join("");
+  const total = `<tr class="media global">
+      <td>Media</td><td class="pos">equipo</td>
+      ${planas.map(c => `<td class="n">${nf(mediaDe(filas, c), dec[c])}</td>`).join("")}
+    </tr>`;
 
 
   return `<section class="panel tablon">
     <h3>Velocidad, aceleraciones e impactos</h3>
-    <p class="sub">Valor de cada jugador, ordenado por posición</p>
+    <p class="sub">En negrita el mejor de cada columna · medias por posición al final</p>
     <div class="scroll"><table class="datos">
       <thead>
         <tr><th></th><th></th>${grupos}</tr>
         <tr><th>Jugador</th><th>Posición</th>${sub}</tr>
       </thead>
       <tbody>${cuerpo}</tbody>
+      <tfoot>${medias}${total}</tfoot>
     </table></div>
   </section>`;
 }
