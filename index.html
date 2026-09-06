@@ -45,40 +45,57 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .md{font-family:'Space Grotesk';font-size:12px;letter-spacing:.06em;background:var(--ink-700);color:var(--lav);padding:3px 10px;border-radius:99px}
 .md.partido{background:rgba(239,181,185,.16);color:var(--pink)}
 
-.selectores{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px}
+.selectores{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
 .selectores select{width:100%;height:36px}
 @media(max-width:1200px){.selectores{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.selectores{grid-template-columns:1fr}}
 
 @media print{
-  @page{margin:10mm;size:landscape}
-  body{background:#fff;color:#111}
-  header,nav,.selectores select{display:none}
-  .selectores{display:none}
+  @page{margin:9mm;size:landscape}
+  *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  body{background:#fff;color:#111;font-size:11px}
+  header,nav,.selectores,.leyenda{display:none}
   .wrap{max-width:none;padding:0}
-  .panel{background:#fff;border:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}
-  table.datos th,table.datos td{color:#111;border-color:#ddd}
-  table.datos th.grupo,table.datos tfoot tr.media td{color:#333;background:#f4f4f4;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  .panel h3,.cab h2{color:#111}
-  .pista{background:#eee}
-  .pista i{background:#6E9A9B !important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  .pista i.alta{background:#4a5aa0 !important}
-  .pista i.baja{background:#bbb !important}
-  .fila .nom,.panel .res,.leyenda{color:#444}
-  .cab .meta{color:#444}
+  .cab h2{color:#111;font-size:16px}
+  .cab .meta{color:#333}
+  .paneles{grid-template-columns:repeat(3,1fr);gap:8px}
+  .panel{background:#fff;border:1px solid #bbb;padding:10px 12px;break-inside:avoid;page-break-inside:avoid}
+  .panel h3{color:#111;font-size:12px}
+  .panel .uni,.caja{color:#555}
+  .caja{background:#f2f2f2;padding:4px 6px}
+  .caja b{color:#111;font-size:12px}
+  .caja.destacada{background:#f7e6e8}
+  .caja.destacada b{color:#a3444d}
+  .fila{grid-template-columns:74px 1fr 52px;padding:1.5px 0}
+  .fila .nom{color:#222;font-size:10px}
+  .fila .val{color:#000;font-size:10px;font-weight:500}
+  .pista{height:13px;background:#e8e8e8}
+  .pista i{background:#7f8bbf}
+  .pista i.alta{background:#3c4a8a}
+  .pista u{background:#c0392b;width:2px}
+  table.datos{font-size:9.5px}
+  table.datos th,table.datos td{color:#111;border-color:#ddd;padding:3px 5px}
+  table.datos th.grupo{color:#333;background:#eee}
+  table.datos td.pos{color:#555}
 }
 
 .paneles{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:900px){.paneles{grid-template-columns:1fr}}
 .panel{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
 .panel h3{font-size:15px}
-.panel .res{font-size:12px;color:var(--text-3);margin:3px 0 14px;font-family:'IBM Plex Mono'}
+.panel .uni{color:var(--text-3);font-size:12px;font-family:Inter}
+.tit{margin-bottom:14px}
+.cajas{display:flex;gap:6px;margin-top:8px}
+.caja{flex:1;background:var(--ink-800);border-radius:8px;padding:6px 8px;text-align:center;
+  font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);line-height:1.3}
+.caja b{display:block;font-family:'IBM Plex Mono';font-weight:500;font-size:14px;color:var(--text);letter-spacing:-.01em}
+.caja.destacada{background:rgba(239,181,185,.14)}
+.caja.destacada b{color:var(--pink)}
 .fila{display:grid;grid-template-columns:92px 1fr 60px;align-items:center;gap:10px;padding:3px 0}
 .fila .nom{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pista{position:relative;height:18px;background:var(--ink-800);border-radius:4px}
 .pista i{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:4px}
 .pista i.alta{background:var(--lav)}
-.pista i.baja{background:var(--ink-600)}
 .pista u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--pink);text-decoration:none}
 .fila .val{font-family:'IBM Plex Mono';font-size:13px;text-align:right}
 .fila:hover .nom{color:var(--text)}
