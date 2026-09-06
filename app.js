@@ -346,8 +346,12 @@ async function cargar() {
   if (!fuente) { DATOS = normaliza(demo()); detectarMetricas(); setEstado("Datos de ejemplo · arrastra tu CSV", false); return; }
   try {
     const res = await fetch(fuente, { redirect:"follow" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    if (!res.ok) throw new Error("el servidor respondió HTTP " + res.status);
     const txt = await res.text();
+    if (/<html/i.test(txt.slice(0, 400))) {
+      throw new Error("Google devolvió una página de error. Suele ser que la implementación " +
+        "no está como \"Cualquier usuario\" o que no publicaste una versión nueva tras cambiar el script");
+    }
     let brutas;
     if (txt.trim().startsWith("[") || txt.trim().startsWith("{")) {
       const j = JSON.parse(txt);
@@ -360,6 +364,7 @@ async function cargar() {
         brutas = Array.isArray(j) ? j : (j.datos || j.data || []);
       }
     } else brutas = parseCSV(txt);
+    if (!brutas.length) throw new Error("el Sheets respondió pero no traía ninguna fila");
     DATOS = normaliza(brutas);
     detectarMetricas();
     if (!DATOS.length) {
@@ -370,8 +375,8 @@ async function cargar() {
   } catch (e) {
     DATOS = normaliza(demo());
     detectarMetricas();
-    setEstado("No se pudo leer el Sheets, mostrando el ejemplo", false);
-    console.warn("Origen de datos:", e);
+    setEstado("Datos de ejemplo · " + (e.message || e), false);
+    console.error("No se pudo leer el Sheets:", e);
   }
 }
 function setEstado(txt, live) {
@@ -468,10 +473,23 @@ function panel(col, filas, indice) {
     </div>`;
   }).join("");
 
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const pie = puestos.length < 2 ? "" : `<div class="pie">
+    ${puestos.map(p => {
+      const v = mediaDe(filas.filter(r => r.posicion === p), col);
+      return `<div class="fila mini">
+        <span class="nom">${esc(puestoCorto(p))}</span>
+        <span class="pista"><i style="width:${ancho(v).toFixed(1)}%"></i><u style="left:${ancho(media).toFixed(1)}%"></u></span>
+        <span class="val">${nf(v, decMedia(met.dec))}</span>
+      </div>`;
+    }).join("")}
+  </div>`;
+
   return `<section class="panel">
     ${selectorMetrica(indice)}
-    <div class="avgline"><b>${nf(media, met.dec)}</b> avg${met.uni ? " " + met.uni : ""}</div>
+    <div class="avgline"><b>${nf(media, met.dec)}</b> media del equipo${met.uni ? " · " + met.uni : ""}</div>
     ${cuerpo}
+    ${pie}
   </section>`;
 }
 
@@ -639,8 +657,11 @@ function tabla(filas) {
   const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
 
   // El mejor valor de cada columna va en negrita, para que la tabla se lea de un vistazo.
-  const tope = {};
-  for (const c of planas) tope[c] = Math.max(...filas.map(r => Math.abs(r.crudo[c] || 0)));
+  const tope = {}, suelo = {};
+  for (const c of planas) {
+    const v = filas.map(r => Math.abs(r.crudo[c] || 0));
+    tope[c] = Math.max(...v); suelo[c] = Math.min(...v);
+  }
 
   let puestoPrevio = null;
   const cuerpo = jugadores.map(r => {
@@ -651,8 +672,10 @@ function tabla(filas) {
       ${planas.map(c => {
         const v = Math.abs(r.crudo[c] || 0);
         // Cada celda se tiñe según su valor dentro de su columna, no entre columnas.
-        const t = tope[c] ? v / tope[c] : 0;
-        const fondo = v > 0 ? `background:rgba(160,167,216,${(0.04 + t * 0.42).toFixed(3)})` : "";
+        // Sin variación en la columna no se tiñe: un bloque uniforme no informa.
+        const rango = tope[c] - suelo[c];
+        const t = rango > 0 ? (v - suelo[c]) / rango : 0;
+        const fondo = rango > 0 && v > 0 ? `background:rgba(160,167,216,${(0.05 + t * 0.4).toFixed(3)})` : "";
         return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
       }).join("")}
     </tr>`;
