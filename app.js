@@ -76,6 +76,8 @@ const puestoCorto = p => ABREV_PUESTO[p] || p;
 /** Media de una columna para un conjunto de filas. */
 const mediaDe = (filas, col) => filas.length
   ? filas.reduce((t, r) => t + Math.abs(r.crudo[col] || 0), 0) / filas.length : 0;
+/** Una media de recuentos enteros se enseña con un decimal: 6,3 dice más que 6. */
+const decMedia = d => d === 0 ? 1 : d;
 
 
 let DATOS = [];
@@ -330,9 +332,7 @@ function cabecera() {
 function decimales(vals) {
   // Recuentos (impactos, aceleraciones) son enteros: no tiene sentido "35,0".
   if (vals.every(v => Number.isInteger(v))) return 0;
-  const max = Math.max(...vals.map(Math.abs), 0);
-  // Distancias con un decimal, como en Catapult; velocidades y ratios con dos.
-  return max >= 100 ? 1 : 2;
+  return 2;
 }
 
 function panel(col, filas) {
@@ -365,7 +365,7 @@ function panel(col, filas) {
       <h3>${met.lbl}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
       <div class="cajas">
         <span class="caja destacada"><b>${nf(media, met.dec)}</b>avg</span>
-        ${puestos.map(p => `<span class="caja"><b>${nf(mediaDe(filas.filter(r => r.posicion === p), col), met.dec)}</b>${esc(puestoCorto(p))}</span>`).join("")}
+        ${puestos.map(p => `<span class="caja"><b>${nf(mediaDe(filas.filter(r => r.posicion === p), col), decMedia(met.dec))}</b>${esc(puestoCorto(p))}</span>`).join("")}
       </div>
     </div>
     ${cuerpo}
@@ -521,7 +521,9 @@ function selectorMetrica(i) {
 
 /** Tabla compacta: valores por jugador y, al final, la media de cada posición. */
 function tabla(filas) {
-  const cols = TABLA.map(([g, c]) => [g, c.filter(x => filas.some(r => Math.abs(r.crudo[x] || 0) > 0))])
+  // Aquí no se esconden las columnas vacías: un cero en impactos de 15-20 G
+  // es información, no un hueco. Solo se quitan las que no existen en el origen.
+  const cols = TABLA.map(([g, c]) => [g, c.filter(x => filas.some(r => x in r.crudo))])
                     .filter(([, c]) => c.length);
   if (!cols.length) return "";
   const planas = cols.flatMap(([, c]) => c);
@@ -555,12 +557,12 @@ function tabla(filas) {
     const suyos = filas.filter(r => r.posicion === p);
     return `<tr class="media">
       <td>Media</td><td class="pos">${esc(p)}</td>
-      ${planas.map(c => `<td class="n">${nf(mediaDe(suyos, c), dec[c])}</td>`).join("")}
+      ${planas.map(c => `<td class="n">${nf(mediaDe(suyos, c), decMedia(dec[c]))}</td>`).join("")}
     </tr>`;
   }).join("");
   const total = `<tr class="media global">
       <td>Media</td><td class="pos">equipo</td>
-      ${planas.map(c => `<td class="n">${nf(mediaDe(filas, c), dec[c])}</td>`).join("")}
+      ${planas.map(c => `<td class="n">${nf(mediaDe(filas, c), decMedia(dec[c]))}</td>`).join("")}
     </tr>`;
 
 
