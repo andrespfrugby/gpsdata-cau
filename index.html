@@ -50,34 +50,7 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 @media(max-width:1200px){.selectores{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.selectores{grid-template-columns:1fr}}
 
-@media print{
-  @page{margin:9mm;size:landscape}
-  *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  body{background:#fff;color:#111;font-size:11px}
-  header,nav,.selectores,.leyenda{display:none}
-  .wrap{max-width:none;padding:0}
-  .cab h2{color:#111;font-size:16px}
-  .cab .meta{color:#333}
-  .paneles{grid-template-columns:repeat(3,1fr);gap:8px}
-  .panel{background:#fff;border:1px solid #bbb;padding:10px 12px;break-inside:avoid;page-break-inside:avoid}
-  .panel h3{color:#111;font-size:12px}
-  .panel .uni,.caja{color:#555}
-  .caja{background:#f2f2f2;padding:4px 6px}
-  .caja b{color:#111;font-size:12px}
-  .caja.destacada{background:#f7e6e8}
-  .caja.destacada b{color:#a3444d}
-  .fila{grid-template-columns:74px 1fr 52px;padding:1.5px 0}
-  .fila .nom{color:#222;font-size:10px}
-  .fila .val{color:#000;font-size:10px;font-weight:500}
-  .pista{height:13px;background:#e8e8e8}
-  .pista i{background:#7f8bbf}
-  .pista i.alta{background:#3c4a8a}
-  .pista u{background:#c0392b;width:2px}
-  table.datos{font-size:9.5px}
-  table.datos th,table.datos td{color:#111;border-color:#ddd;padding:3px 5px}
-  table.datos th.grupo{color:#333;background:#eee}
-  table.datos td.pos{color:#555}
-}
+
 
 .paneles{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:900px){.paneles{grid-template-columns:1fr}}
@@ -133,6 +106,34 @@ table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:
 .pasos{font-size:13px;color:var(--text-3);margin-top:16px;line-height:1.7}
 .pasos code{background:var(--ink-800);padding:1px 6px;border-radius:4px;font-family:'IBM Plex Mono';font-size:12px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media print{
+  @page{margin:9mm;size:landscape}
+  *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  body{background:#fff;color:#111;font-size:11px}
+  header,nav,.selectores,.leyenda{display:none}
+  .wrap{max-width:none;padding:0}
+  .cab h2{color:#111;font-size:16px}
+  .cab .meta{color:#333}
+  .paneles{grid-template-columns:repeat(3,1fr);gap:8px}
+  .panel{background:#fff;border:1px solid #bbb;padding:10px 12px;break-inside:avoid;page-break-inside:avoid}
+  .panel h3{color:#111;font-size:12px}
+  .panel .uni,.caja{color:#555}
+  .caja{background:#f2f2f2;padding:4px 6px}
+  .caja b{color:#111;font-size:12px}
+  .caja.destacada{background:#f7e6e8}
+  .caja.destacada b{color:#a3444d}
+  .fila{grid-template-columns:74px 1fr 52px;padding:1.5px 0}
+  .fila .nom{color:#222;font-size:10px}
+  .fila .val{color:#000;font-size:10px;font-weight:500}
+  .pista{height:13px;background:#e8e8e8}
+  .pista i{background:#7f8bbf}
+  .pista i.alta{background:#3c4a8a}
+  .pista u{background:#c0392b;width:2px}
+  table.datos{font-size:9.5px}
+  table.datos th,table.datos td{color:#111;border-color:#ddd;padding:3px 5px}
+  table.datos th.grupo{color:#333;background:#eee}
+  table.datos td.pos{color:#555}
+}
 </style>
 </head>
 <body>
