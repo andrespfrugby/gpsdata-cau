@@ -1,10 +1,16 @@
 // Ajustes del dashboard. Edita solo este archivo para conectarlo a tu Sheets.
 window.CAU_CONFIG = {
 
-  // URL de la aplicación web de Apps Script, la que acaba en /exec.
-  // Sirve para las dos cosas: leer el histórico al abrir y guardar lo que arrastras.
-  // Si la dejas vacía, la app funciona igual pero solo con lo que cargues a mano.
+  // DE DÓNDE SE LEE. Admite dos cosas:
+  //   a) La URL /exec del Apps Script.
+  //   b) La URL del Sheets publicado como CSV (acaba en output=csv).
+  // La opción b nunca da problemas de permisos, así que si ves "Failed to fetch"
+  // publica la hoja Import Data como CSV y pega aquí esa URL.
   fuente: "https://script.google.com/macros/s/AKfycbzlNs1QIG0zcwVE-Y779hZPoe1YwmRmLlckW19E_mUiURtqSTGQZ_rbAI5kUlcXeLV1ow/exec",
+
+  // DÓNDE SE GUARDA lo que arrastras. Siempre la URL /exec.
+  // Si la dejas vacía se usa "fuente", que es lo correcto cuando fuente ya es /exec.
+  endpoint: "",
 
   // Tiene que ser idéntica a la constante CLAVE del Codigo.gs.
   clave: "cau2026",
