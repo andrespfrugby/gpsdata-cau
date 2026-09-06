@@ -57,12 +57,7 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .panel .selMet{width:100%;height:40px;font-size:14px;margin-bottom:11px}
 .avgline{font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:13px}
 .avgline b{font-family:'IBM Plex Mono';font-size:26px;color:var(--pink);font-weight:500;letter-spacing:-.01em;vertical-align:-2px;margin-right:4px}
-.pie{margin-top:12px;padding-top:10px;border-top:1px solid var(--ink-700)}
-.fila.mini{padding:2px 0}
-.fila.mini .nom{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3)}
-.fila.mini .pista{height:12px;background:var(--ink-900)}
-.fila.mini .pista i{background:var(--text-3)}
-.fila.mini .val{font-size:13px;color:var(--text-2)}
+.pie{margin-top:13px;padding-top:11px;border-top:1px solid var(--ink-700)}
 
 
 
@@ -83,7 +78,8 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .fila .nom{font-size:15px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pista{position:relative;height:24px;background:var(--ink-800);border-radius:5px}
 .pista i{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:4px}
-.pista i.alta{background:var(--lav)}
+.pista i{background:var(--lav)}
+.pista i.cumple{background:var(--teal)}
 .pista u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--pink);text-decoration:none}
 .fila .val{font-family:'IBM Plex Mono';font-size:15px;text-align:right;color:var(--text)}
 .fila:hover .nom{color:var(--text)}
@@ -129,7 +125,6 @@ table.datos td.n{text-align:right;font-family:'IBM Plex Mono'}
 table.datos td.pos{color:var(--text-3)}
 table.datos tbody tr:hover{background:var(--ink-800)}
 table.datos tbody tr.corte td{border-top:1px solid var(--ink-700)}
-table.datos td.n.top{color:var(--pink);font-weight:500}
 table.datos td.n.verde{color:var(--teal);font-weight:500}
 table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:none;color:var(--lav);background:rgba(160,167,216,.06)}
 table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,216,.14);font-weight:500}
@@ -189,10 +184,8 @@ table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,2
   .medalla{background:#f7f7f7;border:1px solid #ddd}
   .medalla .cab b,.medalla li .val,.medalla li.p1 .qui{color:#111}
   .medalla li .qui,.medalla li .nom2{color:#333}
-  table.datos td.n.top{color:#a3444d;font-weight:600}
   table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
-  table.datos tfoot tr.media td{background:#f4f4f4;color:#333}
-  table.datos tfoot tr.media.global td{background:#e8e8e8;color:#111;font-weight:600}
+
   table.datos td.pos{color:#555}
 }
 </style>
