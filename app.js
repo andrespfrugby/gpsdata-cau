@@ -512,7 +512,7 @@ function vistaCargar() {
       <input type="file" id="inpFichero" accept=".csv,.xlsx,.xls" hidden>
     </div>
     <div id="salida"></div>
-    ${C.fuente ? "" : `<p class="pasos">Todavía no has puesto la URL de tu Sheets en <code>config.js</code>, así que lo que cargues se verá pero no se guardará al cerrar.</p>`}
+    ${(C.endpoint || /\/exec/.test(C.fuente || "")) ? "" : `<p class="pasos">Para que lo que cargues quede guardado, pon la URL <code>/exec</code> en <code>endpoint</code> dentro de <code>config.js</code>. Sin eso, los datos se ven pero se pierden al cerrar.</p>`}
   </div>`;
 
   // El CSV de Catapult no trae columna Squad, así que hay que decirlo aquí.
@@ -569,7 +569,7 @@ async function leerFichero(file) {
                fechas:[...new Set(nuevas.map(r => r.fechaISO))].sort() };
     poblarFiltros();
     mostrarResumen(ULTIMO);
-    if (C.fuente) guardarEnSheets(ULTIMO);
+    if (C.endpoint || /\/exec/.test(C.fuente || "")) guardarEnSheets(ULTIMO);
   } catch (err) {
     $("#salida").innerHTML = `<div class="aviso error">No he podido leerlo: ${esc(err.message)}</div>`;
     console.error(err);
@@ -600,7 +600,7 @@ function mostrarResumen(u) {
       <dt>Filas usadas</dt><dd>${nf(u.validas)} · el resto son splits parciales</dd>
     </dl>
   </div>
-  ${u.guardado === null ? (C.fuente ? `<div class="aviso espera" id="estadoGuardado">Guardando en el Sheets…</div>` : "")
+  ${u.guardado === null ? ((C.endpoint || /\/exec/.test(C.fuente || "")) ? `<div class="aviso espera" id="estadoGuardado">Guardando en el Sheets…</div>` : "")
     : u.guardado.ok ? `<div class="aviso ok" id="estadoGuardado">Guardado en Import Data. ${nf(u.guardado.nuevas)} filas nuevas y ${nf(u.guardado.actualizadas)} sustituidas · ${nf(u.guardado.total)} filas en total.</div>`
     : `<div class="aviso error" id="estadoGuardado">No se pudo guardar: ${esc(u.guardado.error)}. Los datos se ven igual, pero se perderán al cerrar.</div>`}
   <p class="pasos">Ya puedes ir a <b>Reporte</b> y elegir la fecha.</p>`;
@@ -616,7 +616,7 @@ async function guardarEnSheets(u) {
       if ($("#estadoGuardado")) {
         $("#estadoGuardado").textContent = `Guardando en el Sheets… ${Math.min(i + trozo, filas.length)} de ${filas.length}`;
       }
-      const res = await fetch(C.fuente, {
+      const res = await fetch(C.endpoint || C.fuente, {
         method:"POST", redirect:"follow",
         headers:{ "Content-Type":"text/plain;charset=utf-8" },   // texto plano: evita el bloqueo del navegador
         body: JSON.stringify({ clave: C.clave || "", equipo: EQUIPO_CARGA, valores: parte })
