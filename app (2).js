@@ -2,29 +2,70 @@
 "use strict";
 const C = window.CAU_CONFIG || {};
 
-/* Métricas de cada pestaña. dec = decimales, ref = con qué comparar la barra. */
-const PESTANAS = {
-  cargar: [],
-  volumen: [
-    { id:"distancia",  lbl:"Distancia total", uni:"m",  dec:0 },
-    { id:"hmld",       lbl:"HMLD",            uni:"m",  dec:0 },
-    { id:"sprint",     lbl:"HSR / sprint distance", uni:"m", dec:0 },
-    { id:"powerPlays", lbl:"Power plays",     uni:"",   dec:0 },
-    { id:"playerLoad", lbl:"Player load",     uni:"",   dec:0 }
-  ],
-  intensidad: [
-    { id:"mMin",       lbl:"Distancia por min", uni:"m/min", dec:1, escala:"rango" },
-    { id:"hmldMin",    lbl:"HMLD por min",      uni:"m/min", dec:2 },
-    { id:"accDecMin",  lbl:"ACC + DECC >3 por min", uni:"/min", dec:2, escala:"rango" },
-    { id:"vmax",       lbl:"Velocidad máxima",  uni:"m/s",   dec:2, escala:"rango" },
-    { id:"pctVmax",    lbl:"% de su Vmax",      uni:"%",     dec:1, min:0, max:100, marca:"umbral", color:"vmax" }
-  ]
-};
+/* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
+   las que traen datos: si una viene entera a cero (Hr Load, por ejemplo), se oculta. */
+const CATALOGO = [
+  ["Volumen", [
+    "Distance (metres)", "Sprint Distance (m)", "Player Load", "Power Plays",
+    "Energy (kcal)", "Impacts", "Hr Load", "Time In Red Zone (min)"
+  ]],
+  ["Intensidad", [
+    "Distance Per Min (m/min)", "Top Speed (m/s)", "Power Score (w/kg)", "Work Ratio",
+    "Max Acceleration (m/s/s)", "Max Deceleration (m/s/s)"
+  ]],
+  ["Zonas de velocidad", [
+    "Distance in Speed Zone 1  (metres)", "Distance in Speed Zone 2  (metres)",
+    "Distance in Speed Zone 3  (metres)", "Distance in Speed Zone 4  (metres)",
+    "Distance in Speed Zone 5  (metres)"
+  ]],
+  ["Aceleraciones", [
+    "Accelerations Zone Count: 1 - 2 m/s/s", "Accelerations Zone Count: 2 - 3 m/s/s",
+    "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s"
+  ]],
+  ["Deceleraciones", [
+    "Deceleration Zone Count: 0 - 1 m/s/s", "Deceleration Zone Count: 1 - 2 m/s/s",
+    "Deceleration Zone Count: 2 - 3 m/s/s", "Deceleration Zone Count: 3 - 4 m/s/s",
+    "Deceleration Zone Count: > 4 m/s/s"
+  ]],
+  ["Impactos por G", [
+    "Impact Zones: 3 - 5 G (Impacts)", "Impact Zones: 5 - 10 G (Impacts)",
+    "Impact Zones: 10 - 15 G (Impacts)", "Impact Zones: 15 - 20 G (Impacts)",
+    "Impact Zones: > 20 G (Impacts)"
+  ]]
+];
 
-let DATOS = [], VMAX = {};
+/* Nombres más cortos para que quepan en el desplegable y en el título del panel. */
+const ALIAS_METRICA = {
+  "Distance (metres)": "Distancia", "Sprint Distance (m)": "HSR / sprint",
+  "Distance Per Min (m/min)": "Distancia por min", "Top Speed (m/s)": "Velocidad máxima",
+  "Max Acceleration (m/s/s)": "Aceleración máxima", "Max Deceleration (m/s/s)": "Deceleración máxima",
+  "Energy (kcal)": "Energía", "Impacts": "Impactos", "Power Plays": "Power plays",
+  "Power Score (w/kg)": "Power score", "Work Ratio": "Work ratio", "Player Load": "Player load",
+  "Time In Red Zone (min)": "Tiempo en zona roja", "Hr Load": "Carga cardiaca"
+};
+const nombreCorto = c => ALIAS_METRICA[c]
+  || c.replace(/Distance in Speed Zone (\d).*/, "Zona de velocidad $1")
+      .replace(/Accelerations Zone Count: /, "ACC ")
+      .replace(/Deceleration Zone Count: /, "DECC ")
+      .replace(/Impact Zones: /, "").replace(/ \(Impacts\)/, "")
+      .replace(/ m\/s\/s/, "").trim();
+
+const UNIDADES = {
+  "Distance (metres)":"m", "Sprint Distance (m)":"m", "Distance Per Min (m/min)":"m/min",
+  "Top Speed (m/s)":"m/s", "Max Acceleration (m/s/s)":"m/s²", "Max Deceleration (m/s/s)":"m/s²",
+  "Energy (kcal)":"kcal", "Power Score (w/kg)":"w/kg", "Time In Red Zone (min)":"min"
+};
+const unidad = c => UNIDADES[c] || (/Speed Zone/.test(c) ? "m" : /Zone Count|Impact Zones/.test(c) ? "nº" : "");
+
+let METRICAS = [];        // catálogo filtrado a lo que hay en los datos
+
+
+let DATOS = [];
 let MOTES = {}, POSICIONES = {};   // maestro que llega del Sheets
 let EQUIPO_CARGA = "";             // equipo elegido al arrastrar un CSV sin columna Squad
-const F = { squad:"", fecha:"", pestana:"volumen" };
+const F = { squad:"", fecha:"", pestana:"reporte",
+  // Cuatro paneles, como los cuatro selectores del Session Report de Power BI.
+  metricas:["Distance (metres)", "Player Load", "Distance Per Min (m/min)", "Top Speed (m/s)"] };
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -133,12 +174,6 @@ function normaliza(brutas) {
     if (!minutos) minutos = Math.round(num(get("duracionSeg")) / 60);
     if (minutos <= 0 || minutos < (C.minutosMinimos ?? 0)) continue;
 
-    let hmld = num(get("hmld"));
-    if (!hmld) hmld = ["pz25","pz30","pz35","pz40","pz45","pz50"].reduce((t, k) => t + num(get(k)), 0);
-
-    const acc3 = get("acc3") !== undefined ? num(get("acc3")) : num(get("acc34")) + num(get("accM4"));
-    const dec3 = get("dec3") !== undefined ? num(get("dec3")) : num(get("dec34")) + num(get("decM4"));
-
     const sesion = String(get("sesion") || "").trim();
     const etiquetas = String(get("tags") || "").trim().toLowerCase();
     // El split manda: en un triangular el tag pone "training" aunque sean partidos.
@@ -148,18 +183,18 @@ function normaliza(brutas) {
     const mdCol = get("md");
     const md = mdCol !== undefined && mdCol !== "" ? num(mdCol) : (esPartido ? 0 : leerMD(sesion));
 
-    const distancia = num(get("distancia"));
+    // Guardamos las columnas del catálogo tal cual vienen, sin recalcular nada.
+    const crudo = {};
+    for (const [, cols] of CATALOGO) {
+      for (const col of cols) if (clave(col) in m) crudo[col] = num(m[clave(col)]);
+    }
+
     salida.push({
+      crudo,
       squad: String(get("squad") || EQUIPO_CARGA || "Senior").trim(),
       fecha, fechaISO: iso(fecha), sesion, jugador, alias, split, md, esPartido,
       posicion: String(get("posicion") || "").trim() || POSICIONES[jugador] || "Sin posición",
-      minutos, distancia, sprint: num(get("sprint")),
-      playerLoad: num(get("playerLoad")), vmax: num(get("vmax")),
-      powerPlays: num(get("powerPlays")), impactos: num(get("impactos")),
-      hmld, acc3, dec3, accDec: acc3 + dec3,
-      mMin: num(get("mMin")) || (minutos ? distancia / minutos : 0),
-      hmldMin: minutos ? hmld / minutos : 0,
-      accDecMin: minutos ? (acc3 + dec3) / minutos : 0
+      minutos
     });
   }
   // Si de la misma sesión llega el split completo y además "all", nos quedamos con el completo.
@@ -171,16 +206,23 @@ function normaliza(brutas) {
   }
   salida = [...porSesion.values()];
   salida.sort((a, b) => a.fecha - b.fecha);
-  VMAX = {};
-  for (const r of salida) if (r.vmax > (VMAX[r.jugador] || 0)) VMAX[r.jugador] = r.vmax;
-  for (const r of salida) r.pctVmax = VMAX[r.jugador] ? (r.vmax / VMAX[r.jugador]) * 100 : 0;
   return salida;
 }
+
+/** Deja en METRICAS solo las columnas que existen y traen algún valor distinto de cero. */
+function detectarMetricas() {
+  METRICAS = [];
+  for (const [grupo, cols] of CATALOGO) {
+    const vivas = cols.filter(c => DATOS.some(r => Math.abs(r.crudo[c] || 0) > 0));
+    if (vivas.length) METRICAS.push([grupo, vivas]);
+  }
+}
+const todasMetricas = () => METRICAS.flatMap(([, c]) => c);
 
 async function cargar() {
   const fuente = (C.fuente || "").trim();
   setEstado("Cargando…", false);
-  if (!fuente) { DATOS = normaliza(demo()); setEstado("Datos de ejemplo · arrastra tu CSV", false); return; }
+  if (!fuente) { DATOS = normaliza(demo()); detectarMetricas(); setEstado("Datos de ejemplo · arrastra tu CSV", false); return; }
   try {
     const res = await fetch(fuente, { redirect:"follow" });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -193,6 +235,7 @@ async function cargar() {
       if (j.posiciones) POSICIONES = j.posiciones;
     } else brutas = parseCSV(txt);
     DATOS = normaliza(brutas);
+    detectarMetricas();
     if (!DATOS.length) {
       setEstado("Conectado · histórico vacío, arrastra tu CSV", true);
       return;
@@ -200,6 +243,7 @@ async function cargar() {
     setEstado("Conectado · " + DATOS.length + " sesiones", true);
   } catch (e) {
     DATOS = normaliza(demo());
+    detectarMetricas();
     setEstado("No se pudo leer el Sheets, mostrando el ejemplo", false);
     console.warn("Origen de datos:", e);
   }
@@ -245,28 +289,32 @@ function cabecera() {
     <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
 }
 
-function panel(met, filas) {
-  const datos = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:r[met.id] || 0 }))
+/** Decimales según el tamaño del número, para no enseñar 2569,68 ni 6 pelado. */
+function decimales(vals) {
+  const max = Math.max(...vals.map(Math.abs), 0);
+  return max >= 100 ? 0 : max >= 10 ? 1 : 2;
+}
+
+function panel(col, filas) {
+  const datos = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[col] || 0) }))
     .sort((a, b) => b.v - a.v);
   const vals = datos.map(d => d.v);
   const media = vals.reduce((t, v) => t + v, 0) / (vals.length || 1);
+  // Rangos estrechos (velocidad, power score) no arrancan en cero o no se distingue nada.
+  const met = { dec: decimales(vals), uni: unidad(col), lbl: nombreCorto(col),
+                escala: (Math.min(...vals) > 0 && Math.max(...vals) / Math.min(...vals) < 2) ? "rango" : "" };
   const alto = Math.max(...vals), bajo = Math.min(...vals);
   // En intensidad el rango útil es estrecho: si todas las barras arrancan en cero
   // no se distingue nada, así que la escala empieza justo por debajo del peor dato.
   const margen = (alto - bajo) * 0.12 || 1;
-  const tope = met.max ?? alto;
-  const suelo = met.min ?? (met.escala === "rango" ? Math.max(0, bajo - margen) : 0);
+  const tope = alto;
+  const suelo = met.escala === "rango" ? Math.max(0, bajo - margen) : 0;
   const ancho = v => Math.max(2, Math.min(100, ((v - suelo) / (tope - suelo || 1)) * 100));
-  const umbral = (C.vmax && C.vmax.estimulo) || 90;
-  const marcaEn = met.marca === "umbral" ? umbral : media;
-
   const cuerpo = datos.map(d => {
-    const clase = met.color === "vmax"
-      ? (d.v >= umbral ? "alta" : d.v >= ((C.vmax && C.vmax.aviso) || 85) ? "" : "baja")
-      : (d.v >= media * 1.1 ? "alta" : d.v <= media * 0.9 ? "baja" : "");
+    const clase = d.v >= media * 1.1 ? "alta" : d.v <= media * 0.9 ? "baja" : "";
     return `<div class="fila">
       <span class="nom" title="${esc(d.pos)}">${esc(d.nom)}</span>
-      <span class="pista"><i class="${clase}" style="width:${ancho(d.v).toFixed(1)}%"></i><u style="left:${ancho(marcaEn).toFixed(1)}%"></u></span>
+      <span class="pista"><i class="${clase}" style="width:${ancho(d.v).toFixed(1)}%"></i><u style="left:${ancho(media).toFixed(1)}%"></u></span>
       <span class="val">${nf(d.v, met.dec)}</span>
     </div>`;
   }).join("");
@@ -275,15 +323,11 @@ function panel(met, filas) {
     <h3>${met.lbl}${met.uni ? ` <span style="color:var(--text-3);font-size:12px">${met.uni}</span>` : ""}</h3>
     <p class="res">media ${nf(media, met.dec)} · máx ${nf(Math.max(...vals), met.dec)} · mín ${nf(Math.min(...vals), met.dec)}</p>
     ${cuerpo}
-    <div class="leyenda">${met.color === "vmax" ? `
-      <span><i class="sw" style="background:var(--lav)"></i>llega al ${umbral}%</span>
-      <span><i class="sw" style="background:var(--teal)"></i>entre ${(C.vmax && C.vmax.aviso) || 85} y ${umbral}%</span>
-      <span><i class="sw" style="background:var(--ink-600)"></i>sin estímulo</span>
-      <span><i class="sw" style="background:var(--pink);width:2px;height:12px;border-radius:0"></i>umbral ${umbral}%</span>` : `
+    <div class="leyenda">
       <span><i class="sw" style="background:var(--lav)"></i>+10% sobre la media</span>
       <span><i class="sw" style="background:var(--teal)"></i>en la media</span>
       <span><i class="sw" style="background:var(--ink-600)"></i>−10% por debajo</span>
-      <span><i class="sw" style="background:var(--pink);width:2px;height:12px;border-radius:0"></i>media del grupo</span>`}
+      <span><i class="sw" style="background:var(--pink);width:2px;height:12px;border-radius:0"></i>media del grupo</span>
     </div>
   </section>`;
 }
@@ -293,6 +337,7 @@ let ULTIMO = null;   // resultado del último fichero leído
 
 function vistaCargar() {
   $("#cab").innerHTML = "";
+  $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = `<div class="solo">
     <div class="zona" id="zona">
       <h3>Arrastra aquí el CSV de Catapult</h3>
@@ -374,9 +419,7 @@ function fusionar(nuevas) {
   const mapa = new Map(DATOS.map(r => [llave(r), r]));
   for (const r of nuevas) mapa.set(llave(r), r);
   DATOS = [...mapa.values()].sort((a, b) => a.fecha - b.fecha);
-  VMAX = {};
-  for (const r of DATOS) if (r.vmax > (VMAX[r.jugador] || 0)) VMAX[r.jugador] = r.vmax;
-  for (const r of DATOS) r.pctVmax = VMAX[r.jugador] ? (r.vmax / VMAX[r.jugador]) * 100 : 0;
+  detectarMetricas();
   setEstado(DATOS.length + " sesiones cargadas", true);
 }
 
@@ -426,6 +469,13 @@ async function guardarEnSheets(u) {
   if (F.pestana === "cargar") mostrarResumen(u);
 }
 
+function selectorMetrica(i) {
+  const grupos = METRICAS.map(([g, cols]) => `<optgroup label="${esc(g)}">` +
+    cols.map(c => `<option value="${esc(c)}"${c === F.metricas[i] ? " selected" : ""}>${esc(nombreCorto(c))}</option>`).join("") +
+    `</optgroup>`).join("");
+  return `<select class="selMet" data-i="${i}" aria-label="Métrica ${i + 1}">${grupos}</select>`;
+}
+
 function pintar() {
   if (F.pestana === "cargar") return vistaCargar();
   cabecera();
@@ -442,13 +492,28 @@ function pintar() {
       </p></div>`;
     return;
   }
-  $("#paneles").innerHTML = PESTANAS[F.pestana].map(m => panel(m, filas)).join("");
+  // Si la métrica guardada ya no existe en estos datos, se coge otra de las que hay.
+  const disponibles = todasMetricas();
+  if (!disponibles.length) {
+    $("#selectores").innerHTML = "";
+    $("#paneles").innerHTML = `<p class="empty">Los datos cargados no traen ninguna de las métricas del catálogo.</p>`;
+    return;
+  }
+  F.metricas = F.metricas.map((m, i) => disponibles.includes(m) ? m : (disponibles[i] || disponibles[0]));
+
+  $("#selectores").innerHTML = F.metricas.map((_, i) => selectorMetrica(i)).join("");
+  document.querySelectorAll(".selMet").forEach(sel => sel.onchange = e => {
+    F.metricas[+e.target.dataset.i] = e.target.value;
+    pintar();
+  });
+  $("#paneles").innerHTML = F.metricas.map(m => panel(m, filas)).join("");
 }
 
 /* ---------- eventos ---------- */
 function eventos() {
   $("#fSquad").onchange = e => { F.squad = e.target.value; poblarFechas(); pintar(); };
   $("#fFecha").onchange = e => { F.fecha = e.target.value; pintar(); };
+  $("#btnPdf").onclick = () => window.print();
   document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
     document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
     F.pestana = t.id.replace("tab-", "");
