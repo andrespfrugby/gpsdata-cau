@@ -4,11 +4,51 @@ const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
    las que traen datos: si una viene entera a cero (Hr Load, por ejemplo), se oculta. */
+/* Métricas que no vienen en el export y calculamos nosotros. */
+const HMLD = "HMLD (m)";
+const ACC3 = "ACC > 3 m/s²";
+const ACC3MIN = "ACC > 3 por min";
+const DEC3 = "DECC > 3 m/s²";
+const DEC3MIN = "DECC > 3 por min";
+const CALCULADAS = [HMLD, ACC3, ACC3MIN, DEC3, DEC3MIN];
+
+/* Zonas de potencia que componen el HMLD: todo lo que pasa de 25 w/kg. */
+const ZONAS_HMLD = [
+  "Distance in Power Zone: 25 - 30 w/kg  (metres)",
+  "Distance in Power Zone: 30 - 35 w/kg  (metres)",
+  "Distance in Power Zone: 35 - 40 w/kg  (metres)",
+  "Distance in Power Zone: 40 - 45 w/kg  (metres)",
+  "Distance in Power Zone: 45 - 50 w/kg  (metres)",
+  "Distance in Power Zone: > 50 w/kg  (metres)"
+];
+
+/**
+ * HMLD = distancia recorrida por encima de 25 w/kg de potencia metabólica.
+ * ACC/DECC > 3 = suma de las zonas 3-4 y > 4, y su versión por minuto.
+ */
+function calcular(crudo, minutos) {
+  const v = c => Math.abs(crudo[c] || 0);
+  crudo[HMLD] = ZONAS_HMLD.reduce((t, c) => t + v(c), 0);
+  crudo[ACC3] = v("Accelerations Zone Count: 3 - 4 m/s/s") + v("Accelerations Zone Count: > 4 m/s/s");
+  crudo[DEC3] = v("Deceleration Zone Count: 3 - 4 m/s/s") + v("Deceleration Zone Count: > 4 m/s/s");
+  crudo[ACC3MIN] = minutos ? crudo[ACC3] / minutos : 0;
+  crudo[DEC3MIN] = minutos ? crudo[DEC3] / minutos : 0;
+}
+
 /* Lo que va en gráficos de barras: volumen y distancias por zona. */
 const CATALOGO = [
   ["Volumen", [
-    "Distance (metres)", "Sprint Distance (m)", "Player Load", "Power Plays",
+    "Distance (metres)", HMLD, "Sprint Distance (m)", "Player Load", "Power Plays",
     "Energy (kcal)", "Hr Load", "Time In Red Zone (min)", "Distance Per Min (m/min)"
+  ]],
+  ["Acciones de alta intensidad", [ACC3, ACC3MIN, DEC3, DEC3MIN]],
+  ["Distancia por zona de potencia", [
+    "Distance in Power Zone: 25 - 30 w/kg  (metres)",
+    "Distance in Power Zone: 30 - 35 w/kg  (metres)",
+    "Distance in Power Zone: 35 - 40 w/kg  (metres)",
+    "Distance in Power Zone: 40 - 45 w/kg  (metres)",
+    "Distance in Power Zone: 45 - 50 w/kg  (metres)",
+    "Distance in Power Zone: > 50 w/kg  (metres)"
   ]],
   ["Distancia por zona de velocidad", [
     "Distance in Speed Zone 1  (metres)", "Distance in Speed Zone 2  (metres)",
@@ -23,11 +63,13 @@ const TABLA = [
   // Solo las acciones de alta intensidad: por debajo de 3 m/s² no aporta.
   ["Aceleraciones de alta intensidad", [
     "Max Acceleration (m/s/s)",
-    "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s"
+    "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s",
+    ACC3, ACC3MIN
   ]],
   ["Deceleraciones de alta intensidad", [
     "Max Deceleration (m/s/s)",
-    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s"
+    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s",
+    DEC3, DEC3MIN
   ]],
   ["Impactos", [
     "Impacts",
@@ -38,24 +80,35 @@ const TABLA = [
 ];
 const TODAS_COLUMNAS = () => CATALOGO.concat(TABLA).flatMap(([, c]) => c);
 
+/* Los cuatro números fijos de la cabecera: vista general de la sesión. */
+const RESUMEN = [
+  { col:"Distance (metres)", titulo:"Distancia", uni:"m",   tipo:"vol" },
+  { col:HMLD,                titulo:"HMLD",      uni:"m",   tipo:"vol" },
+  { col:ACC3,                titulo:"ACC > 3",   uni:"m/s²", tipo:"int" },
+  { col:"Player Load",       titulo:"Player load", uni:"",  tipo:"vol" }
+];
+
 /* Los nombres se dejan tal cual salen en el Sheets, para que no haya dudas
    de qué columna es cada cosa. Solo se les añade el rango cuando lo tienes
    configurado, porque el export no lo trae. */
 const RANGOS_ZONA = (C.zonasVelocidad) || {};
 const nombreMetrica = c => {
+  if (c === HMLD) return "HMLD (m)  ·  > 25 w/kg";
   const z = c.match(/Speed Zone (\d)/);
   if (z && RANGOS_ZONA[z[1]]) return c + "  ·  " + RANGOS_ZONA[z[1]];
   if (c === "Impacts" && C.umbralImpacto) return "Impacts  ·  > " + C.umbralImpacto + " G";
   return c;
 };
 /* Versión corta para las cabeceras de la tabla, donde no cabe el nombre entero. */
-const nombreCorto = c => c
+const nombreCorto = c => CALCULADAS.includes(c) ? c : c
   .replace(/Accelerations Zone Count: (.*) m\/s\/s/, "ACC $1 m/s²")
   .replace(/Deceleration Zone Count: (.*) m\/s\/s/, "DECC $1 m/s²")
   .replace(/Max Acceleration.*/, "ACC máx m/s²")
   .replace(/Max Deceleration.*/, "DECC máx m/s²")
   .replace(/Top Speed \(m\/s\)/, "Top speed m/s")
   .replace(/Impact Zones: /, "").replace(/ \(Impacts\)/, "")
+  .replace(/Distance in Power Zone: (.*) w\/kg.*/, "$1 w/kg")
+  .replace(/Distance in Speed Zone (\d).*/, "Zona $1")
   .trim();
 
 const UNIDADES = {
@@ -63,7 +116,9 @@ const UNIDADES = {
   "Top Speed (m/s)":"m/s", "Max Acceleration (m/s/s)":"m/s²", "Max Deceleration (m/s/s)":"m/s²",
   "Energy (kcal)":"kcal", "Power Score (w/kg)":"w/kg", "Time In Red Zone (min)":"min"
 };
-const unidad = c => UNIDADES[c] || (/Speed Zone/.test(c) ? "m" : /Zone Count|Impact Zones/.test(c) ? "nº" : "");
+const unidad = c => UNIDADES[c]
+  || (c === HMLD ? "m" : /por min/.test(c) ? "/min" : /ACC|DECC/.test(c) ? "nº"
+     : /Speed Zone|Power Zone/.test(c) ? "m" : /Zone Count|Impact Zones/.test(c) ? "nº" : "");
 
 let METRICAS = [];        // catálogo filtrado a lo que hay en los datos
 
@@ -85,9 +140,8 @@ let MOTES = {}, POSICIONES = {};   // maestro que llega del Sheets
 let EQUIPO_CARGA = "";             // equipo elegido al arrastrar un CSV sin columna Squad
 const F = { squad:"", fecha:"", pestana:"reporte",
   // Cuatro paneles, como los cuatro selectores del Session Report de Power BI.
-  metricas:["Distance (metres)", "Sprint Distance (m)", "Player Load",
-            "Distance in Speed Zone 3  (metres)", "Distance in Speed Zone 4  (metres)",
-            "Distance in Speed Zone 5  (metres)"] };
+  metricas:["Distance (metres)", HMLD, "Sprint Distance (m)",
+            ACC3, "Player Load", "Distance in Speed Zone 5  (metres)"] };
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -213,6 +267,7 @@ function normaliza(brutas) {
     // Guardamos las columnas del catálogo tal cual vienen, sin recalcular nada.
     const crudo = {};
     for (const col of TODAS_COLUMNAS()) if (clave(col) in m) crudo[col] = num(m[clave(col)]);
+    calcular(crudo, minutos);
 
     salida.push({
       crudo,
@@ -316,6 +371,22 @@ function poblarFechas() {
 const sesion = () => DATOS.filter(r => r.squad === F.squad && idSesion(r) === F.fecha);
 
 /* ---------- pintado ---------- */
+/** Cuatro cifras fijas para leer la sesión antes de entrar en detalle. */
+function resumen(filas) {
+  return `<div class="resumen">${RESUMEN.map(r => {
+    if (!filas.some(x => r.col in x.crudo)) return "";
+    const vals = filas.map(x => Math.abs(x.crudo[r.col] || 0));
+    const media = vals.reduce((t, v) => t + v, 0) / (vals.length || 1);
+    const total = vals.reduce((t, v) => t + v, 0);
+    const dec = decMedia(decimales(vals));
+    return `<div class="kpi ${r.tipo}">
+      <span class="k">${r.tipo === "vol" ? "Volumen" : "Intensidad"}</span>
+      <b>${nf(media, dec)}<i>${r.uni ? " " + r.uni : ""}</i></b>
+      <span class="s">${esc(r.titulo)} media · ${nf(total, 0)} total</span>
+    </div>`;
+  }).join("")}</div>`;
+}
+
 function cabecera() {
   const filas = sesion();
   if (!filas.length) { $("#cab").innerHTML = ""; return; }
@@ -326,6 +397,7 @@ function cabecera() {
     <h2>${esc(titulos.join(" · ") || "Sesión")}</h2>
     ${md ? `<span class="md${filas[0].esPartido ? " partido" : ""}">${md}</span>` : ""}
     <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
+  $("#resumen").innerHTML = resumen(filas);
 }
 
 /** Decimales según el tamaño del número, para no enseñar 2569,68 ni 6 pelado. */
@@ -335,10 +407,9 @@ function decimales(vals) {
   return 2;
 }
 
-function panel(col, filas) {
+function panel(col, filas, indice) {
   const datos = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[col] || 0) }))
     .sort((a, b) => b.v - a.v);
-  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
   const vals = datos.map(d => d.v);
   const media = vals.reduce((t, v) => t + v, 0) / (vals.length || 1);
   // Rangos estrechos (velocidad, power score) no arrancan en cero o no se distingue nada.
@@ -361,13 +432,8 @@ function panel(col, filas) {
   }).join("");
 
   return `<section class="panel">
-    <div class="tit">
-      <h3>${met.lbl}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
-      <div class="cajas">
-        <span class="caja destacada"><b>${nf(media, met.dec)}</b>avg</span>
-        ${puestos.map(p => `<span class="caja"><b>${nf(mediaDe(filas.filter(r => r.posicion === p), col), decMedia(met.dec))}</b>${esc(puestoCorto(p))}</span>`).join("")}
-      </div>
-    </div>
+    ${selectorMetrica(indice)}
+    <div class="avgline"><b>${nf(media, met.dec)}</b> avg${met.uni ? " " + met.uni : ""}</div>
     ${cuerpo}
   </section>`;
 }
@@ -547,7 +613,10 @@ function tabla(filas) {
       <td>${esc(r.jugador)}</td><td class="pos">${esc(r.posicion)}</td>
       ${planas.map(c => {
         const v = Math.abs(r.crudo[c] || 0);
-        return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}">${nf(v, dec[c])}</td>`;
+        // Cada celda se tiñe según su valor dentro de su columna, no entre columnas.
+        const t = tope[c] ? v / tope[c] : 0;
+        const fondo = v > 0 ? `background:rgba(160,167,216,${(0.04 + t * 0.42).toFixed(3)})` : "";
+        return `<td class="n${v === tope[c] && v > 0 ? " top" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
       }).join("")}
     </tr>`;
   }).join("");
@@ -613,12 +682,12 @@ function pintar() {
   }
   F.metricas = F.metricas.map((m, i) => disponibles.includes(m) ? m : (disponibles[i] || disponibles[0]));
 
-  $("#selectores").innerHTML = F.metricas.map((_, i) => selectorMetrica(i)).join("");
+  $("#selectores").innerHTML = "";
+  $("#paneles").innerHTML = F.metricas.map((m, i) => panel(m, filas, i)).join("");
   document.querySelectorAll(".selMet").forEach(sel => sel.onchange = e => {
     F.metricas[+e.target.dataset.i] = e.target.value;
     pintar();
   });
-  $("#paneles").innerHTML = F.metricas.map(m => panel(m, filas)).join("");
   $("#tabla").innerHTML = tabla(filas);
 }
 
