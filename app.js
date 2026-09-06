@@ -340,10 +340,46 @@ function detectarMetricas() {
 }
 const todasMetricas = () => METRICAS.flatMap(([, c]) => c);
 
+/**
+ * Segunda vía de lectura, para cuando fetch falla por permisos entre dominios.
+ * Carga el script con una etiqueta <script>, que el navegador nunca bloquea.
+ */
+function cargarPorScript(url, segundos = 20) {
+  return new Promise((resolve, reject) => {
+    const nombre = "__cauDatos" + Date.now();
+    const et = document.createElement("script");
+    const limpiar = () => { delete window[nombre]; et.remove(); clearTimeout(reloj); };
+    const reloj = setTimeout(() => { limpiar(); reject(new Error("el script tardó demasiado en responder")); }, segundos * 1000);
+    window[nombre] = datos => { limpiar(); resolve(datos); };
+    et.onerror = () => { limpiar(); reject(new Error("el navegador no pudo cargar el script")); };
+    et.src = url + (url.includes("?") ? "&" : "?") + "callback=" + nombre;
+    document.head.appendChild(et);
+  });
+}
+
 async function cargar() {
   const fuente = (C.fuente || "").trim();
   setEstado("Cargando…", false);
   if (!fuente) { DATOS = normaliza(demo()); detectarMetricas(); setEstado("Datos de ejemplo · arrastra tu CSV", false); return; }
+  // Con el endpoint del script probamos primero la vía que no depende de permisos.
+  if (/\/exec/.test(fuente)) {
+    try {
+      const j = await cargarPorScript(fuente);
+      if (j.motes) MOTES = j.motes;
+      if (j.posiciones) POSICIONES = j.posiciones;
+      const brutas = (j.cabeceras && j.filas)
+        ? j.filas.map(f => Object.fromEntries(j.cabeceras.map((c, i) => [c, f[i]])))
+        : (j.datos || []);
+      DATOS = normaliza(brutas);
+      detectarMetricas();
+      setEstado(DATOS.length ? "Conectado · " + DATOS.length + " filas"
+                             : "Conectado · histórico vacío, arrastra tu CSV", true);
+      if (DATOS.length) return;
+    } catch (e) {
+      console.warn("Lectura por script:", e);
+    }
+  }
+
   try {
     const res = await fetch(fuente, { redirect:"follow" });
     if (!res.ok) throw new Error("el servidor respondió HTTP " + res.status);
