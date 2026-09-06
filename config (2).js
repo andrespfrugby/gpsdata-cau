@@ -18,12 +18,6 @@ window.CAU_CONFIG = {
     "_defecto": 50
   },
 
-  // Zona de trabajo del ratio agudo:crónico.
-  acwr: { bajo: 0.8, alto: 1.3 },
-
-  // Umbrales de exposición a velocidad máxima (% sobre la Vmax individual).
-  vmax: { estimulo: 90, aviso: 85 },
-
   // Nombres de split que representan la sesión o el partido completo.
   splitsCompletos: ["Rugby - Full Sessi", "Full Session", "Full Match", "Sesión completa"],
 
