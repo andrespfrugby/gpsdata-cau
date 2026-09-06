@@ -18,6 +18,14 @@ window.CAU_CONFIG = {
     "_defecto": 50
   },
 
+  // Umbral en G de la columna "Impacts" de Catapult, para etiquetarla bien.
+  // Déjalo vacío si no lo sabes: no cambia ningún cálculo, solo el título.
+  umbralImpacto: "",
+
+  // Rangos de tus zonas de velocidad, para que salgan en el título del gráfico.
+  // Ejemplo: { 4: "5,5 - 7 m/s", 5: "> 7 m/s" }. Vacío = solo el número de zona.
+  zonasVelocidad: {},
+
   // Nombres de split que representan la sesión o el partido completo.
   splitsCompletos: ["Rugby - Full Sessi", "Full Session", "Full Match", "Sesión completa"],
 
