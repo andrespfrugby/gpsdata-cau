@@ -10,7 +10,9 @@ const ACC3 = "ACC > 3 m/s²";
 const ACC3MIN = "ACC > 3 por min";
 const DEC3 = "DECC > 3 m/s²";
 const DEC3MIN = "DECC > 3 por min";
-const CALCULADAS = [HMLD, ACC3, ACC3MIN, DEC3, DEC3MIN];
+const PCTVEL = "% de su top speed";
+const PCTACC = "% de su ACC máx";
+const CALCULADAS = [HMLD, ACC3, ACC3MIN, DEC3, DEC3MIN, PCTVEL, PCTACC];
 
 /* Zonas de potencia que componen el HMLD: todo lo que pasa de 25 w/kg. */
 const ZONAS_HMLD = [
@@ -59,10 +61,10 @@ const CATALOGO = [
 
 /* Lo que va en la tabla de abajo, sin barras ni medias por jugador. */
 const TABLA = [
-  ["Velocidad", ["Top Speed (m/s)"]],
+  ["Velocidad", ["Top Speed (m/s)", PCTVEL]],
   // Solo las acciones de alta intensidad: por debajo de 3 m/s² no aporta.
   ["Aceleraciones de alta intensidad", [
-    "Max Acceleration (m/s/s)",
+    "Max Acceleration (m/s/s)", PCTACC,
     "Accelerations Zone Count: 3 - 4 m/s/s", "Accelerations Zone Count: > 4 m/s/s",
     ACC3, ACC3MIN
   ]],
@@ -117,7 +119,7 @@ const UNIDADES = {
   "Energy (kcal)":"kcal", "Power Score (w/kg)":"w/kg", "Time In Red Zone (min)":"min"
 };
 const unidad = c => UNIDADES[c]
-  || (c === HMLD ? "m" : /por min/.test(c) ? "/min" : /ACC|DECC/.test(c) ? "nº"
+  || (c === PCTVEL || c === PCTACC ? "%" : c === HMLD ? "m" : /por min/.test(c) ? "/min" : /ACC|DECC/.test(c) ? "nº"
      : /Speed Zone|Power Zone/.test(c) ? "m" : /Zone Count|Impact Zones/.test(c) ? "nº" : "");
 
 let METRICAS = [];        // catálogo filtrado a lo que hay en los datos
@@ -293,8 +295,28 @@ function normaliza(brutas) {
   return salida;
 }
 
+/**
+ * Exposición: qué porcentaje de su propio techo alcanzó cada jugador ese día.
+ * El techo es el mejor registro suyo en todo el histórico cargado, así que
+ * cuanto más histórico tengas, más fiable es la referencia.
+ */
+function recalcularExposicion() {
+  const techo = {};
+  for (const r of DATOS) {
+    const t = techo[r.jugador] || (techo[r.jugador] = { vel:0, acc:0 });
+    t.vel = Math.max(t.vel, Math.abs(r.crudo["Top Speed (m/s)"] || 0));
+    t.acc = Math.max(t.acc, Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0));
+  }
+  for (const r of DATOS) {
+    const t = techo[r.jugador];
+    if (t.vel) r.crudo[PCTVEL] = Math.abs(r.crudo["Top Speed (m/s)"] || 0) / t.vel * 100;
+    if (t.acc) r.crudo[PCTACC] = Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0) / t.acc * 100;
+  }
+}
+
 /** Deja en METRICAS solo las columnas que existen y traen algún valor distinto de cero. */
 function detectarMetricas() {
+  recalcularExposicion();
   METRICAS = [];
   for (const [grupo, cols] of CATALOGO) {
     const vivas = cols.filter(c => DATOS.some(r => Math.abs(r.crudo[c] || 0) > 0));
