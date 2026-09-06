@@ -18,10 +18,10 @@
 html,body{margin:0;padding:0}
 body{background:var(--ink-900);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:'Space Grotesk',sans-serif;font-weight:500;margin:0;letter-spacing:-.01em}
-.wrap{max-width:1180px;margin:0 auto;padding:0 20px 64px}
+.wrap{max-width:1760px;margin:0 auto;padding:0 28px 64px}
 
 header{border-bottom:1px solid var(--ink-700);background:var(--ink-900);position:sticky;top:0;z-index:20}
-.hd{max-width:1180px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.hd{max-width:1760px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
 .mark{width:30px;height:30px;border-radius:8px;background:var(--teal);color:var(--ink-900);display:grid;place-items:center;font-family:'Space Grotesk';font-weight:700;font-size:13px}
 .brand b{font-family:'Space Grotesk';font-weight:500;font-size:16px;display:block;line-height:1.2}
@@ -45,17 +45,20 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .md{font-family:'Space Grotesk';font-size:12px;letter-spacing:.06em;background:var(--ink-700);color:var(--lav);padding:3px 10px;border-radius:99px}
 .md.partido{background:rgba(239,181,185,.16);color:var(--pink)}
 
-.selectores{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.selectores{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px}
 .selectores select{width:100%;height:36px}
-@media(max-width:900px){.selectores{grid-template-columns:1fr 1fr}}
+@media(max-width:1200px){.selectores{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.selectores{grid-template-columns:1fr}}
 
 @media print{
-  @page{margin:12mm}
+  @page{margin:10mm;size:landscape}
   body{background:#fff;color:#111}
   header,nav,.selectores select{display:none}
   .selectores{display:none}
   .wrap{max-width:none;padding:0}
   .panel{background:#fff;border:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}
+  table.datos th,table.datos td{color:#111;border-color:#ddd}
+  table.datos th.grupo,table.datos tfoot tr.media td{color:#333;background:#f4f4f4;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   .panel h3,.cab h2{color:#111}
   .pista{background:#eee}
   .pista i{background:#6E9A9B !important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -70,7 +73,7 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .panel{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
 .panel h3{font-size:15px}
 .panel .res{font-size:12px;color:var(--text-3);margin:3px 0 14px;font-family:'IBM Plex Mono'}
-.fila{display:grid;grid-template-columns:104px 1fr 66px;align-items:center;gap:10px;padding:3px 0}
+.fila{display:grid;grid-template-columns:92px 1fr 60px;align-items:center;gap:10px;padding:3px 0}
 .fila .nom{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pista{position:relative;height:18px;background:var(--ink-800);border-radius:4px}
 .pista i{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:4px}
@@ -82,6 +85,18 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin-top:12px;padding-top:10px;border-top:1px solid var(--ink-800)}
 .leyenda span{display:flex;align-items:center;gap:6px}
 .sw{width:9px;height:9px;border-radius:2px;display:inline-block}
+.tablon{margin-bottom:20px}
+.panel .sub{font-size:12px;color:var(--text-3);margin:2px 0 14px}
+.scroll{overflow-x:auto}
+table.datos{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+table.datos th{font-weight:400;font-size:11px;color:var(--text-3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-700)}
+table.datos th.grupo{text-align:center;color:var(--lav);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--ink-600)}
+table.datos th.n{text-align:right}
+table.datos td{padding:6px 8px;border-bottom:1px solid var(--ink-800)}
+table.datos td.n{text-align:right;font-family:'IBM Plex Mono'}
+table.datos td.pos{color:var(--text-3)}
+table.datos tbody tr:hover{background:var(--ink-800)}
+table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:none;color:var(--lav);background:rgba(160,167,216,.06)}
 .empty{padding:36px 20px;text-align:center;color:var(--text-3);font-size:13px;grid-column:1/-1}
 
 .solo{grid-column:1/-1;max-width:720px}
@@ -122,6 +137,7 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
   <div class="cab" id="cab"></div>
   <div class="selectores" id="selectores"></div>
   <div class="paneles" id="paneles"></div>
+  <div id="tabla"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
