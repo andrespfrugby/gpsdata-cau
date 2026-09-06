@@ -154,6 +154,8 @@ const F = { squad:"", fecha:"", pestana:"reporte",
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
+/** Los porcentajes llevan el símbolo pegado, que si no parecen otra cosa. */
+const fmt = (col, v, d) => nf(v, d) + (col === PCTVEL || col === PCTACC ? "%" : "");
 const nf = (v, d = 0) => (v == null || isNaN(v)) ? "–" : Number(v).toLocaleString("es-ES", { minimumFractionDigits:d, maximumFractionDigits:d });
 const num = v => {
   if (typeof v === "number") return v;
@@ -374,6 +376,8 @@ async function cargar() {
       const j = await cargarPorScript(fuente);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
+        j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
       const brutas = (j.cabeceras && j.filas)
         ? j.filas.map(f => Object.fromEntries(j.cabeceras.map((c, i) => [c, f[i]])))
         : (j.datos || []);
@@ -400,6 +404,8 @@ async function cargar() {
       const j = JSON.parse(txt);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
+        j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
       if (j.cabeceras && j.filas) {
         // Formato compacto: cabeceras aparte y filas como listas.
         brutas = j.filas.map(f => Object.fromEntries(j.cabeceras.map((c, i) => [c, f[i]])));
@@ -517,21 +523,465 @@ function panel(col, filas, indice) {
     return `<div class="fila">
       <span class="nom" title="${esc(d.pos)}">${esc(d.nom)}</span>
       <span class="pista"><i class="${clase}" style="width:${ancho(d.v).toFixed(1)}%"></i><u style="left:${ancho(media).toFixed(1)}%"></u></span>
-      <span class="val">${nf(d.v, met.dec)}</span>
+      <span class="val">${fmt(col, d.v, met.dec)}</span>
     </div>`;
   }).join("");
 
   const puestos = [...new Set(filas.map(r => r.posicion))].sort();
   const pie = puestos.length < 2 ? "" : `<div class="pie cajas">
-    ${puestos.map(p => `<span class="caja"><b>${nf(mediaPuesto[p], decMedia(met.dec))}</b>${esc(puestoCorto(p))}</span>`).join("")}
+    ${puestos.map(p => `<span class="caja"><b>${fmt(col, mediaPuesto[p], decMedia(met.dec))}</b>${esc(puestoCorto(p))}</span>`).join("")}
   </div>`;
 
   return `<section class="panel">
     ${selectorMetrica(indice)}
-    <div class="avgline"><b>${nf(media, met.dec)}</b> media del equipo${met.uni ? " · " + met.uni : ""}</div>
+    <div class="avgline"><b>${fmt(col, media, met.dec)}</b> media del equipo${met.uni && met.uni !== "%" ? " · " + met.uni : ""}</div>
     ${cuerpo}
     ${pie}
   </section>`;
+}
+
+/* ---------- balón en juego ---------- */
+let BIP = [];                 // fases guardadas, una por secuencia
+const FB = { partido:"", vista:"partido", sesionGps:"", metrica:"Distance (metres)" };
+const PAREJAS = {};   // partido de BiP -> sesión de GPS que le corresponde
+
+const mmss = seg => {
+  if (!seg && seg !== 0) return "–";
+  const m = Math.floor(seg / 60), r = Math.round(seg % 60);
+  return m + ":" + String(r).padStart(2, "0");
+};
+
+/** Resume un conjunto de fases: lo que va en la cabecera del reporte. */
+function resumirBip(fases) {
+  const dur = fases.map(f => f.duracion);
+  const total = dur.reduce((t, v) => t + v, 0);
+  const descanso = fases.map(f => f.post).filter(v => v > 0);
+  const mediaDescanso = descanso.length ? descanso.reduce((t, v) => t + v, 0) / descanso.length : 0;
+  const media = dur.length ? total / dur.length : 0;
+  return {
+    n: fases.length, total, media, mediaDescanso,
+    ratio: media ? mediaDescanso / media : 0,
+    max: dur.length ? Math.max(...dur) : 0,
+    rucks: fases.reduce((t, f) => t + f.rucks, 0)
+  };
+}
+
+/** Reparte las fases en tramos de duración, como tu Excel. */
+const TRAMOS = [[0,30],[31,60],[61,90],[91,120],[121,180],[181,1e9]];
+const TRAMOS_RUCK = [[0,3],[4,6],[7,9],[10,12],[13,15]];
+
+function barrasTramos(fases, tramos, valor, etiquetas, color) {
+  const cuentas = tramos.map(([lo, hi]) => fases.filter(f => valor(f) >= lo && valor(f) <= hi).length);
+  const tope = Math.max(...cuentas, 1), suma = cuentas.reduce((t, v) => t + v, 0) || 1;
+  return `<div class="franjas">${cuentas.map((n, i) => `<div class="franja">
+    <span class="n">${etiquetas[i]}</span>
+    <span class="b"><i style="width:${(n / tope * 100).toFixed(0)}%;background:${color}"></i></span>
+    <span class="v">${n}<em>${Math.round(n / suma * 100)}%</em></span>
+  </div>`).join("")}</div>`;
+}
+
+function reporteBip(fases) {
+  const r = resumirBip(fases);
+  const partes = [...new Set(fases.map(f => f.parte))];
+  const porParte = partes.map(p => resumirBip(fases.filter(f => f.parte === p)));
+  const bruto = fases.reduce((t, f) => t + f.duracion + (f.post || 0), 0);
+  const pct = bruto ? r.total / bruto * 100 : 0;
+  const largas = fases.filter(f => f.duracion > 30);
+  const rl = resumirBip(largas);
+
+  return `
+  <p class="secc">Fases de balón en juego</p>
+  <div class="celdas seis">
+    <div class="c"><span>Fases</span><b>${r.n}</b></div>
+    ${porParte.map((p, i) => `<div class="c"><span>${esc(partes[i])}</span><b>${mmss(p.total)}</b></div>`).join("")}
+    <div class="c dest"><span>Total BiP</span><b>${mmss(r.total)}</b></div>
+    <div class="c"><span>Tiempo bruto</span><b>${mmss(bruto)}</b></div>
+    <div class="c dest"><span>% BiP</span><b>${nf(pct, 1)}<i>%</i></b></div>
+  </div>
+
+  <p class="secc">Medias y ratio trabajo:descanso</p>
+  <div class="scroll"><table class="datos bip">
+    <thead><tr><th></th><th class="n">Media BiP</th>${partes.map(p => `<th class="n">${esc(p)}</th>`).join("")}<th class="n">Descanso</th><th class="n">W:R</th></tr></thead>
+    <tbody>
+      <tr><td>Todas las fases</td><td class="n">${mmss(r.media)}</td>
+        ${porParte.map(p => `<td class="n">${mmss(p.media)}</td>`).join("")}
+        <td class="n">${mmss(r.mediaDescanso)}</td><td class="n">1 : ${nf(r.ratio, 2)}</td></tr>
+      <tr><td>Solo fases > 30 s <i>(${largas.length})</i></td><td class="n">${mmss(rl.media)}</td>
+        ${partes.map(() => `<td class="n">–</td>`).join("")}
+        <td class="n">${mmss(rl.mediaDescanso)}</td><td class="n">1 : ${nf(rl.ratio, 2)}</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="paneles dos">
+    <section class="panel"><h3>Duración de las fases</h3>
+      ${barrasTramos(fases, TRAMOS, f => f.duracion, ["0-30 s","31-60 s","61-90 s","91-120 s","121-180 s","> 180 s"], "var(--lav)")}
+    </section>
+    <section class="panel"><h3>Rucks por fase</h3>
+      ${barrasTramos(fases, TRAMOS_RUCK, f => f.rucks, ["0-3","4-6","7-9","10-12","13-15"], "var(--teal)")}
+    </section>
+  </div>
+
+  <div class="paneles dos">
+    <section class="panel"><h3>Rucks</h3>
+      <div class="celdas cinco">
+        <div class="c"><span>Total</span><b>${r.rucks}</b></div>
+        ${porParte.map((p, i) => `<div class="c"><span>${esc(partes[i])}</span><b>${p.rucks}</b></div>`).join("")}
+        <div class="c"><span>Por fase</span><b>${nf(r.n ? r.rucks / r.n : 0, 2)}</b></div>
+        <div class="c"><span>Por min BiP</span><b>${nf(r.total ? r.rucks / (r.total / 60) : 0, 2)}</b></div>
+      </div>
+    </section>
+    <section class="panel"><h3>Fase pico</h3>
+      <div class="celdas cuatro">
+        <div class="c dest"><span>Max BiP</span><b>${mmss(r.max)}</b></div>
+        <div class="c"><span>Fases > 90 s</span><b>${fases.filter(f => f.duracion > 90).length}</b></div>
+        <div class="c dest"><span>Max rucks</span><b>${Math.max(...fases.map(f => f.rucks), 0)}</b></div>
+        <div class="c"><span>Fases > 7 rucks</span><b>${fases.filter(f => f.rucks > 7).length}</b></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h3>Las ${fases.length} fases, en orden</h3>
+    <div class="secuencias">${fases.map((f, i) => {
+      const c = f.duracion === r.max ? "wcs" : f.duracion >= 45 ? "larga" : f.duracion >= 25 ? "" : "corta";
+      return `<div class="sec"><span class="id">${esc(f.nombre || "BIP " + (i + 1))}</span>
+        <span class="barra"><i class="${c}" style="width:${(f.duracion / r.max * 100).toFixed(1)}%"></i></span>
+        <span class="seg">${nf(f.duracion, 1)}</span></div>`;
+    }).join("")}</div>
+  </section>`;
+}
+
+/** Evolución entre partidos: una fila por partido con sus cifras. */
+function historicoBip() {
+  const partidos = [...new Set(BIP.map(f => f.partido))];
+  const filas = partidos.map(p => {
+    const fases = BIP.filter(f => f.partido === p);
+    const r = resumirBip(fases);
+    const bruto = fases.reduce((t, f) => t + f.duracion + (f.post || 0), 0);
+    return { partido:p, fecha:fases[0].fecha, ...r, pct: bruto ? r.total / bruto * 100 : 0,
+             rucksMin: r.total ? r.rucks / (r.total / 60) : 0 };
+  }).sort((a, b) => a.fecha - b.fecha);
+
+  if (!filas.length) return `<p class="empty">Todavía no hay partidos guardados.</p>`;
+  const media = c => filas.reduce((t, f) => t + f[c], 0) / filas.length;
+  const barra = (v, max, color) => `<span class="b"><i style="width:${(v / max * 100).toFixed(0)}%;background:${color}"></i></span>`;
+  const maxTot = Math.max(...filas.map(f => f.total));
+
+  return `
+  <div class="celdas cuatro">
+    <div class="c dest"><span>Partidos</span><b>${filas.length}</b></div>
+    <div class="c"><span>BiP medio</span><b>${mmss(media("total"))}</b></div>
+    <div class="c"><span>% BiP medio</span><b>${nf(media("pct"), 1)}<i>%</i></b></div>
+    <div class="c"><span>Fase media</span><b>${mmss(media("media"))}</b></div>
+  </div>
+
+  <section class="panel">
+    <h3>Evolución del balón en juego</h3>
+    <div class="franjas">${filas.map(f => `<div class="franja ancha">
+      <span class="n">${esc(f.partido)}</span>
+      ${barra(f.total, maxTot, "var(--teal)")}
+      <span class="v">${mmss(f.total)}<em>${nf(f.pct, 0)}%</em></span>
+    </div>`).join("")}</div>
+  </section>
+
+  <section class="panel">
+    <h3>Partido a partido</h3>
+    <div class="scroll"><table class="datos">
+      <thead><tr><th>Partido</th><th class="n">Fases</th><th class="n">BiP</th><th class="n">% BiP</th>
+        <th class="n">Fase media</th><th class="n">Descanso</th><th class="n">W:R</th>
+        <th class="n">Max fase</th><th class="n">Rucks</th><th class="n">Rucks/min</th></tr></thead>
+      <tbody>${filas.map(f => `<tr>
+        <td>${esc(f.partido)}</td><td class="n">${f.n}</td><td class="n">${mmss(f.total)}</td>
+        <td class="n">${nf(f.pct, 1)}%</td><td class="n">${mmss(f.media)}</td>
+        <td class="n">${mmss(f.mediaDescanso)}</td><td class="n">1 : ${nf(f.ratio, 2)}</td>
+        <td class="n">${mmss(f.max)}</td><td class="n">${f.rucks}</td><td class="n">${nf(f.rucksMin, 2)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+  </section>`;
+}
+
+/**
+ * Cruce con el GPS: la intensidad medida sobre el tiempo real de juego.
+ * El tiempo de BiP de cada jugador se ajusta a lo que participó, porque quien
+ * juega media parte no ha estado en todas las fases.
+ */
+function cruceBip(fases, sesionId) {
+  const filas = DATOS.filter(r => idSesion(r) === sesionId);
+  if (!filas.length) return `<p class="empty">Elige la sesión de GPS que corresponde a este partido.</p>`;
+
+  const r = resumirBip(fases);
+  const bipMin = r.total / 60;
+  const bruto = fases.reduce((t, f) => t + f.duracion + (f.post || 0), 0) / 60;
+  const minPartido = Math.max(...filas.map(x => x.minutos));
+
+  const cols = [
+    { id:"Distance (metres)", lbl:"m / min" },
+    { id:HMLD, lbl:"HMLD / min" },
+    { id:"Sprint Distance (m)", lbl:"HSR / min" },
+    { id:ACC3, lbl:"ACC > 3 / min" },
+    { id:DEC3, lbl:"DECC > 3 / min" }
+  ];
+
+  const cuerpo = filas.slice().sort((a, b) => b.minutos - a.minutos).map(x => {
+    // Proporción del partido que estuvo en campo, aplicada al tiempo de juego.
+    const suBip = bipMin * Math.min(1, x.minutos / (minPartido || 1));
+    return `<tr><td>${esc(x.jugador)}</td><td class="pos">${esc(x.posicion)}</td>
+      <td class="n">${nf(x.minutos)}</td><td class="n">${nf(suBip, 1)}</td>
+      ${cols.map(c => {
+        const v = Math.abs(x.crudo[c.id] || 0);
+        return `<td class="n">${nf(x.minutos ? v / x.minutos : 0, 2)}</td>
+                <td class="n verde">${nf(suBip ? v / suBip : 0, 2)}</td>`;
+      }).join("")}
+    </tr>`;
+  }).join("");
+
+  return `
+  <div class="celdas cuatro">
+    <div class="c"><span>Tiempo bruto</span><b>${nf(bruto, 1)}<i> min</i></b></div>
+    <div class="c dest"><span>Balón en juego</span><b>${nf(bipMin, 1)}<i> min</i></b></div>
+    <div class="c"><span>Factor</span><b>×${nf(bipMin ? bruto / bipMin : 0, 2)}</b></div>
+    <div class="c"><span>Jugadores</span><b>${filas.length}</b></div>
+  </div>
+  <section class="panel">
+    <h3>Intensidad sobre tiempo total y sobre balón en juego</h3>
+    <p class="sub">La segunda columna de cada par es la exigencia real: lo mismo dividido entre el tiempo de juego</p>
+    <div class="scroll"><table class="datos">
+      <thead>
+        <tr><th></th><th></th><th></th><th></th>${cols.map(c => `<th colspan="2" class="grupo">${esc(c.lbl)}</th>`).join("")}</tr>
+        <tr><th>Jugador</th><th>Posición</th><th class="n">Min</th><th class="n">Min BiP</th>
+          ${cols.map(() => `<th class="n">total</th><th class="n">BiP</th>`).join("")}</tr>
+      </thead>
+      <tbody>${cuerpo}</tbody>
+    </table></div>
+  </section>`;
+}
+
+/**
+ * Evolución: un punto por partido que tenga BiP y GPS emparejados.
+ * El emparejamiento lo guarda el usuario en PAREJAS (partido BiP -> sesión GPS).
+ */
+const METRICAS_BIP = [
+  { id:"Distance (metres)",   lbl:"Distancia por min BiP", uni:"m", dec:1 },
+  { id:HMLD,                  lbl:"HMLD por min BiP",      uni:"m", dec:2 },
+  { id:"Sprint Distance (m)", lbl:"HSR por min BiP",       uni:"m", dec:2 },
+  { id:"accdec",              lbl:"ACC + DECC > 3 por min BiP", uni:"", dec:2 }
+];
+
+function puntosEvolucion(metrica) {
+  const partidos = [...new Set(BIP.map(f => f.partido))];
+  const salida = [];
+  for (const p of partidos) {
+    const sesionId = PAREJAS[p];
+    if (!sesionId) continue;
+    const filas = DATOS.filter(r => idSesion(r) === sesionId);
+    if (!filas.length) continue;
+
+    const fases = BIP.filter(f => f.partido === p);
+    const r = resumirBip(fases);
+    const bruto = fases.reduce((t, f) => t + f.duracion + (f.post || 0), 0);
+    const bipMin = r.total / 60;
+    if (!bipMin) continue;
+    const minPartido = Math.max(...filas.map(x => x.minutos));
+
+    // Media del equipo de la métrica, dividida entre el tiempo de juego de cada uno.
+    const vals = filas.map(x => {
+      const v = metrica.id === "accdec"
+        ? Math.abs(x.crudo[ACC3] || 0) + Math.abs(x.crudo[DEC3] || 0)
+        : Math.abs(x.crudo[metrica.id] || 0);
+      const suBip = bipMin * Math.min(1, x.minutos / (minPartido || 1));
+      return suBip ? v / suBip : 0;
+    }).filter(v => v > 0);
+
+    salida.push({
+      partido: p, fecha: fases[0].fecha,
+      pct: bruto ? r.total / bruto * 100 : 0,
+      bipMin,
+      valor: vals.length ? vals.reduce((t, v) => t + v, 0) / vals.length : 0
+    });
+  }
+  return salida.sort((a, b) => a.fecha - b.fecha);
+}
+
+function evolucionBip() {
+  const met = METRICAS_BIP.find(m => m.id === FB.metrica) || METRICAS_BIP[0];
+  const puntos = puntosEvolucion(met);
+  const partidos = [...new Set(BIP.map(f => f.partido))];
+
+  const emparejador = `<section class="panel">
+    <h3>Emparejar partidos</h3>
+    <p class="sub">Cada partido de BiP con su sesión de GPS. Sin pareja no entra en la gráfica.</p>
+    ${partidos.map(p => {
+      const sesiones = [...new Set(DATOS.filter(r => r.esPartido).map(r => idSesion(r)))];
+      return `<div class="fila" style="grid-template-columns:200px 1fr">
+        <span class="nom">${esc(p)}</span>
+        <select class="parejaBip" data-p="${esc(p)}">
+          <option value="">— sin emparejar —</option>
+          ${sesiones.map(id => {
+            const r = DATOS.find(x => idSesion(x) === id);
+            return `<option value="${esc(id)}"${PAREJAS[p] === id ? " selected" : ""}>${esc(fechaLarga(r.fecha))} · ${esc(r.sesion)}</option>`;
+          }).join("")}
+        </select>
+      </div>`;
+    }).join("")}
+  </section>`;
+
+  if (puntos.length < 1) {
+    return `<div class="empty"><p>Empareja al menos un partido para ver la evolución.</p></div>${emparejador}`;
+  }
+
+  const maxPct = Math.max(...puntos.map(p => p.pct), 1);
+  const maxVal = Math.max(...puntos.map(p => p.valor), 1);
+  const minVal = Math.min(...puntos.map(p => p.valor));
+  const rango = maxVal - minVal || maxVal;
+
+  return `
+  <section class="panel">
+    <div class="row">
+      <div><h3>BiP frente a intensidad</h3>
+        <p class="sub" style="margin:0">Barras: % de balón en juego · línea: métrica por minuto de juego</p></div>
+      <select id="fMetBip">${METRICAS_BIP.map(m =>
+        `<option value="${esc(m.id)}"${m.id === met.id ? " selected" : ""}>${esc(m.lbl)}</option>`).join("")}</select>
+    </div>
+    <div class="evo">
+      ${puntos.map(p => `<div class="col">
+        <span class="dato">${nf(p.valor, met.dec)}</span>
+        <span class="punto" style="bottom:${(18 + (p.valor - minVal) / rango * 62).toFixed(1)}%"></span>
+        <span class="barra" style="height:${(p.pct / maxPct * 72).toFixed(1)}%"></span>
+        <span class="pct">${nf(p.pct, 1)}%</span>
+        <span class="nom">${esc(p.partido)}</span>
+      </div>`).join("")}
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Partido a partido</h3>
+    <div class="scroll"><table class="datos">
+      <thead><tr><th>Partido</th><th class="n">% BiP</th><th class="n">Min BiP</th><th class="n">${esc(met.lbl)}</th></tr></thead>
+      <tbody>${puntos.map(p => `<tr><td>${esc(p.partido)}</td>
+        <td class="n">${nf(p.pct, 1)}%</td><td class="n">${nf(p.bipMin, 1)}</td>
+        <td class="n">${nf(p.valor, met.dec)}</td></tr>`).join("")}</tbody>
+    </table></div>
+  </section>
+  ${emparejador}`;
+}
+
+function vistaBip() {
+  $("#cab").innerHTML = "";
+  $("#resumen").innerHTML = "";
+  $("#selectores").innerHTML = "";
+  $("#paneles").innerHTML = "";
+
+  const partidos = [...new Set(BIP.map(f => f.partido))];
+  if (!partidos.includes(FB.partido)) FB.partido = partidos[partidos.length - 1] || "";
+  const fases = BIP.filter(f => f.partido === FB.partido).sort((a, b) => a.inicio - b.inicio);
+
+  const sesiones = [...new Set(DATOS.filter(r => r.esPartido).map(r => idSesion(r)))];
+  if (!sesiones.includes(FB.sesionGps)) FB.sesionGps = sesiones[0] || "";
+
+  const barra = `<div class="row">
+    <div class="conmuta">
+      ${[["partido","Partido"],["historico","Histórico"],["cruce","Cruce con GPS"],["evolucion","BiP vs intensidad"]]
+        .map(([v, t]) => `<button class="mini${FB.vista === v ? " on" : ""}" data-v="${v}">${t}</button>`).join("")}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      ${FB.vista === "cruce" ? `<select id="fSesionGps">${sesiones.map(id => {
+        const r = DATOS.find(x => idSesion(x) === id);
+        return `<option value="${esc(id)}"${id === FB.sesionGps ? " selected" : ""}>${esc(fechaLarga(r.fecha))} · ${esc(r.sesion)}</option>`;
+      }).join("")}</select>` : ""}
+      ${FB.vista !== "historico" && FB.vista !== "evolucion" && partidos.length ? `<select id="fPartidoBip">${partidos.map(p =>
+        `<option${p === FB.partido ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
+      <button id="btnBip">Cargar CSV de BiP</button>
+      <input type="file" id="inpBip" accept=".csv" hidden>
+    </div>
+  </div>`;
+
+  const contenido = !BIP.length
+    ? `<div class="empty"><p style="font-size:15px;color:var(--text-2)">Todavía no hay partidos de balón en juego.</p>
+       <p>Pulsa <b>Cargar CSV de BiP</b> y arrastra el export de tu herramienta.</p></div>`
+    : FB.vista === "historico" ? historicoBip()
+    : FB.vista === "evolucion" ? evolucionBip()
+    : FB.vista === "cruce" ? cruceBip(fases, FB.sesionGps)
+    : reporteBip(fases);
+
+  $("#tabla").innerHTML = `<div class="bip">${barra}
+    ${BIP.length && FB.vista !== "historico" ? `<div class="cab"><h2>${esc(FB.partido)}</h2>
+      <span class="meta">${esc(fechaLarga(fases[0].fecha))} · ${fases.length} fases</span></div>` : ""}
+    ${contenido}<div id="salidaBip"></div></div>`;
+
+  $("#btnBip").onclick = () => $("#inpBip").click();
+  $("#inpBip").onchange = e => { if (e.target.files[0]) leerBip(e.target.files[0]); };
+  const selP = $("#fPartidoBip"); if (selP) selP.onchange = e => { FB.partido = e.target.value; pintar(); };
+  const selS = $("#fSesionGps"); if (selS) selS.onchange = e => { FB.sesionGps = e.target.value; pintar(); };
+  document.querySelectorAll(".conmuta .mini").forEach(b => b.onclick = () => { FB.vista = b.dataset.v; pintar(); });
+  const selM = $("#fMetBip"); if (selM) selM.onchange = e => { FB.metrica = e.target.value; pintar(); };
+  document.querySelectorAll(".parejaBip").forEach(sel => sel.onchange = e => {
+    PAREJAS[e.target.dataset.p] = e.target.value;
+    pintar();
+  });
+}
+
+/** Lee el CSV de balón en juego, lo muestra y lo manda al Sheets. */
+async function leerBip(file) {
+  $("#salidaBip").innerHTML = `<div class="aviso espera">Leyendo ${esc(file.name)}…</div>`;
+  try {
+    const txt = await file.text();
+    const objetos = parseCSV(txt);
+    if (!objetos.length) throw new Error("El archivo no tiene filas");
+    const cab = Object.keys(objetos[0]);
+    const nombre = String(objetos[0]["activity_name"] || file.name.replace(/\.csv$/i, "")).trim();
+
+    const nuevas = normalizaBip(objetos, nombre);
+    if (!nuevas.length) throw new Error("No encontré fases de balón en juego (entity_type = bip)");
+
+    const llave = f => f.id || (f.partido + "|" + f.nombre);
+    const mapa = new Map(BIP.map(f => [llave(f), f]));
+    for (const f of nuevas) mapa.set(llave(f), f);
+    BIP = [...mapa.values()];
+    FB.partido = nombre;
+
+    const valores = [cab, ...objetos.map(o => cab.map(c => o[c]))];
+    pintar();
+    $("#salidaBip").innerHTML = `<div class="aviso ok">${nuevas.length} fases leídas de ${esc(nombre)}.</div>`;
+    if (C.endpoint || /\/exec/.test(C.fuente || "")) {
+      const res = await fetch(C.endpoint || C.fuente, {
+        method:"POST", redirect:"follow",
+        headers:{ "Content-Type":"text/plain;charset=utf-8" },
+        body: JSON.stringify({ clave: C.clave || "", tipo:"bip", partido: nombre, valores })
+      });
+      const j = await res.json();
+      $("#salidaBip").innerHTML = j.ok
+        ? `<div class="aviso ok">Guardado. ${nf(j.nuevas)} fases nuevas y ${nf(j.actualizadas)} sustituidas · ${nf(j.total)} en total.</div>`
+        : `<div class="aviso error">Leído, pero no se pudo guardar: ${esc(j.error)}</div>`;
+    }
+  } catch (err) {
+    $("#salidaBip").innerHTML = `<div class="aviso error">No he podido leerlo: ${esc(err.message)}</div>`;
+    console.error(err);
+  }
+}
+
+/** Deja las filas del CSV de BiP en la forma que usa la app. */
+function normalizaBip(objetos, partido) {
+  const salida = [];
+  for (const o of objetos) {
+    const m = {};
+    for (const [k, v] of Object.entries(o)) m[clave(k)] = v;
+    // El CSV crudo trae rucks y partes mezclados; lo guardado en el Sheets ya viene filtrado.
+    if ("entitytype" in m && String(m.entitytype).trim().toLowerCase() !== "bip") continue;
+    if (!m.bipid && !m.bipname) continue;
+    const inicio = num(m.starttimeunixms);
+    salida.push({
+      partido: String(m.activityname || partido || "").trim() || partido,
+      parte: String(m.taskname || "").trim() || "Parte 1",
+      id: String(m.bipid || "").trim(),
+      nombre: String(m.bipname || "").trim(),
+      rucks: num(m.ruckcount),
+      duracion: num(m.durationseconds),
+      pre: num(m.predeadballseconds),
+      post: num(m.postdeadballseconds),
+      inicio, fecha: inicio ? new Date(inicio) : new Date()
+    });
+  }
+  return salida;
 }
 
 /* ---------- cargar ficheros ---------- */
@@ -681,6 +1131,28 @@ function selectorMetrica(i) {
   return `<select class="selMet" data-i="${i}" aria-label="Métrica ${i + 1}">${grupos}</select>`;
 }
 
+/**
+ * Cuánto se sale un valor de lo habitual en ese jugador, en %.
+ * Devuelve null si no tiene bastante histórico como para que la comparación valga.
+ */
+function desvio(jugador, col, valor) {
+  const suyas = DATOS.filter(r => r.jugador === jugador && (r.crudo[col] || 0) > 0);
+  if (suyas.length < 6) return null;
+  const v = suyas.map(r => Math.abs(r.crudo[col])).sort((a, b) => a - b);
+  const mediana = v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+  if (!mediana) return null;
+  return (valor / mediana - 1) * 100;
+}
+
+/* Bandas sacadas del reparto real de tus sesiones: el 25% de las veces se baja
+   de -17% y el 25% se pasa de +20%, así que fuera de esas bandas es día raro. */
+function bandaColor(p) {
+  if (p >= 50) return "224,107,112";   // muy por encima de lo suyo
+  if (p >= 20) return "240,225,153";   // por encima
+  if (p <= -35) return "110,130,170";  // muy por debajo
+  return "110,154,155";                // dentro de su normalidad
+}
+
 /** Tabla compacta: valores por jugador y, al final, la media de cada posición. */
 function tabla(filas) {
   // Aquí no se esconden las columnas vacías: un cero en impactos de 15-20 G
@@ -697,15 +1169,11 @@ function tabla(filas) {
   const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
   const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
 
-  // El gradiente solo tiñe recuentos y ritmos, no velocidades ni porcentajes.
-  const conGradiente = c => /Zone Count|Impact Zones/.test(c) || c === "Impacts"
-    || c === ACC3MIN || c === DEC3MIN;
+  // Solo se sombrean el ritmo de aceleración, el de deceleración y los impactos.
+  const conSemaforo = c => c === ACC3MIN || c === DEC3MIN || c === "Impacts";
 
-  const tope = {}, suelo = {};
-  for (const c of planas) {
-    const v = filas.map(r => Math.abs(r.crudo[c] || 0));
-    tope[c] = Math.max(...v); suelo[c] = Math.min(...v);
-  }
+  const tope = {};
+  for (const c of planas) tope[c] = Math.max(...filas.map(r => Math.abs(r.crudo[c] || 0)));
 
   let puestoPrevio = null;
   const cuerpo = jugadores.map(r => {
@@ -716,16 +1184,18 @@ function tabla(filas) {
       ${planas.map(c => {
         const v = Math.abs(r.crudo[c] || 0);
         // Cada celda se tiñe según su valor dentro de su columna, no entre columnas.
-        // Sin variación en la columna no se tiñe: un bloque uniforme no informa.
-        const rango = tope[c] - suelo[c];
-        const t = rango > 0 ? (v - suelo[c]) / rango : 0;
-        let fondo = conGradiente(c) && rango > 0 && v > 0
-          ? `background:rgba(160,167,216,${(0.05 + t * 0.4).toFixed(3)})` : "";
+        let fondo = "";
+        if (conSemaforo(c)) {
+          const p = desvio(r.jugador, c, v);   // % respecto a lo habitual en él
+          if (p !== null) fondo = `background:rgba(${bandaColor(p)},.15)`;
+        }
         // Exposición: verde a partir del umbral, porque ahí sí hubo estímulo.
         const esPct = c === PCTVEL || c === PCTACC;
         const expuesto = esPct && v >= (C.umbralExposicion ?? 85);
         if (esPct) fondo = expuesto ? "background:rgba(110,154,155,.28)" : "";
-        return `<td class="n${expuesto ? " verde" : ""}" style="${fondo}">${nf(v, dec[c])}</td>`;
+        // El líder de cada columna, en negrita y sin color.
+        const lider = v === tope[c] && v > 0;
+        return `<td class="n${expuesto ? " verde" : ""}${lider ? " lider" : ""}" style="${fondo}">${fmt(c, v, dec[c])}</td>`;
       }).join("")}
     </tr>`;
   }).join("");
@@ -735,7 +1205,6 @@ function tabla(filas) {
 
   return `<section class="panel tablon">
     <h3>Velocidad, aceleraciones e impactos</h3>
-    <p class="sub">Color según el valor dentro de su columna · verde si llega al ${C.umbralExposicion ?? 85}% de su techo</p>
     <div class="scroll"><table class="datos">
       <thead>
         <tr><th></th><th></th>${grupos}</tr>
@@ -747,6 +1216,7 @@ function tabla(filas) {
 }
 
 function pintar() {
+  if (F.pestana === "bip") return vistaBip();
   if (F.pestana === "cargar") return vistaCargar();
   cabecera();
   const filas = sesion();
