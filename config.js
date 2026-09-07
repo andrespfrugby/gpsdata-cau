@@ -47,6 +47,45 @@ window.CAU_CONFIG = {
     5: "> 7 m/s"
   },
 
+  // DEMANDAS DE JUEGO 25/26 · tu estudio con los partidos de Liga Regular DHb
+  // y Fase de Ascenso a DH Elite. Fijas: no se recalculan con datos nuevos.
+  demandas: {
+    etiqueta: "Demandas de juego 25/26",
+    escenarios: [["p50","P50 · típico"],["p75","P75 · exigente"],["p90","P90 · peor escenario"],
+                 ["media","Media"],["max","Máximo"]],
+    metricas: ["Distance (metres)", "Sprint Distance (m)", "HMLD (m)", "Power Plays", "Impacts", "Player Load"],
+    valores: {
+      "Primera línea": {
+        p50:   [3918.56,  10.98,   78.34,  5,    2,    207.24],
+        p75:   [4258.74,  18.52,  105.06,  6,    4,    221.19],
+        p90:   [4606.92,  34.30,  120.97,  7.60, 5,    234.07],
+        media: [3814.71,  13.84,   85.13,  5.13, 2.60, 198.85],
+        max:   [4818.39,  44.14,  189.11, 12,    6,    247.26]
+      },
+      "Segunda línea": {
+        p50:   [5955.92, 124.69,  280.62, 22,    3,    277.21],
+        p75:   [6170.36, 224.45,  472.21, 28,    5.50, 285.08],
+        p90:   [6376.53, 279.43,  531.60, 31,   10.20, 302.69],
+        media: [5517.24, 150.08,  337.37, 20.43, 4.52, 257.52],
+        max:   [6629.80, 566.09,  953.84, 45,   15,    327.10]
+      },
+      "Tercera línea": {
+        p50:   [5946.15, 250.06,  506.01, 28,    4,    255.13],
+        p75:   [6110.78, 346.57,  574.24, 33,    6,    281.95],
+        p90:   [6321.65, 376.10,  629.01, 36,    7,    288.84],
+        media: [5672.48, 258.76,  471.18, 27.29, 4.10, 255.97],
+        max:   [6662.69, 494.42,  756.57, 40,   10,    289.18]
+      },
+      "Tres cuartos": {
+        p50:   [6777.61, 419.55,  704.61, 38,    2,    278.70],
+        p75:   [7173.16, 537.13,  847.92, 44,    3,    292.88],
+        p90:   [7441.23, 627.18,  944.47, 53,    5.90, 314.05],
+        media: [6674.46, 418.24,  694.62, 39.44, 2.65, 277.12],
+        max:   [7955.21, 881.71, 1116.18, 64,   11,    350.04]
+      }
+    }
+  },
+
   // Nombres de split que representan la sesión o el partido completo.
   splitsCompletos: ["Rugby - Full Sessi", "Full Session", "Full Match", "Sesión completa"],
 
