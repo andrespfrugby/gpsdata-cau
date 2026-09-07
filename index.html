@@ -6,7 +6,7 @@
 <title>CAU · Reporte de sesión</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink-900:#0E1524; --ink-850:#151F33; --ink-800:#1B263B; --ink-700:#26344F; --ink-600:#33445F;
@@ -16,14 +16,14 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{background:var(--ink-900);color:var(--text);font-family:Chivo,system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-h1,h2,h3{font-family:Chivo,sans-serif;font-weight:600;margin:0;letter-spacing:-.01em}
+body{background:var(--ink-900);color:var(--text);font-family:Sora,system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:Sora,sans-serif;font-weight:600;margin:0;letter-spacing:-.01em}
 .wrap{max-width:1760px;margin:0 auto;padding:0 28px 64px}
 
 header{border-bottom:1px solid var(--ink-700);background:var(--ink-900);position:sticky;top:0;z-index:20}
 .hd{max-width:1760px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
-.mark{width:32px;height:32px;border-radius:8px;background:var(--teal);color:var(--ink-900);display:grid;place-items:center;font-family:Chivo;font-weight:700;font-size:13px}
+.mark{width:32px;height:32px;border-radius:8px;background:var(--teal);color:var(--ink-900);display:grid;place-items:center;font-family:Sora;font-weight:700;font-size:13px}
 .brand b{font-family:Chivo;font-weight:500;font-size:16px;display:block;line-height:1.2}
 .brand span{font-size:12px;color:var(--text-3)}
 select,button{font-family:inherit;font-size:13px;color:var(--text);background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--r);padding:7px 10px;height:34px}
@@ -65,7 +65,7 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 @media(max-width:900px){.paneles{grid-template-columns:1fr}}
 .panel{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
 .panel h3{font-size:16px}
-.panel .uni{color:var(--text-3);font-size:12px;font-family:Inter}
+.panel .uni{color:var(--text-3);font-size:12px;font-weight:400}
 .tit{margin-bottom:14px}
 .cajas{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .caja{display:inline-flex;align-items:baseline;gap:6px;background:var(--ink-800);border:1px solid var(--ink-700);
@@ -125,6 +125,13 @@ table.datos td.n{text-align:right;font-family:'Chivo Mono'}
 table.datos td.pos{color:var(--text-3)}
 table.datos tbody tr:hover{background:var(--ink-800)}
 table.datos tbody tr.corte td{border-top:1px solid var(--ink-700)}
+table.datos th.orden{cursor:pointer;user-select:none}
+table.datos th.orden:hover{color:var(--text)}
+table.datos.drills td{padding:9px 10px}
+table.datos.drills .nomb{font-size:14px}
+table.datos.drills .dur{display:flex;align-items:center;gap:7px;margin-top:4px}
+table.datos.drills .dur i{height:4px;background:var(--ink-600);border-radius:2px;display:block}
+table.datos.drills .dur span{font-size:10.5px;color:var(--text-3)}
 table.datos td.n.verde{color:var(--teal);font-weight:500}
 table.datos td.n.lider{font-weight:700;color:var(--text)}
 table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:none;color:var(--lav);background:rgba(160,167,216,.06)}
@@ -235,7 +242,14 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   .medalla{background:#f7f7f7;border:1px solid #ddd}
   .medalla .cab b,.medalla li .val,.medalla li.p1 .qui{color:#111}
   .medalla li .qui,.medalla li .nom2{color:#333}
-  table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
+  table.datos th.orden{cursor:pointer;user-select:none}
+table.datos th.orden:hover{color:var(--text)}
+table.datos.drills td{padding:9px 10px}
+table.datos.drills .nomb{font-size:14px}
+table.datos.drills .dur{display:flex;align-items:center;gap:7px;margin-top:4px}
+table.datos.drills .dur i{height:4px;background:var(--ink-600);border-radius:2px;display:block}
+table.datos.drills .dur span{font-size:10.5px;color:var(--text-3)}
+table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
 
   table.datos td.pos{color:#555}
 }
@@ -253,9 +267,10 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
 
 <div class="wrap">
   <nav role="tablist">
-    <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Reporte</button>
+    <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
+    <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
     <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
-    <button class="tab" role="tab" id="tab-cargar" aria-selected="false">Cargar datos</button>
+    <button class="tab" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
     <button id="btnPdf" style="margin-left:auto;align-self:center">Exportar PDF</button>
   </nav>
   <div class="cab" id="cab"></div>
