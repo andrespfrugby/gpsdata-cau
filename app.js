@@ -144,7 +144,7 @@ const mediaDe = (filas, col) => filas.length
 const decMedia = d => d === 0 ? 1 : d;
 
 
-let DATOS = [];
+let DATOS = [], BLOQUES = [];   // sesiones completas y bloques parciales
 let MOTES = {}, POSICIONES = {};   // maestro que llega del Sheets
 let EQUIPO_CARGA = "";             // equipo elegido al arrastrar un CSV sin columna Squad
 const F = { squad:"", fecha:"", pestana:"reporte",
@@ -260,7 +260,6 @@ function normaliza(brutas) {
     const split = String(get("split") || "").trim();
     const esCompleto = !split || (C.splitsCompletos || []).some(s => clave(s) === clave(split));
     const esRespaldo = clave(split) === "all";
-    if (!esCompleto && !esRespaldo) continue;
 
     let minutos = num(get("minutos"));
     if (!minutos) minutos = Math.round(num(get("duracionSeg")) / 60);
@@ -281,13 +280,17 @@ function normaliza(brutas) {
     calcular(crudo, minutos);
 
     salida.push({
-      crudo,
+      crudo, esCompleto, esRespaldo,
       squad: String(get("squad") || EQUIPO_CARGA || "Senior").trim(),
       fecha, fechaISO: iso(fecha), sesion, jugador, alias, split, md, esPartido,
       posicion: String(get("posicion") || "").trim() || POSICIONES[jugador] || "Sin posición",
       minutos
     });
   }
+  // Los splits parciales son los bloques del entrenamiento: van aparte.
+  BLOQUES = salida.filter(r => !r.esCompleto && !r.esRespaldo);
+  salida = salida.filter(r => r.esCompleto || r.esRespaldo);
+
   // Una fila por jugador y evento. Si llegan el split completo y el "all",
   // se queda el completo; el "all" solo sirve cuando no hay nada mejor.
   const porSesion = new Map();
@@ -540,8 +543,104 @@ function panel(col, filas, indice) {
   </section>`;
 }
 
+/* ---------- análisis por bloques ---------- */
+const METRICAS_DRILL = [
+  { id:"Player Load",       lbl:"PL / min",   dec:2 },
+  { id:"Distance (metres)", lbl:"TD / min",   dec:1 },
+  { id:HMLD,                lbl:"HMLD / min", dec:2 },
+  { id:"Sprint Distance (m)", lbl:"HSR / min", dec:2 },
+  { id:ACC3,                lbl:"ACC / min",  dec:2 },
+  { id:DEC3,                lbl:"DECC / min", dec:2 }
+];
+
+/**
+ * Escala divergente: azul por debajo de la media de la columna, blanco en la
+ * media y rojo por encima. Así el color dice "más o menos que lo normal en
+ * esta sesión", no "más o menos que cero".
+ */
+function tinte(v, lo, hi, media) {
+  if (hi === lo) return "";
+  const t = v >= media
+    ? (hi > media ? (v - media) / (hi - media) : 0)
+    : (media > lo ? (v - media) / (media - lo) : 0);
+  const a = Math.min(0.55, Math.abs(t) * 0.55);
+  return t >= 0 ? `background:rgba(224,107,112,${a.toFixed(3)})`
+                : `background:rgba(122,162,214,${a.toFixed(3)})`;
+}
+
+function drillAnalysis() {
+  const filas = BLOQUES.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0);
+  if (!filas.length) {
+    return `<div class="empty"><p>Esta sesión no tiene bloques parciales guardados.</p>
+      <p style="font-size:12px">Solo aparecen aquí los splits que no son la sesión o el partido completo.</p></div>`;
+  }
+
+  // Un bloque = un split. Se promedia entre los jugadores que lo hicieron.
+  const bloques = [...new Set(filas.map(r => r.split))].map(nombre => {
+    const suyas = filas.filter(r => r.split === nombre);
+    const min = suyas.reduce((t, r) => t + r.minutos, 0) / suyas.length;
+    const vals = {};
+    for (const m of METRICAS_DRILL) {
+      vals[m.id] = suyas.reduce((t, r) => t + (r.minutos ? Math.abs(r.crudo[m.id] || 0) / r.minutos : 0), 0) / suyas.length;
+    }
+    return { nombre, min, jugadores:suyas.length, vals };
+  });
+
+  const orden = FD.orden;
+  bloques.sort((a, b) => orden.col === "nombre"
+    ? a.nombre.localeCompare(b.nombre) * (orden.asc ? 1 : -1)
+    : orden.col === "min" ? (a.min - b.min) * (orden.asc ? 1 : -1)
+    : (a.vals[orden.col] - b.vals[orden.col]) * (orden.asc ? 1 : -1));
+
+  const rango = {};
+  for (const m of METRICAS_DRILL) {
+    const v = bloques.map(b => b.vals[m.id]);
+    rango[m.id] = { lo:Math.min(...v), hi:Math.max(...v), media:v.reduce((t, x) => t + x, 0) / v.length };
+  }
+  const maxMin = Math.max(...bloques.map(b => b.min));
+  const flecha = c => orden.col === c ? (orden.asc ? " ↑" : " ↓") : "";
+
+  return `<section class="panel">
+    <div class="row">
+      <div><h3>Bloques de la sesión</h3>
+        <p class="sub" style="margin:0">Azul por debajo de la media de la columna, rojo por encima · pulsa una cabecera para ordenar</p></div>
+    </div>
+    <div class="scroll"><table class="datos drills">
+      <thead><tr>
+        <th class="orden" data-c="nombre">Bloque${flecha("nombre")}</th>
+        <th class="n orden" data-c="min">Min${flecha("min")}</th>
+        ${METRICAS_DRILL.map(m => `<th class="n orden" data-c="${esc(m.id)}">${esc(m.lbl)}${flecha(m.id)}</th>`).join("")}
+      </tr></thead>
+      <tbody>${bloques.map(b => `<tr>
+        <td><div class="nomb">${esc(b.nombre)}</div>
+          <div class="dur"><i style="width:${(b.min / maxMin * 62).toFixed(0)}px"></i>
+          <span>${nf(b.min, 1)} min · ${b.jugadores} jug.</span></div></td>
+        <td class="n">${nf(b.min, 1)}</td>
+        ${METRICAS_DRILL.map(m => {
+          const v = b.vals[m.id], r = rango[m.id];
+          return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, m.dec)}</td>`;
+        }).join("")}
+      </tr>`).join("")}</tbody>
+    </table></div>
+  </section>`;
+}
+
+function vistaDrill() {
+  cabecera();
+  $("#selectores").innerHTML = "";
+  $("#paneles").innerHTML = "";
+  $("#tabla").innerHTML = drillAnalysis();
+  document.querySelectorAll(".drills .orden").forEach(th => th.onclick = () => {
+    const c = th.dataset.c;
+    FD.orden = { col:c, asc: FD.orden.col === c ? !FD.orden.asc : false };
+    pintar();
+  });
+}
+
 /* ---------- balón en juego ---------- */
 let BIP = [];                 // fases guardadas, una por secuencia
+const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloques
+             ordenJug:{ col:"", asc:false } };      // orden de la tabla de jugadores
 const FB = { partido:"", vista:"partido", sesionGps:"", metrica:"Distance (metres)" };
 const PAREJAS = {};   // partido de BiP -> sesión de GPS que le corresponde
 
@@ -1164,10 +1263,19 @@ function tabla(filas) {
   const dec = {};
   for (const c of planas) dec[c] = decimales(filas.map(r => Math.abs(r.crudo[c] || 0)));
 
-  const jugadores = filas.slice().sort((a, b) => a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador));
+  // Por defecto agrupados por puesto; al pulsar una cabecera manda esa columna.
+  const o = FD.ordenJug;
+  const jugadores = filas.slice().sort((a, b) => {
+    if (!o.col) return a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador);
+    const signo = o.asc ? 1 : -1;
+    if (o.col === "jugador") return a.jugador.localeCompare(b.jugador) * signo;
+    if (o.col === "posicion") return (a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador)) * signo;
+    return (Math.abs(a.crudo[o.col] || 0) - Math.abs(b.crudo[o.col] || 0)) * signo;
+  });
+  const flechaJ = c => o.col === c ? (o.asc ? " ↑" : " ↓") : "";
 
   const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
-  const sub = planas.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("");
+  const sub = planas.map(c => `<th class="n orden" data-c="${esc(c)}">${esc(nombreCorto(c))}${flechaJ(c)}</th>`).join("");
 
   // Solo se sombrean el ritmo de aceleración, el de deceleración y los impactos.
   const conSemaforo = c => c === ACC3MIN || c === DEC3MIN || c === "Impacts";
@@ -1208,7 +1316,8 @@ function tabla(filas) {
     <div class="scroll"><table class="datos">
       <thead>
         <tr><th></th><th></th>${grupos}</tr>
-        <tr><th>Jugador</th><th>Posición</th>${sub}</tr>
+        <tr><th class="orden" data-c="jugador">Jugador${flechaJ("jugador")}</th>
+            <th class="orden" data-c="posicion">Posición${flechaJ("posicion")}</th>${sub}</tr>
       </thead>
       <tbody>${cuerpo}</tbody>
     </table></div>
@@ -1216,6 +1325,8 @@ function tabla(filas) {
 }
 
 function pintar() {
+  recordar();
+  if (F.pestana === "drill") return vistaDrill();
   if (F.pestana === "bip") return vistaBip();
   if (F.pestana === "cargar") return vistaCargar();
   cabecera();
@@ -1256,6 +1367,11 @@ function pintar() {
     pintar();
   });
   $("#tabla").innerHTML = tabla(filas);
+  document.querySelectorAll("#tabla .orden").forEach(th => th.onclick = () => {
+    const c = th.dataset.c;
+    FD.ordenJug = { col:c, asc: FD.ordenJug.col === c ? !FD.ordenJug.asc : (c === "jugador" || c === "posicion") };
+    pintar();
+  });
 }
 
 /* ---------- eventos ---------- */
@@ -1315,9 +1431,31 @@ function demo() {
   return filas;
 }
 
+/* ---------- memoria de la sesión de trabajo ---------- */
+const GUARDA = "cau_gps_prefs";
+function recordar() {
+  try {
+    localStorage.setItem(GUARDA, JSON.stringify({
+      squad:F.squad, fecha:F.fecha, metricas:F.metricas, pestana:F.pestana,
+      parejas:PAREJAS, ordenDrill:FD.orden
+    }));
+  } catch (e) { /* navegador sin almacenamiento, no pasa nada */ }
+}
+function recuperar() {
+  try {
+    const p = JSON.parse(localStorage.getItem(GUARDA) || "{}");
+    if (p.squad) F.squad = p.squad;
+    if (p.fecha) F.fecha = p.fecha;
+    if (Array.isArray(p.metricas) && p.metricas.length) F.metricas = p.metricas;
+    if (p.ordenDrill) FD.orden = p.ordenDrill;
+    if (p.parejas) Object.assign(PAREJAS, p.parejas);
+  } catch (e) { /* preferencias corruptas: se ignoran */ }
+}
+
 /* ---------- arranque ---------- */
 (async function init() {
   eventos();
+  recuperar();
   await cargar();
   poblarFiltros();
   pintar();
