@@ -125,6 +125,8 @@ table.datos td.n{text-align:right;font-family:'Chivo Mono'}
 table.datos td.pos{color:var(--text-3)}
 table.datos tbody tr:hover{background:var(--ink-800)}
 table.datos tbody tr.corte td{border-top:1px solid var(--ink-700)}
+table.datos.carga td.n i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:2px}
+table.datos.carga tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.06);color:var(--lav)}
 table.datos th.orden{cursor:pointer;user-select:none}
 table.datos th.orden:hover{color:var(--text)}
 table.datos.drills td{padding:9px 10px}
@@ -233,6 +235,10 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   table.datos{font-size:10.5px}
   table.datos th,table.datos td{color:#111;border-color:#ddd;padding:3px 5px}
   table.datos th.grupo{color:#333;background:#eee}
+  table.datos.drills td{padding:5px 7px}
+  table.datos.drills .nomb{font-size:11px;color:#111}
+  table.datos.drills .dur i{background:#bbb}
+  table.datos.drills .dur span{color:#555}
   .conmuta{display:none}
   .c{background:#f7f7f7;border:1px solid #ccc}
   .c b{color:#111;font-size:17px}
@@ -242,7 +248,9 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   .medalla{background:#f7f7f7;border:1px solid #ddd}
   .medalla .cab b,.medalla li .val,.medalla li.p1 .qui{color:#111}
   .medalla li .qui,.medalla li .nom2{color:#333}
-  table.datos th.orden{cursor:pointer;user-select:none}
+  table.datos.carga td.n i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:2px}
+table.datos.carga tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.06);color:var(--lav)}
+table.datos th.orden{cursor:pointer;user-select:none}
 table.datos th.orden:hover{color:var(--text)}
 table.datos.drills td{padding:9px 10px}
 table.datos.drills .nomb{font-size:14px}
@@ -269,6 +277,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   <nav role="tablist">
     <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
     <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
+    <button class="tab" role="tab" id="tab-carga" aria-selected="false">% Carga</button>
     <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
     <button class="tab" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
     <button id="btnPdf" style="margin-left:auto;align-self:center">Exportar PDF</button>
