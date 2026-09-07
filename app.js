@@ -187,9 +187,8 @@ function parseFecha(v) {
   m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if (m) {
     const a = +m[3] < 100 ? 2000 + +m[3] : +m[3];
-    // La hoja está en inglés, así que 9/5/2026 es 5 de septiembre.
-    // Si el primer número pasa de 12 solo puede ser el día.
-    return +m[1] > 12 ? new Date(a, +m[2] - 1, +m[1]) : new Date(a, +m[1] - 1, +m[2]);
+    // Fechas con barras: día primero, como se pegaron desde Excel.
+    return +m[2] > 12 ? new Date(a, +m[1] - 1, +m[2]) : new Date(a, +m[2] - 1, +m[1]);
   }
   const d = new Date(s);
   return isNaN(d) ? null : d;
