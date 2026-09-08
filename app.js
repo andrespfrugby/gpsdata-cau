@@ -1224,6 +1224,17 @@ async function leerFichero(file) {
     }
     if (!valores || valores.length < 2) throw new Error("El archivo no tiene filas de datos");
 
+    // Si es un export de balón en juego, se manda a BiP en vez de a GPS.
+    const cabecerasK = valores[0].map(clave);
+    if (cabecerasK.includes("entitytype") || cabecerasK.includes("bipid")) {
+      $("#salida").innerHTML = `<div class="aviso espera">Esto es un archivo de balón en juego, lo llevo a la pestaña BiP…</div>`;
+      F.pestana = "bip";
+      document.querySelectorAll(".tab").forEach(t =>
+        t.setAttribute("aria-selected", t.id === "tab-bip"));
+      pintar();
+      return leerBip(file);
+    }
+
     // Nos quedamos solo con las columnas que usamos: el CSV de Catapult trae 101.
     const utiles = [];
     valores[0].forEach((c, i) => {
@@ -1234,7 +1245,15 @@ async function leerFichero(file) {
 
     const objetos = recorte.slice(1).map(f => Object.fromEntries(recorte[0].map((c, i) => [c, f[i]])));
     const nuevas = normaliza(objetos);
-    if (!nuevas.length) throw new Error("Ninguna fila pasó los filtros. Revisa que el archivo tenga la columna Split Name.");
+    const bloques = BLOQUES.length;
+    if (!nuevas.length && !bloques) {
+      throw new Error("Ninguna fila tenía jugador y fecha reconocibles. " +
+        "¿Es el CSV de Catapult? Debe traer al menos Player Name y Date.");
+    }
+    if (!nuevas.length) {
+      throw new Error("El archivo solo trae bloques parciales (" + bloques + " filas), " +
+        "ninguna sesión ni partido completo. Revisa la columna Split Name.");
+    }
 
     fusionar(nuevas);
     ULTIMO = { nombre:file.name, brutas:valores.length - 1, validas:nuevas.length, valores:recorte,
