@@ -200,7 +200,17 @@ function serieAFecha(n) {
 }
 
 /* ---------- lectura del origen ---------- */
-function parseCSV(txt) {
+/** Catapult exporta con coma o con punto y coma según el idioma del equipo. */
+function separadorDe(txt) {
+  const linea = txt.slice(0, txt.indexOf("\n") === -1 ? txt.length : txt.indexOf("\n"));
+  const cuenta = ch => linea.split(ch).length - 1;
+  const punto = cuenta(";"), coma = cuenta(","), tab = cuenta("\t");
+  if (tab > punto && tab > coma) return "\t";
+  return punto > coma ? ";" : ",";
+}
+
+function parseCSV(txt, sep) {
+  const s2 = sep || separadorDe(txt);
   const filas = []; let f = [], c = "", q = false;
   for (let i = 0; i < txt.length; i++) {
     const ch = txt[i];
@@ -208,7 +218,7 @@ function parseCSV(txt) {
       if (ch === '"') { if (txt[i+1] === '"') { c += '"'; i++; } else q = false; }
       else c += ch;
     } else if (ch === '"') q = true;
-    else if (ch === ",") { f.push(c); c = ""; }
+    else if (ch === s2) { f.push(c); c = ""; }
     else if (ch === "\n") { f.push(c); filas.push(f); f = []; c = ""; }
     else if (ch !== "\r") c += ch;
   }
