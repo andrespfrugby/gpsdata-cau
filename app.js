@@ -10,9 +10,10 @@ const ACC3 = "ACC > 3 m/s²";
 const ACC3MIN = "ACC > 3 por min";
 const DEC3 = "DECC > 3 m/s²";
 const DEC3MIN = "DECC > 3 por min";
+const ACDC3MIN = "ACC + DECC > 3 por min";
 const PCTVEL = "% de su top speed";
 const PCTACC = "% de su ACC máx";
-const CALCULADAS = [HMLD, ACC3, ACC3MIN, DEC3, DEC3MIN, PCTVEL, PCTACC];
+const CALCULADAS = [HMLD, ACC3, ACC3MIN, DEC3, DEC3MIN, ACDC3MIN, PCTVEL, PCTACC];
 
 /* Zonas de potencia que componen el HMLD: todo lo que pasa de 25 w/kg. */
 const ZONAS_HMLD = [
@@ -35,6 +36,7 @@ function calcular(crudo, minutos) {
   crudo[DEC3] = v("Deceleration Zone Count: 3 - 4 m/s/s") + v("Deceleration Zone Count: > 4 m/s/s");
   crudo[ACC3MIN] = minutos ? crudo[ACC3] / minutos : 0;
   crudo[DEC3MIN] = minutos ? crudo[DEC3] / minutos : 0;
+  crudo[ACDC3MIN] = minutos ? (crudo[ACC3] + crudo[DEC3]) / minutos : 0;
 }
 
 /* Lo que va en gráficos de barras: volumen y distancias por zona. */
@@ -43,7 +45,7 @@ const CATALOGO = [
     "Distance (metres)", HMLD, "Sprint Distance (m)", "Player Load", "Power Plays",
     "Energy (kcal)", "Hr Load", "Time In Red Zone (min)", "Distance Per Min (m/min)"
   ]],
-  ["Acciones de alta intensidad", [ACC3, ACC3MIN, DEC3, DEC3MIN]],
+  ["Acciones de alta intensidad", [ACC3, ACC3MIN, DEC3, DEC3MIN, ACDC3MIN]],
   ["Distancia por zona de potencia", [
     "Distance in Power Zone: 25 - 30 w/kg  (metres)",
     "Distance in Power Zone: 30 - 35 w/kg  (metres)",
@@ -69,7 +71,8 @@ const TABLA = [
   ]],
   ["Deceleraciones de alta intensidad", [
     "Max Deceleration (m/s/s)",
-    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s", DEC3MIN
+    "Deceleration Zone Count: 3 - 4 m/s/s", "Deceleration Zone Count: > 4 m/s/s", DEC3MIN,
+    ACDC3MIN
   ]],
   ["Impactos", [
     "Impacts",
@@ -106,7 +109,7 @@ const CORTOS = {
   "Max Deceleration (m/s/s)": "DECC máx",
   "Accelerations Zone Count: 3 - 4 m/s/s": "ACC 3-4", "Accelerations Zone Count: > 4 m/s/s": "ACC > 4",
   "Deceleration Zone Count: 3 - 4 m/s/s": "DECC 3-4", "Deceleration Zone Count: > 4 m/s/s": "DECC > 4",
-  [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min",
+  [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min", [ACDC3MIN]: "ACC+DECC / min",
   "Impacts": "Impactos", [HMLD]: "HMLD", [ACC3]: "ACC > 3", [DEC3]: "DECC > 3",
   "Distance (metres)": "Distancia", "Sprint Distance (m)": "Sprint dist.",
   "Player Load": "Player load", "Power Plays": "Power plays"
@@ -658,7 +661,8 @@ const METRICAS_DRILL = [
   { id:HMLD,                lbl:"HMLD / min", dec:2 },
   { id:"Sprint Distance (m)", lbl:"HSR / min", dec:2 },
   { id:ACC3,                lbl:"ACC / min",  dec:2 },
-  { id:DEC3,                lbl:"DECC / min", dec:2 }
+  { id:DEC3,                lbl:"DECC / min", dec:2 },
+  { id:"__acdc",            lbl:"ACC+DECC / min", dec:2 }
 ];
 
 /**
@@ -676,6 +680,20 @@ function tinte(v, lo, hi, media) {
                 : `background:rgba(122,162,214,${a.toFixed(3)})`;
 }
 
+/** Media entre jugadores de cada métrica dividida entre sus propios minutos. */
+function porMinuto(filas) {
+  const vals = {};
+  for (const m of METRICAS_DRILL) {
+    vals[m.id] = filas.reduce((t, r) => {
+      const v = m.id === "__acdc"
+        ? Math.abs(r.crudo[ACC3] || 0) + Math.abs(r.crudo[DEC3] || 0)
+        : Math.abs(r.crudo[m.id] || 0);
+      return t + (r.minutos ? v / r.minutos : 0);
+    }, 0) / (filas.length || 1);
+  }
+  return vals;
+}
+
 function drillAnalysis() {
   const filas = BLOQUES.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0);
   if (!filas.length) {
@@ -687,11 +705,7 @@ function drillAnalysis() {
   const bloques = [...new Set(filas.map(r => r.split))].map(nombre => {
     const suyas = filas.filter(r => r.split === nombre);
     const min = suyas.reduce((t, r) => t + r.minutos, 0) / suyas.length;
-    const vals = {};
-    for (const m of METRICAS_DRILL) {
-      vals[m.id] = suyas.reduce((t, r) => t + (r.minutos ? Math.abs(r.crudo[m.id] || 0) / r.minutos : 0), 0) / suyas.length;
-    }
-    return { nombre, min, jugadores:suyas.length, vals };
+    return { nombre, min, jugadores:suyas.length, vals: porMinuto(suyas) };
   });
 
   const orden = FD.orden;
@@ -707,6 +721,19 @@ function drillAnalysis() {
   }
   const maxMin = Math.max(...bloques.map(b => b.min));
   const flecha = c => orden.col === c ? (orden.asc ? " ↑" : " ↓") : "";
+
+  // Fila de referencia: la sesión completa, sin teñir, para comparar el total.
+  const completas = sesion();
+  const pieSesion = !completas.length ? "" : (() => {
+    const v = porMinuto(completas);
+    const min = completas.reduce((t, r) => t + r.minutos, 0) / completas.length;
+    return `<tfoot><tr class="media">
+      <td><div class="nomb">Sesión completa</div>
+        <div class="dur"><span>${nf(min, 1)} min · ${completas.length} jug.</span></div></td>
+      <td class="n">${nf(min, 1)}</td>
+      ${METRICAS_DRILL.map(m => `<td class="n">${nf(v[m.id], m.dec)}</td>`).join("")}
+    </tr></tfoot>`;
+  })();
 
   return `<section class="panel">
     <h3>Bloques de la sesión</h3>
@@ -726,6 +753,7 @@ function drillAnalysis() {
           return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, m.dec)}</td>`;
         }).join("")}
       </tr>`).join("")}</tbody>
+      ${pieSesion}
     </table></div>
   </section>`;
 }
