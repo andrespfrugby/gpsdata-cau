@@ -30,6 +30,10 @@ window.CAU_CONFIG = {
   //   "p95"     -> el percentil 95 de sus registros.
   techo: "segundo",
 
+  // Sesiones mínimas de un jugador para poder calcular su techo. Con menos,
+  // las columnas de % salen vacías en vez de dar un 100% engañoso.
+  minSesionesTecho: 4,
+
   // A partir de este % de su techo, la celda de exposición se pinta en verde.
   umbralExposicion: 85,
 
