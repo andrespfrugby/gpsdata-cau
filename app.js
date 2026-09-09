@@ -336,10 +336,13 @@ function recalcularExposicion() {
   // Un pico aislado del sensor no debería marcar el techo de todo el año.
   // Con "segundo" se usa el segundo mejor registro, que ya es repetible.
   const modo = C.techo || "segundo";
+  // Sin un mínimo de sesiones el techo no significa nada: el jugador saldría
+  // siempre al 100% por ser su único registro. Mejor no enseñar el dato.
+  const minimo = C.minSesionesTecho ?? 4;
   const techoDe = lista => {
-    if (!lista.length) return 0;
+    if (lista.length < minimo) return 0;
     const orden = lista.slice().sort((a, b) => b - a);
-    if (modo === "max" || orden.length < 3) return orden[0];
+    if (modo === "max") return orden[0];
     if (modo === "p95") return orden[Math.floor(orden.length * 0.05)];
     return orden[1];
   };
@@ -347,6 +350,8 @@ function recalcularExposicion() {
   for (const r of DATOS) {
     const t = registros[r.jugador];
     const tv = techoDe(t.vel), ta = techoDe(t.acc);
+    delete r.crudo[PCTVEL];
+    delete r.crudo[PCTACC];
     if (tv) r.crudo[PCTVEL] = Math.min(100, Math.abs(r.crudo["Top Speed (m/s)"] || 0) / tv * 100);
     if (ta) r.crudo[PCTACC] = Math.min(100, Math.abs(r.crudo["Max Acceleration (m/s/s)"] || 0) / ta * 100);
   }
@@ -1404,6 +1409,9 @@ function tabla(filas) {
     return `<tr${cambia ? ' class="corte"' : ""}>
       <td>${esc(r.jugador)}</td><td class="pos">${esc(r.posicion)}</td>
       ${planas.map(c => {
+        if (!(c in r.crudo) && (c === PCTVEL || c === PCTACC)) {
+          return `<td class="n" title="Necesita al menos ${C.minSesionesTecho ?? 4} sesiones">–</td>`;
+        }
         const v = Math.abs(r.crudo[c] || 0);
         // Cada celda se tiñe según su valor dentro de su columna, no entre columnas.
         let fondo = "";
