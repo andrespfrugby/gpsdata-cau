@@ -556,6 +556,7 @@ function panel(col, filas, indice) {
   </div>`;
 
   return `<section class="panel">
+    <h3 class="soloPdf">${esc(met.lbl)}${met.uni ? ` <span class="uni">${met.uni}</span>` : ""}</h3>
     ${selectorMetrica(indice)}
     <div class="avgline"><b>${fmt(col, media, met.dec)}</b> media del equipo${met.uni && met.uni !== "%" ? " · " + met.uni : ""}</div>
     ${cuerpo}
