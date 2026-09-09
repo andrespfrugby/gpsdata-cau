@@ -25,10 +25,13 @@ window.CAU_CONFIG = {
   },
 
   // Cómo se calcula el techo de cada jugador para los porcentajes de exposición.
-  //   "segundo" -> su segundo mejor registro. Inmune a un pico falso del sensor.
-  //   "max"     -> su mejor registro, sin más.
+  //   "auto"    -> su mejor marca, salvo que con 8 o más registros esa marca se
+  //                despegue más de un 10% de la siguiente: eso es un pico del
+  //                sensor y entonces se usa la segunda. Es lo recomendable.
+  //   "max"     -> su mejor registro siempre.
+  //   "segundo" -> siempre el segundo mejor.
   //   "p95"     -> el percentil 95 de sus registros.
-  techo: "segundo",
+  techo: "auto",
 
   // Sesiones mínimas de un jugador para poder calcular su techo. Con menos,
   // las columnas de % salen vacías en vez de dar un 100% engañoso.
