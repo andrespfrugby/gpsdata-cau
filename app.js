@@ -335,7 +335,7 @@ function recalcularExposicion() {
 
   // Un pico aislado del sensor no debería marcar el techo de todo el año.
   // Con "segundo" se usa el segundo mejor registro, que ya es repetible.
-  const modo = C.techo || "segundo";
+  const modo = C.techo || "auto";
   // Sin un mínimo de sesiones el techo no significa nada: el jugador saldría
   // siempre al 100% por ser su único registro. Mejor no enseñar el dato.
   const minimo = C.minSesionesTecho ?? 4;
@@ -344,7 +344,11 @@ function recalcularExposicion() {
     const orden = lista.slice().sort((a, b) => b - a);
     if (modo === "max") return orden[0];
     if (modo === "p95") return orden[Math.floor(orden.length * 0.05)];
-    return orden[1];
+    if (modo === "segundo") return orden[1];
+    // "auto": manda su mejor marca. Solo se descarta cuando hay histórico
+    // suficiente y esa marca se despega más de un 10% de la siguiente, que es
+    // el patrón de un pico del sensor y no de una capacidad real.
+    return (orden.length >= 8 && orden[0] > orden[1] * 1.10) ? orden[1] : orden[0];
   };
 
   for (const r of DATOS) {
