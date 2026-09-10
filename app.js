@@ -1,4 +1,3 @@
-
 (() => {
 "use strict";
 const C = window.CAU_CONFIG || {};
@@ -512,9 +511,8 @@ function cabecera() {
   const md = etiquetaMD(filas[0].md);
   const mins = filas.reduce((t, r) => t + r.minutos, 0) / filas.length;
   $("#cab").innerHTML = `
-    <h2>${esc(titulos.join(" · ") || "Sesión")}</h2>
-    ${md ? `<span class="md${filas[0].esPartido ? " partido" : ""}">${md}</span>` : ""}
-    <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
+    <h2>${esc(titulos.join(" · ") || "Sesión")}${md ? `<span class="md${filas[0].esPartido ? " partido" : ""}">${md}</span>` : ""}</h2>
+    <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
   $("#resumen").innerHTML = resumen(filas);
 }
 
@@ -681,6 +679,32 @@ function tinte(v, lo, hi, media) {
                 : `background:rgba(122,162,214,${a.toFixed(3)})`;
 }
 
+/**
+ * Valores típicos de un día de microciclo: se toma cada sesión completa con
+ * ese mismo MD, se calcula su intensidad media y se saca la mediana entre
+ * sesiones. La mediana y no la media, para que una sesión rara no la mueva.
+ */
+function tipicoMD(md, excluirSesion) {
+  if (md == null) return null;
+  const suyas = DATOS.filter(r => r.squad === F.squad && r.md === md && idSesion(r) !== excluirSesion);
+  const sesiones = [...new Set(suyas.map(r => idSesion(r)))];
+  if (sesiones.length < 2) return null;
+
+  const porSesion = sesiones.map(id => porMinuto(suyas.filter(r => idSesion(r) === id)));
+  const mediana = lista => {
+    const o = lista.slice().sort((a, b) => a - b);
+    const m = Math.floor(o.length / 2);
+    return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
+  };
+  const vals = {};
+  for (const m of METRICAS_DRILL) vals[m.id] = mediana(porSesion.map(v => v[m.id]));
+  const mins = sesiones.map(id => {
+    const f = suyas.filter(r => idSesion(r) === id);
+    return f.reduce((t, r) => t + r.minutos, 0) / f.length;
+  });
+  return { vals, min: mediana(mins), n: sesiones.length };
+}
+
 /** Media entre jugadores de cada métrica dividida entre sus propios minutos. */
 function porMinuto(filas) {
   const vals = {};
@@ -723,18 +747,46 @@ function drillAnalysis() {
   const maxMin = Math.max(...bloques.map(b => b.min));
   const flecha = c => orden.col === c ? (orden.asc ? " ↑" : " ↓") : "";
 
-  // Fila de referencia: la sesión completa, sin teñir, para comparar el total.
+  // Filas de referencia: esta sesión completa y el MD típico del histórico.
   const completas = sesion();
-  const pieSesion = !completas.length ? "" : (() => {
-    const v = porMinuto(completas);
-    const min = completas.reduce((t, r) => t + r.minutos, 0) / completas.length;
-    return `<tfoot><tr class="media">
-      <td><div class="nomb">Sesión completa</div>
-        <div class="dur"><span>${nf(min, 1)} min · ${completas.length} jug.</span></div></td>
+  const fila = (titulo, sub, filasRef) => {
+    const v = porMinuto(filasRef);
+    const min = filasRef.reduce((t, r) => t + r.minutos, 0) / filasRef.length;
+    return `<tr class="media">
+      <td><div class="nomb">${esc(titulo)}</div>
+        <div class="dur"><span>${esc(sub)}</span></div></td>
       <td class="n">${nf(min, 1)}</td>
       ${METRICAS_DRILL.map(m => `<td class="n">${nf(v[m.id], m.dec)}</td>`).join("")}
-    </tr></tfoot>`;
-  })();
+    </tr>`;
+  };
+
+  // Qué es lo normal en ese día de microciclo, según el histórico.
+  const md = completas.length ? completas[0].md : null;
+  const tipico = tipicoMD(md, F.fecha);
+  const hoy = completas.length ? porMinuto(completas) : null;
+  const minHoy = completas.length
+    ? completas.reduce((t, r) => t + r.minutos, 0) / completas.length : 0;
+
+  const pieSesion = `<tfoot>
+    ${completas.length ? fila("Sesión completa",
+      nf(minHoy, 1) + " min · " + completas.length + " jug.", completas) : ""}
+    ${tipico ? `<tr class="media tipico">
+      <td><div class="nomb">${esc(etiquetaMD(md) || "Sin MD")} típico</div>
+        <div class="dur"><span>mediana de ${tipico.n} sesiones anteriores</span></div></td>
+      <td class="n">${nf(tipico.min, 1)}</td>
+      ${METRICAS_DRILL.map(m => `<td class="n">${nf(tipico.vals[m.id], m.dec)}</td>`).join("")}
+    </tr>
+    <tr class="media dif">
+      <td><div class="nomb">Hoy sobre lo típico</div></td>
+      <td class="n">${tipico.min ? nf(minHoy / tipico.min * 100, 0) + "%" : "–"}</td>
+      ${METRICAS_DRILL.map(m => {
+        const t = tipico.vals[m.id];
+        if (!t) return `<td class="n">–</td>`;
+        const p = hoy[m.id] / t * 100;
+        return `<td class="n" style="${tintePct(p)}">${nf(p, 0)}%</td>`;
+      }).join("")}
+    </tr>` : ""}
+  </tfoot>`;
 
   return `<section class="panel">
     <h3>Bloques de la sesión</h3>
