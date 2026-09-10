@@ -18,9 +18,18 @@
 html,body{margin:0;padding:0}
 body{background:var(--ink-900);color:var(--text);font-family:Sora,system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:Sora,sans-serif;font-weight:600;margin:0;letter-spacing:-.01em}
-.wrap{max-width:1760px;margin:0 auto;padding:0 28px 64px}
+.app{display:grid;grid-template-columns:170px 1fr;min-height:100vh}
+aside{background:var(--ink-850);border-right:1px solid var(--ink-700);padding:16px 11px;
+  display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh}
+aside .brand{display:flex;align-items:center;gap:9px;padding:0 5px;margin-bottom:16px}
+aside .brand b{font-family:Sora;font-weight:600;font-size:15px}
+aside nav{display:flex;flex-direction:column;gap:3px;border:none;padding:0;margin:0;overflow:visible}
+main{min-width:0}
+.wrap{max-width:none;margin:0;padding:18px 22px 64px}
 
-header{border-bottom:1px solid var(--ink-700);background:var(--ink-900);position:sticky;top:0;z-index:20}
+header{border-bottom:1px solid var(--ink-700);background:var(--ink-850);position:sticky;top:0;z-index:20}
+.ctx{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:15px 22px;flex-wrap:wrap}
+.ctrl{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .hd{max-width:1760px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
 .mark{width:32px;height:32px;border-radius:8px;background:var(--teal);color:var(--ink-900);display:grid;place-items:center;font-family:Sora;font-weight:700;font-size:13px}
@@ -33,23 +42,36 @@ select:focus-visible,button:focus-visible,.tab:focus-visible{outline:2px solid v
 .field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--sand);flex:none}
 .dot.live{background:var(--teal)}
-#estado{font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:7px}
+#estado{font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;
+  padding:11px 5px 0;margin-top:10px;border-top:1px solid var(--ink-700);line-height:1.35}
 
 nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700);margin-bottom:22px}
-.tab{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;height:38px;padding:0 16px;color:var(--text-3);font-size:14px}
-.tab[aria-selected=true]{color:var(--text);border-bottom-color:var(--teal)}
+.tab{background:none;border:none;border-radius:8px;height:auto;padding:9px 12px;color:var(--text-3);
+  font-size:13.5px;text-align:left;width:100%}
+.tab:hover{background:var(--ink-800);border-color:transparent}
+.tab[aria-selected=true]{background:var(--ink-700);color:var(--text);font-weight:500}
+.tab.abajo{margin-top:auto}
 
-.cab{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 20px}
-.cab h2{font-size:23px}
-.cab .meta{font-size:13px;color:var(--text-2)}
+.cab{display:block;margin:0}
+.cab h2{font-size:22px;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cab .meta{display:block;font-size:12.5px;color:var(--text-3);margin-top:3px}
 .md{font-family:Chivo;font-size:12px;letter-spacing:.06em;background:var(--ink-700);color:var(--lav);padding:3px 10px;border-radius:99px}
 .md.partido{background:rgba(239,181,185,.16);color:var(--pink)}
 
 .resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
 @media(max-width:1000px){.resumen{grid-template-columns:1fr 1fr}}
-.kpi{border-radius:12px;padding:12px 15px;border:1px solid var(--ink-700)}
-.kpi.vol{background:linear-gradient(180deg,rgba(110,154,155,.16),rgba(110,154,155,.04));border-color:rgba(110,154,155,.35)}
-.kpi.int{background:linear-gradient(180deg,rgba(160,167,216,.16),rgba(160,167,216,.04));border-color:rgba(160,167,216,.35)}
+@media(max-width:820px){
+  .app{grid-template-columns:1fr}
+  aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;
+    border-right:none;border-bottom:1px solid var(--ink-700)}
+  aside nav{flex-direction:row;flex-wrap:wrap}
+  .tab{width:auto}
+  .tab.abajo{margin-top:0}
+  #estado{border-top:none;padding:0;margin:0}
+}
+.kpi{border-radius:12px;padding:12px 15px;background:var(--ink-850);border:1px solid var(--ink-700);
+  border-left:3px solid var(--teal)}
+.kpi.int{border-left-color:var(--lav)}
 .kpi .k{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-2)}
 .kpi b{display:block;font-family:'Chivo Mono';font-weight:600;font-size:36px;line-height:1.15;margin:2px 0}
 .kpi b i{font-style:normal;font-size:14px;color:var(--text-2)}
@@ -133,6 +155,8 @@ table.datos th.orden:hover{color:var(--text)}
 table.datos.drills td{padding:9px 10px}
 table.datos.drills tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.10);color:var(--lav)}
 table.datos.drills tfoot .nomb{color:var(--text)}
+table.datos.drills tfoot tr.tipico td{background:rgba(110,154,155,.10);color:var(--teal);border-top:none}
+table.datos.drills tfoot tr.dif td{background:var(--ink-800);color:var(--text-2);border-top:none}
 table.datos.drills .nomb{font-size:14px}
 table.datos.drills .dur{display:flex;align-items:center;gap:7px;margin-top:4px}
 table.datos.drills .dur i{height:4px;background:var(--ink-600);border-radius:2px;display:block}
@@ -209,11 +233,12 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   @page{margin:9mm;size:landscape}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
   body{background:#fff;color:#111;font-size:12px}
-  header,nav,.selectores,.leyenda{display:none}
+  header,nav,aside,.selectores,.leyenda{display:none}
+  .app{display:block}
   .soloPdf{display:block;font-size:13px;margin-bottom:6px;color:#111}
   /* las cajas de arriba pierden el degradado, que en papel sale casi negro */
-  .kpi,.kpi.vol,.kpi.int{background:#f4f4f4 !important;border:1px solid #bbb}
-  .kpi.int{background:#eef0f8 !important}
+  .kpi{background:#f7f7f7 !important;border:1px solid #bbb;border-left:3px solid #5a8b8c}
+  .kpi.int{border-left-color:#7f8bbf}
   .c,.c.dest{background:#f4f4f4 !important;border:1px solid #bbb}
   .panel .selMet{display:none}
   .resumen{grid-template-columns:repeat(4,1fr);gap:6px}
@@ -269,6 +294,8 @@ table.datos th.orden:hover{color:var(--text)}
 table.datos.drills td{padding:9px 10px}
 table.datos.drills tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.10);color:var(--lav)}
 table.datos.drills tfoot .nomb{color:var(--text)}
+table.datos.drills tfoot tr.tipico td{background:rgba(110,154,155,.10);color:var(--teal);border-top:none}
+table.datos.drills tfoot tr.dif td{background:var(--ink-800);color:var(--text-2);border-top:none}
 table.datos.drills .nomb{font-size:14px}
 table.datos.drills .dur{display:flex;align-items:center;gap:7px;margin-top:4px}
 table.datos.drills .dur i{height:4px;background:var(--ink-600);border-radius:2px;display:block}
@@ -280,29 +307,37 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
 </style>
 </head>
 <body>
-<header>
-  <div class="hd">
-    <div class="brand"><div class="mark">CAU</div><div><b>Reporte de sesión</b><span>GPS · rugby</span></div></div>
-    <div class="field"><label for="fSquad">Equipo</label><select id="fSquad"></select></div>
-    <div class="field"><label for="fFecha">Fecha</label><select id="fFecha" style="max-width:320px"></select></div>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="mark">CAU</span><b>Cargas</b></div>
+    <nav role="tablist">
+      <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
+      <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
+      <button class="tab" role="tab" id="tab-carga" aria-selected="false">% Carga</button>
+      <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
+      <button class="tab abajo" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
+    </nav>
     <div id="estado"><span class="dot"></span><span id="estadoTxt">Cargando…</span></div>
-  </div>
-</header>
+  </aside>
 
-<div class="wrap">
-  <nav role="tablist">
-    <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
-    <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
-    <button class="tab" role="tab" id="tab-carga" aria-selected="false">% Carga</button>
-    <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
-    <button class="tab" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
-    <button id="btnPdf" style="margin-left:auto;align-self:center">Exportar PDF</button>
-  </nav>
-  <div class="cab" id="cab"></div>
-  <div id="resumen"></div>
-  <div class="selectores" id="selectores"></div>
-  <div class="paneles" id="paneles"></div>
-  <div id="tabla"></div>
+  <main>
+    <header>
+      <div class="ctx">
+        <div class="cab" id="cab"></div>
+        <div class="ctrl">
+          <div class="field"><label for="fSquad">Equipo</label><select id="fSquad"></select></div>
+          <div class="field"><label for="fFecha">Sesión</label><select id="fFecha"></select></div>
+          <button id="btnPdf">Exportar PDF</button>
+        </div>
+      </div>
+    </header>
+    <div class="wrap">
+      <div id="resumen"></div>
+      <div class="selectores" id="selectores"></div>
+      <div class="paneles" id="paneles"></div>
+      <div id="tabla"></div>
+    </div>
+  </main>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
