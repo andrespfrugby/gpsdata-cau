@@ -296,7 +296,7 @@ function normaliza(brutas) {
     salida.push({
       crudo, esCompleto, esRespaldo,
       squad: String(get("squad") || EQUIPO_CARGA || "Senior").trim(),
-      fecha, fechaISO: iso(fecha), sesion, jugador, alias, split, md, esPartido,
+      fecha, fechaMs: fecha.getTime(), fechaISO: iso(fecha), sesion, jugador, alias, split, md, esPartido,
       posicion: String(get("posicion") || "").trim() || POSICIONES[jugador] || "Sin posición",
       minutos
     });
@@ -339,9 +339,9 @@ function recalcularExposicion() {
   // Un pico aislado del sensor no debería marcar el techo de todo el año.
   // Con "segundo" se usa el segundo mejor registro, que ya es repetible.
   const modo = C.techo || "auto";
-  // Sin un mínimo de sesiones el techo no significa nada: el jugador saldría
-  // siempre al 100% por ser su único registro. Mejor no enseñar el dato.
-  const minimo = C.minSesionesTecho ?? 4;
+  // El techo se actualiza solo conforme entran sesiones. Con una sola, ese
+  // registro es a la vez su marca y su techo, así que saldrá al 100%.
+  const minimo = C.minSesionesTecho ?? 1;
   const techoDe = lista => {
     if (lista.length < minimo) return 0;
     const orden = lista.slice().sort((a, b) => b - a);
@@ -651,6 +651,177 @@ function vistaCarga() {
   $("#tabla").innerHTML = porcentajeCarga();
   const sel = $("#fEscenario");
   if (sel) sel.onchange = e => { FC.escenario = e.target.value; pintar(); };
+}
+
+/* ---------- carga aguda:crónica ---------- */
+const FA = { metrica:"Distance (metres)", semanas:6 };
+const METRICAS_ACWR = [
+  { id:"Distance (metres)", lbl:"Distancia", dec:0 },
+  { id:HMLD,                lbl:"HMLD",      dec:0 },
+  { id:"Sprint Distance (m)", lbl:"Sprint distance", dec:0 },
+  { id:"Player Load",       lbl:"Player load", dec:0 },
+  { id:ACC3,                lbl:"ACC > 3",   dec:0 },
+  { id:DEC3,                lbl:"DECC > 3",  dec:0 }
+];
+
+/**
+ * Ratio agudo:crónico de un jugador a una fecha dada.
+ * Aguda: lo acumulado en los 7 días anteriores. Crónica: la media semanal de
+ * los 28 anteriores, ajustada a las semanas que realmente tienen histórico,
+ * para que las primeras semanas de temporada no den ratios disparados.
+ */
+function acwr(jugador, col, hasta) {
+  const suyas = DATOS.filter(r => r.jugador === jugador);
+  if (!suyas.length) return null;
+  const fin = hasta.getTime() + 86400000;
+  const suma = dias => suyas
+    .filter(r => r.fechaMs < fin && r.fechaMs >= fin - dias * 86400000)
+    .reduce((t, r) => t + Math.abs(r.crudo[col] || 0), 0);
+
+  const primera = suyas[0].fechaMs;
+  const historia = Math.min(28, Math.max(0, Math.round((fin - primera) / 86400000)));
+  const ventana = suyas.filter(r => r.fechaMs < fin && r.fechaMs >= fin - 28 * 86400000);
+  // En cuántas de las cuatro semanas anteriores hubo trabajo. Si solo entrenó
+  // la última, la crónica no es una base: es una vuelta tras un parón.
+  const semanasConDatos = new Set(ventana.map(r =>
+    Math.floor((fin - r.fechaMs) / (7 * 86400000)))).size;
+
+  const aguda = suma(7);
+  const cronica = historia >= 7 ? suma(28) / (historia / 7) : 0;
+  const ratio = (historia >= 14 && semanasConDatos >= 3 && cronica) ? aguda / cronica : null;
+  return { aguda, cronica, ratio, sesiones: ventana.length, semanas: semanasConDatos,
+           reincorporacion: ratio == null && aguda > 0 && semanasConDatos < 3 };
+}
+
+function estadoAcwr(r, f) {
+  const lo = (C.acwr && C.acwr.bajo) ?? 0.8, hi = (C.acwr && C.acwr.alto) ?? 1.3;
+  if (r == null) return { cls:"", txt: f && f.reincorporacion ? "Vuelve de parón" : "Sin histórico" };
+  if (r < lo) return { cls:"baja", txt:"Por debajo" };
+  if (r > hi) return { cls:"alta", txt:"Por encima" };
+  return { cls:"ok", txt:"En rango" };
+}
+
+/** Semanas naturales hacia atrás desde la fecha de referencia. */
+function semanasHasta(hasta, n) {
+  const fin = new Date(hasta); fin.setHours(0,0,0,0);
+  const lunes = new Date(fin); lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+  return [...Array(n)].map((_, i) => {
+    const ini = new Date(lunes); ini.setDate(ini.getDate() - (n - 1 - i) * 7);
+    const fin2 = new Date(ini); fin2.setDate(fin2.getDate() + 7);
+    return { ini, fin: fin2 };
+  });
+}
+
+function vistaAcwr() {
+  cabecera();
+  $("#selectores").innerHTML = "";
+  $("#paneles").innerHTML = "";
+
+  const ref = sesion()[0];
+  if (!ref) { $("#tabla").innerHTML = `<p class="empty">Elige una sesión para fijar la fecha de referencia.</p>`; return; }
+
+  const jugadores = [...new Set(DATOS.filter(r => r.squad === F.squad).map(r => r.jugador))];
+  const semanas = semanasHasta(ref.fecha, FA.semanas);
+  const principal = "Distance (metres)";   // la métrica de la tendencia
+
+  const filas = jugadores.map(j => {
+    const suyas = DATOS.filter(r => r.jugador === j);
+    const ratios = {};
+    for (const m of METRICAS_ACWR) ratios[m.id] = acwr(j, m.id, ref.fecha);
+    const porSemana = semanas.map(s => suyas
+      .filter(r => r.fecha >= s.ini && r.fecha < s.fin)
+      .reduce((t, r) => t + Math.abs(r.crudo[principal] || 0), 0));
+    const ult = porSemana[porSemana.length - 1], previa = porSemana[porSemana.length - 2];
+    return {
+      jugador:j, posicion:suyas[suyas.length - 1].posicion, ratios, porSemana,
+      sesionesSemana: suyas.filter(r => r.fecha >= semanas[semanas.length - 1].ini).length,
+      delta: previa > 0 ? (ult / previa - 1) * 100 : null
+    };
+  }).filter(f => f.porSemana.some(v => v > 0));
+
+  if (!filas.length) { $("#tabla").innerHTML = `<p class="empty">Sin datos para este equipo.</p>`; return; }
+
+  const alto = c => (C.acwr && C.acwr.alto) ?? 1.3, bajo = () => (C.acwr && C.acwr.bajo) ?? 0.8;
+  const clase = r => r == null ? "" : r > alto() ? "alta" : r < bajo() ? "baja" : "ok";
+  // Se ordena por el peor caso de cada jugador, que es lo que quieres ver arriba.
+  const peor = f => Math.max(...METRICAS_ACWR.map(m => f.ratios[m.id] && f.ratios[m.id].ratio || 0));
+  filas.sort((a, b) => peor(b) - peor(a));
+
+  const tope = Math.max(...filas.flatMap(f => f.porSemana), 1);
+  const detalle = METRICAS_ACWR.find(m => m.id === FA.metrica) || METRICAS_ACWR[0];
+
+  const alarmas = filas.filter(f => peor(f) > alto()).length;
+  const conRatio = filas.map(f => f.ratios[principal] && f.ratios[principal].ratio).filter(v => v);
+  const mediaRatio = conRatio.length ? conRatio.reduce((t, v) => t + v, 0) / conRatio.length : null;
+
+  const cuerpo = filas.map(f => `<tr>
+    <td>${esc(f.jugador)}</td><td class="pos">${esc(f.posicion)}</td>
+    ${METRICAS_ACWR.map(m => {
+      const a = f.ratios[m.id];
+      const cl = clase(a && a.ratio);
+      return `<td class="n acwr ${cl}" data-m="${esc(m.id)}">${a && a.ratio != null ? nf(a.ratio, 2) : "–"}</td>`;
+    }).join("")}
+    <td class="n ${f.delta == null ? "" : f.delta >= 15 ? "acwr alta" : f.delta <= -15 ? "acwr baja" : ""}">
+      ${f.delta == null ? "–" : (f.delta > 0 ? "+" : "") + nf(f.delta, 0) + "%"}</td>
+    <td class="n">${f.sesionesSemana}</td>
+    <td class="chispa">${f.porSemana.map((v, i) => `<i style="height:${Math.max(3, v / tope * 26).toFixed(0)}px"
+      class="${i === f.porSemana.length - 1 ? "ult" : ""}" title="${nf(v, 0)} m"></i>`).join("")}</td>
+  </tr>`).join("");
+
+  // Detalle de una sola métrica: aguda, crónica y de dónde sale cada número.
+  const det = filas.map(f => {
+    const a = f.ratios[detalle.id];
+    if (!a) return "";
+    return `<tr><td>${esc(f.jugador)}</td><td class="pos">${esc(f.posicion)}</td>
+      <td class="n">${nf(a.aguda, detalle.dec)}</td>
+      <td class="n">${nf(a.cronica, detalle.dec)}</td>
+      <td class="n acwr ${clase(a.ratio)}">${a.ratio == null ? "–" : nf(a.ratio, 2)}</td>
+      <td class="n">${a.sesiones}</td>
+      <td>${a.ratio == null
+        ? `<span class="tag na">${a.reincorporacion ? "Vuelve de parón" : "Sin histórico"}</span>`
+        : `<span class="tag ${clase(a.ratio)}">${clase(a.ratio) === "alta" ? "Por encima" : clase(a.ratio) === "baja" ? "Por debajo" : "En rango"}</span>`}</td>
+    </tr>`;
+  }).join("");
+
+  $("#tabla").innerHTML = `
+  <div class="celdas cuatro">
+    <div class="c"><span>Referencia</span><b style="font-size:16px">${esc(fechaLarga(ref.fecha))}</b></div>
+    <div class="c dest"><span>ACWR medio · distancia</span><b>${mediaRatio == null ? "–" : nf(mediaRatio, 2)}</b></div>
+    <div class="c"><span>Con alguna métrica sobre ${nf(alto(), 2)}</span><b>${alarmas}</b></div>
+    <div class="c"><span>Jugadores</span><b>${filas.length}</b></div>
+  </div>
+
+  <section class="panel">
+    <h3>Ratio agudo:crónico por métrica</h3>
+    <p class="sub">Carga de 7 días sobre la media semanal de los 28 anteriores · pulsa una columna para ver el detalle</p>
+    <div class="scroll"><table class="datos acwrtabla">
+      <thead><tr><th>Jugador</th><th>Posición</th>
+        ${METRICAS_ACWR.map(m => `<th class="n col" data-m="${esc(m.id)}">${esc(m.lbl)}${m.id === detalle.id ? " ·" : ""}</th>`).join("")}
+        <th class="n">Δ semana</th><th class="n">Ses.</th><th>Últimas ${FA.semanas} semanas</th></tr></thead>
+      <tbody>${cuerpo}</tbody>
+    </table></div>
+    <div class="leyenda">
+      <span><i class="sw" style="background:#F08A90"></i>por encima de ${nf(alto(), 2)}</span>
+      <span><i class="sw" style="background:var(--teal)"></i>en rango</span>
+      <span><i class="sw" style="background:var(--lav)"></i>por debajo de ${nf(bajo(), 2)}</span>
+      <span>Δ semana: cambio de distancia respecto a la semana anterior</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>Detalle · ${esc(detalle.lbl)}</h3>
+    <p class="sub">De dónde sale el ratio de esa columna</p>
+    <div class="scroll"><table class="datos">
+      <thead><tr><th>Jugador</th><th>Posición</th><th class="n">Aguda (7 d)</th>
+        <th class="n">Crónica (28 d)</th><th class="n">ACWR</th><th class="n">Ses. 28 d</th><th>Estado</th></tr></thead>
+      <tbody>${det}</tbody>
+    </table></div>
+  </section>`;
+
+  document.querySelectorAll(".acwrtabla .col").forEach(th => th.onclick = () => {
+    FA.metrica = th.dataset.m;
+    pintar();
+  });
 }
 
 /* ---------- análisis por bloques ---------- */
@@ -1534,6 +1705,7 @@ function tabla(filas) {
 
 function pintar() {
   recordar();
+  if (F.pestana === "acwr") return vistaAcwr();
   if (F.pestana === "carga") return vistaCarga();
   if (F.pestana === "drill") return vistaDrill();
   if (F.pestana === "bip") return vistaBip();
@@ -1646,6 +1818,7 @@ function recordar() {
   try {
     localStorage.setItem(GUARDA, JSON.stringify({
       squad:F.squad, fecha:F.fecha, metricas:F.metricas, pestana:F.pestana, escenario:FC.escenario,
+      metricaAcwr:FA.metrica,
       parejas:PAREJAS, ordenDrill:FD.orden
     }));
   } catch (e) { /* navegador sin almacenamiento, no pasa nada */ }
@@ -1658,6 +1831,7 @@ function recuperar() {
     if (Array.isArray(p.metricas) && p.metricas.length) F.metricas = p.metricas;
     if (p.ordenDrill) FD.orden = p.ordenDrill;
     if (p.escenario) FC.escenario = p.escenario;
+    if (p.metricaAcwr) FA.metrica = p.metricaAcwr;
     if (p.parejas) Object.assign(PAREJAS, p.parejas);
   } catch (e) { /* preferencias corruptas: se ignoran */ }
 }
