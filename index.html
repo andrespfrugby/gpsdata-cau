@@ -150,6 +150,20 @@ table.datos tbody tr:hover{background:var(--ink-800)}
 table.datos tbody tr.corte td{border-top:1px solid var(--ink-700)}
 table.datos.carga td.n i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:2px}
 table.datos.carga tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.06);color:var(--lav)}
+table.datos.acwrtabla th.col{cursor:pointer}
+table.datos.acwrtabla th.col:hover{color:var(--text)}
+table.datos td.acwr{font-weight:600}
+table.datos td.acwr.alta{color:#F08A90}
+table.datos td.acwr.ok{color:var(--teal)}
+table.datos td.acwr.baja{color:var(--lav)}
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px}
+.tag.alta{background:rgba(230,57,70,.16);color:#F08A90}
+.tag.ok{background:rgba(110,154,155,.18);color:var(--teal)}
+.tag.baja{background:rgba(160,167,216,.16);color:var(--lav)}
+.tag.na{background:var(--ink-800);color:var(--text-3)}
+td.chispa{display:flex;align-items:flex-end;gap:2px;height:34px;padding-top:12px}
+td.chispa i{width:9px;background:var(--ink-600);border-radius:2px;display:block}
+td.chispa i.ult{background:var(--teal)}
 table.datos th.orden{cursor:pointer;user-select:none}
 table.datos th.orden:hover{color:var(--text)}
 table.datos.drills td{padding:9px 10px}
@@ -278,6 +292,12 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   table.datos.drills .nomb{font-size:11px;color:#111}
   table.datos.drills .dur i{background:#bbb}
   table.datos.drills .dur span{color:#555}
+  table.datos td.acwr.alta{color:#b03a3a}
+  table.datos td.acwr.ok{color:#2f5f60}
+  table.datos td.acwr.baja{color:#4a5a8a}
+  .tag{border:1px solid #ccc;color:#333;background:#f4f4f4}
+  td.chispa i{background:#ccc}
+  td.chispa i.ult{background:#5a8b8c}
   .conmuta{display:none}
   .c{background:#f7f7f7;border:1px solid #ccc}
   .c b{color:#111;font-size:17px}
@@ -314,6 +334,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
       <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
       <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
       <button class="tab" role="tab" id="tab-carga" aria-selected="false">% Carga</button>
+      <button class="tab" role="tab" id="tab-acwr" aria-selected="false">Carga ACWR</button>
       <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
       <button class="tab abajo" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
     </nav>
