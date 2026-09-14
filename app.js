@@ -741,6 +741,24 @@ function vistaAcwr() {
 
   if (!filas.length) { $("#tabla").innerHTML = `<p class="empty">Sin datos para este equipo.</p>`; return; }
 
+  // Lo que importa no es cuánto histórico hay en total, sino cuánto cae dentro
+  // de los 28 días anteriores a la sesión elegida. Un año de datos con seis
+  // meses de parón justo antes no sirve para calcular una carga crónica.
+  const fin = ref.fecha.getTime() + 86400000;
+  const ventana = DATOS.filter(r => r.squad === F.squad
+    && r.fechaMs < fin && r.fechaMs >= fin - 28 * 86400000);
+  const sesionesVentana = new Set(ventana.map(r => idSesion(r))).size;
+  const semanasVentana = new Set(ventana.map(r =>
+    Math.floor((fin - r.fechaMs) / (7 * 86400000)))).size;
+
+  const aviso = semanasVentana >= 3 ? "" : `<div class="aviso espera" style="margin:0 0 16px">
+    En los 28 días anteriores al ${esc(fechaLarga(ref.fecha))} solo hay
+    <b>${sesionesVentana} ${sesionesVentana === 1 ? "sesión" : "sesiones"}</b>,
+    repartidas en ${semanasVentana} ${semanasVentana === 1 ? "semana" : "semanas"}.
+    El ratio compara la última semana contra la media de las cuatro anteriores, así que
+    necesita al menos tres semanas con trabajo. Empezará a salir cuando encadenes un mes seguido.
+  </div>`;
+
   const alto = c => (C.acwr && C.acwr.alto) ?? 1.3, bajo = () => (C.acwr && C.acwr.bajo) ?? 0.8;
   const clase = r => r == null ? "" : r > alto() ? "alta" : r < bajo() ? "baja" : "ok";
   // Se ordena por el peor caso de cada jugador, que es lo que quieres ver arriba.
@@ -783,7 +801,7 @@ function vistaAcwr() {
     </tr>`;
   }).join("");
 
-  $("#tabla").innerHTML = `
+  $("#tabla").innerHTML = `${aviso}
   <div class="celdas cuatro">
     <div class="c"><span>Referencia</span><b style="font-size:16px">${esc(fechaLarga(ref.fecha))}</b></div>
     <div class="c dest"><span>ACWR medio · distancia</span><b>${mediaRatio == null ? "–" : nf(mediaRatio, 2)}</b></div>
