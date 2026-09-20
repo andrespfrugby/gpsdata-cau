@@ -33,25 +33,40 @@ window.CAU_CONFIG = {
   //   "p95"     -> el percentil 95 de sus registros.
   techo: "auto",
 
-  // Sesiones mínimas de un jugador para poder calcular su techo. Con menos,
-  // las columnas de % salen vacías en vez de dar un 100% engañoso.
-  minSesionesTecho: 4,
+  // Sesiones mínimas de un jugador para calcular su techo. En 1 siempre se
+  // muestra y se va afinando conforme cargas sesiones.
+  minSesionesTecho: 1,
 
   // A partir de este % de su techo, la celda de exposición se pinta en verde.
   umbralExposicion: 85,
 
   // Umbral en G de la columna "Impacts" de Catapult, para etiquetarla bien.
-  // Déjalo vacío si no lo sabes: no cambia ningún cálculo, solo el título.
-  umbralImpacto: 6,
+  // Admite un número para todos o uno por equipo, como aquí. No cambia ningún
+  // cálculo, solo el título de la columna.
+  umbralImpacto: {
+    _defecto: 6,
+    "Femenino": 5
+  },
 
-  // Rangos de tus zonas de velocidad, para que salgan en el título del gráfico.
-  // Ejemplo: { 4: "5,5 - 7 m/s", 5: "> 7 m/s" }. Vacío = solo el número de zona.
+  // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
+  // Se pueden poner por equipo: el femenino lleva bandas distintas.
   zonasVelocidad: {
-    1: "0 – 1,5 m/s",
-    2: "1,5 – 3,5 m/s",
-    3: "3,5 – 5,5 m/s",
-    4: "5,5 – 7 m/s",
-    5: "> 7 m/s"
+    _defecto: {
+      1: "0 – 1,5 m/s",
+      2: "1,5 – 3,5 m/s",
+      3: "3,5 – 5,5 m/s",
+      4: "5,5 – 7 m/s",
+      5: "> 7 m/s"
+    },
+    // Bandas propias del femenino territorial: la alta velocidad arranca en
+    // 18 km/h y el sprint en 21,6, que es lo estándar en rugby femenino.
+    "Femenino": {
+      1: "0 – 1,5 m/s",
+      2: "1,5 – 3,5 m/s",
+      3: "3,5 – 5 m/s",
+      4: "5 – 6 m/s",
+      5: "> 6 m/s"
+    }
   },
 
   // DEMANDAS DE JUEGO 25/26 · tu estudio con los partidos de Liga Regular DHb
