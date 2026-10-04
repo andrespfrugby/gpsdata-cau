@@ -243,6 +243,37 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .pasos code{background:var(--ink-800);padding:1px 6px;border-radius:4px;font-family:'Chivo Mono';font-size:12px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---- Jugador: evolución individual ---- */
+body.sinSesion #paneles{display:block}
+body.sinSesion .panel{margin-bottom:16px}
+body.sinSesion #campoFecha{display:none}
+#campoJugador{display:none}
+body.sinSesion #campoJugador{display:flex}
+#fJugador{min-width:160px}
+.barraJug{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.segm{display:flex;gap:3px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:99px;padding:3px}
+.segm button{background:none;border:none;height:28px;padding:0 15px;border-radius:99px;font-size:12.5px;color:var(--text-3)}
+.segm button.on{background:var(--ink-700);color:var(--text);font-weight:500}
+.resumen.cinco{grid-template-columns:repeat(5,1fr)}
+@media(max-width:1100px){.resumen.cinco{grid-template-columns:repeat(2,1fr)}}
+.kpi.pico{border-left-color:var(--pink)}
+.svgJug{width:100%;height:auto;display:block}
+.svgJug text{font-family:'Chivo Mono',monospace}
+.ptJug{cursor:pointer}
+.sw.ln{width:16px;height:2px;border-radius:0}
+table.datos.jug td.ses{color:var(--text-2);max-width:260px;overflow:hidden;text-overflow:ellipsis}
+table.datos.jug th.minc,table.datos.jug td.minc{background:rgba(160,167,216,.08)}
+table.datos.jug td.minc{font-weight:600;color:var(--text)}
+table.datos.jug tr.fuera{opacity:.42}
+table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer}
+.tipoEv{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:99px;
+  background:rgba(160,167,216,.15);color:var(--lav)}
+.tipoEv.p{background:rgba(239,181,185,.16);color:var(--pink)}
+.tip{position:fixed;pointer-events:none;background:var(--ink-800);border:1px solid var(--ink-600);border-radius:8px;
+  padding:8px 11px;font-size:12px;opacity:0;transition:opacity .1s;z-index:50;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.tip b{font-family:'Chivo Mono';font-size:13px;display:block}
+.tip em{font-style:normal;color:var(--text-3)}
 @media print{
   @page{margin:9mm;size:landscape}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -299,6 +330,22 @@ table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
   td.chispa i{background:#ccc}
   td.chispa i.ult{background:#5a8b8c}
   .conmuta{display:none}
+  /* La pestaña de jugador en papel: fondo claro y todo el texto legible. */
+  .barraJug,.tip,table.datos.jug input{display:none}
+  .resumen{background:#fff !important;border:none;padding:0}
+  .svgJug text{fill:#444}
+  .svgJug line[stroke="#1B263B"]{stroke:#e3e3e3}
+  .svgJug rect{fill:#9aa3bd !important}
+  .svgJug path[fill^="url"]{opacity:.35}
+  table.datos.jug tr.fuera{display:none}
+  table.datos.jug th.minc,table.datos.jug td.minc{background:#eef0f7}
+  table.datos.jug td.minc,table.datos.jug td.ses,table.datos.jug td{color:#111}
+  table.datos.jug .tipoEv{background:#ececec;color:#333;border:none}
+  table.datos.jug .tipoEv.p{background:#f7e6e8;color:#a3444d}
+  .panel .sub{color:#555}
+  .panel.ancho{break-inside:auto;page-break-inside:auto}
+  .cabPdf{font-size:15px;color:#111;margin-bottom:10px}
+  .cabPdf b{font-size:17px}
   .c{background:#f7f7f7;border:1px solid #ccc}
   .c b{color:#111;font-size:17px}
   .c span{color:#555}
@@ -333,6 +380,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
     <nav role="tablist">
       <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
       <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
+      <button class="tab" role="tab" id="tab-jugador" aria-selected="false">Jugador</button>
       <button class="tab" role="tab" id="tab-carga" aria-selected="false">% Carga</button>
       <button class="tab" role="tab" id="tab-acwr" aria-selected="false">Carga ACWR</button>
       <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
@@ -347,7 +395,8 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
         <div class="cab" id="cab"></div>
         <div class="ctrl">
           <div class="field"><label for="fSquad">Equipo</label><select id="fSquad"></select></div>
-          <div class="field"><label for="fFecha">Sesión</label><select id="fFecha"></select></div>
+          <div class="field" id="campoFecha"><label for="fFecha">Sesión</label><select id="fFecha"></select></div>
+          <div class="field" id="campoJugador"><label for="fJugador">Jugador</label><select id="fJugador"></select></div>
           <button id="btnPdf">Exportar PDF</button>
         </div>
       </div>
@@ -360,6 +409,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
     </div>
   </main>
 </div>
+<div class="tip" id="tipJug"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
