@@ -347,6 +347,22 @@ svg.cols text{font-family:'Chivo Mono',monospace}
 .enlace{background:none;border:none;padding:0;height:auto;color:var(--teal);font-size:12px;
   text-decoration:underline;cursor:pointer;font-family:inherit}
 .enlace:hover{color:var(--text)}
+
+/* ---- Comentarios escritos a mano ---- */
+.panel.comentarios{margin-top:16px}
+.coment{min-height:84px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:10px;
+  padding:11px 14px;font-size:14px;line-height:1.6;white-space:pre-wrap;outline:none}
+.coment:focus{border-color:var(--teal)}
+.coment:empty:before{content:attr(data-vacio);color:var(--text-3)}
+
+/* ---- Informe de varias métricas del jugador ---- */
+.chipsJug{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:-8px 0 16px}
+.chipsJug .et{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
+.chipsJug .chip{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:99px;
+  height:28px;padding:0 12px;font-size:12.5px;color:var(--text-2);cursor:pointer;font-family:inherit}
+.chipsJug .chip:hover{border-color:var(--teal);color:var(--text)}
+.chipsJug .chip i{font-style:normal;color:var(--text-3);margin-left:4px}
+#jMas{max-width:210px}
 @media print{
   @page{margin:9mm;size:landscape}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -388,8 +404,12 @@ svg.cols text{font-family:'Chivo Mono',monospace}
      primero el resumen de la sesión, los paneles después. */
   .wrap{display:flex;flex-direction:column}
   #resumen{order:1}
-  #tabla{order:2;break-after:page;page-break-after:always}
-  #paneles{order:3}
+  /* Sin saltos forzados: el resumen y la tabla llenan la primera hoja y los
+     comentarios siguen justo detrás, compartiendo página con el primer panel
+     si queda sitio. Forzar el salto dejaba una hoja casi vacía. */
+  #tabla{order:2}
+  #notas{order:3}
+  #paneles{order:4}
   .tablon{border:none;padding:0;margin-bottom:0}
   .leyTabla{color:#6B7384;font-size:7.5px;gap:12px;margin-top:6px;padding-top:5px;border-top:1px solid #EDEFF3}
   .leyTabla i{width:8px;height:8px}
@@ -442,7 +462,15 @@ svg.cols text{font-family:'Chivo Mono',monospace}
   td.chispa i.ult{background:#5a8b8c}
   .conmuta{display:none}
   /* La pestaña de jugador en papel: fondo claro y todo el texto legible. */
-  .barraJug,.tip,table.datos.jug input{display:none}
+  .barraJug,.chipsJug,.tip,table.datos.jug input{display:none}
+  /* Los comentarios se imprimen como texto, sin la caja de edición. */
+  .panel.comentarios{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #D4D8E0;
+    padding:6px 10px;margin-top:6px}
+  .panel.comentarios h3{color:#14161C;font-size:11px;margin-bottom:4px}
+  .coment{background:#FBFCFD !important;border:1px solid #E2E6EE;color:#14161C;font-size:11px;
+    min-height:0;padding:8px 11px;white-space:pre-wrap}
+  .coment:empty{display:none}
+  .noPdf{display:none}
   .resumen{background:#fff !important;border:none;padding:0}
   .svgJug text{fill:#444}
   .svgJug line[stroke="#1B263B"]{stroke:#e3e3e3}
@@ -501,7 +529,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   /* La nota de los paneles se iba sola a una página en blanco al final. */
   .leyPaneles{display:none}
   /* el minigráfico también se imprime */
-  .resumen.cinco .kpi .chispa{display:block;height:26px}
+  .resumen.cinco .kpi .chispa{display:block;height:20px}
   .delta.sube{color:#2F5F60}
   .delta.baja{color:#9C4B52}
 }
@@ -540,6 +568,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
       <div class="selectores" id="selectores"></div>
       <div class="paneles" id="paneles"></div>
       <div id="tabla"></div>
+      <div id="notas"></div>
     </div>
   </main>
 </div>
