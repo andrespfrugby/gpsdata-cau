@@ -52,6 +52,11 @@ window.CAU_CONFIG = {
     "Femenino": 5
   },
 
+  // Umbral de la distancia a alta velocidad de Catapult, para que en el título
+  // del gráfico se vea qué está midiendo. Admite un valor por equipo, igual
+  // que las zonas. Déjalo vacío si no quieres que salga.
+  umbralSprint: { _defecto: "> 5 m/s", "Femenino": "> 5 m/s" },
+
   // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
   // Se pueden poner por equipo: el femenino lleva bandas distintas.
   zonasVelocidad: {
