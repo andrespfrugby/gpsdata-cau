@@ -37,8 +37,12 @@ window.CAU_CONFIG = {
   // muestra y se va afinando conforme cargas sesiones.
   minSesionesTecho: 1,
 
-  // A partir de este % de su techo, la celda de exposición se pinta en verde.
-  umbralExposicion: 85,
+  // A partir de este % de su propio techo, la celda se pinta en verde.
+  // A la velocidad punta se llega más a menudo que a la aceleración máxima: con
+  // tus datos, el 90% de la top speed y el 85% de la ACC máx se cruzan los dos
+  // en torno a un tercio de las sesiones, así que el verde significa lo mismo
+  // en las dos columnas. Puedes poner un solo número para usarlo en ambas.
+  umbralExposicion: { velocidad: 90, aceleracion: 85 },
 
   // Umbral en G de la columna "Impacts" de Catapult, para etiquetarla bien.
   // Admite un número para todos o uno por equipo, como aquí. No cambia ningún
