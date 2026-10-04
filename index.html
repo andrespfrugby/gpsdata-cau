@@ -280,8 +280,8 @@ table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer
 @media(max-width:620px){.medallas{grid-template-columns:repeat(2,1fr)}}
 .medalla{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:10px;padding:8px 9px;
   display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.medalla .top{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-height:28px}
-.medalla .ico{font-size:17px;line-height:1;width:19px;text-align:center;flex:none}
+.medalla .top{display:flex;align-items:center;gap:8px;margin-bottom:5px;min-height:30px}
+.medalla .ico{font-size:22px;line-height:1;width:25px;text-align:center;flex:none}
 .medalla .tit{min-width:0}
 .medalla .tit b{display:block;font-size:10.5px;font-weight:600;line-height:1.22;letter-spacing:-.01em}
 .medalla ol{list-style:none;margin:auto 0 0;padding:0}
@@ -313,7 +313,7 @@ table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer
 /* ---- Semáforo, alertas e iconos de la tabla ---- */
 table.datos td.n{text-align:center}
 table.datos th.n{text-align:center}
-.icoMejor{font-size:11px;margin-left:5px;vertical-align:-1px}
+.icoMejor{font-size:14px;margin-left:6px;vertical-align:-3px}
 .alertaG{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
   background:var(--sand);color:#3A2F0B;font-size:10px;font-weight:700;margin-left:5px;
   cursor:help;vertical-align:-3px;line-height:1}
@@ -326,6 +326,27 @@ table.datos th.n{text-align:center}
   color:var(--text-3);margin-top:2px}
 .leyPaneles i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .leyPaneles i.raya{width:2px;height:11px;border-radius:0;background:var(--pink)}
+
+/* ---- Paneles de columnas agrupadas por línea ---- */
+.paneles{grid-template-columns:1fr}
+.panel .cajasMedia{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px}
+.cm{background:var(--ink-800);border-left:3px solid var(--ink-600);border-radius:8px;padding:6px 12px;min-width:102px}
+.cm span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3)}
+.cm b{font-family:'Chivo Mono';font-size:16px;letter-spacing:-.02em;font-weight:600;display:block;line-height:1.25}
+.cm.eq{background:rgba(239,181,185,.14);border:1px solid rgba(239,181,185,.3);border-left:1px solid rgba(239,181,185,.3)}
+.cm.eq b{color:var(--pink);font-size:20px}
+svg.cols{width:100%;height:auto;display:block}
+svg.cols text{font-family:'Chivo Mono',monospace}
+.leyPaneles{grid-column:1/-1;display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin-top:2px}
+
+/* ---- Minigráfico en las cajas de promedio ---- */
+.resumen.cinco .kpi .chispa{display:block;width:100%;height:32px;margin-top:5px}
+.delta{font-family:'Chivo Mono';font-size:10.5px;margin-left:6px}
+.delta.sube{color:var(--teal)}
+.delta.baja{color:var(--pink)}
+.enlace{background:none;border:none;padding:0;height:auto;color:var(--teal);font-size:12px;
+  text-decoration:underline;cursor:pointer;font-family:inherit}
+.enlace:hover{color:var(--text)}
 @media print{
   @page{margin:9mm;size:landscape}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -342,7 +363,7 @@ table.datos th.n{text-align:center}
   /* El reporte en papel: podio y promedios arriba, tabla, y los paneles después. */
   .medallas{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:7px;break-inside:avoid}
   .medalla{background:#FBFCFD !important;border:1px solid #D4D8E0;border-radius:7px;padding:6px 8px}
-  .medalla .ico{font-size:13px;width:16px}
+  .medalla .ico{font-size:16px;width:19px}
   .medalla .top{min-height:0;margin-bottom:4px}
   .medalla .tit b{font-size:9px;color:#14161C}
   .larga{display:inline}.corta{display:none}
@@ -375,7 +396,7 @@ table.datos th.n{text-align:center}
   .leyTabla i.sw.verde{background:#D8E8E4}
   .leyTabla b{color:#14161C}
   table.datos td.n.verde{background:#D8E8E4;color:#2F5F60;font-weight:600}
-  .icoMejor{font-size:9px}
+  .icoMejor{font-size:11px;vertical-align:-2px}
   .alertaG{width:12px;height:12px;font-size:8px;background:#E8CF6E;color:#4A3B06}
   .kpi{border:1px solid #ccc;background:#f7f7f7}
   .kpi b{color:#111;font-size:18px}
@@ -462,26 +483,26 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   table.datos td.pos{color:#555}
 
   /* Los paneles van al final del bloque de impresión a propósito: así ganan a
-     las reglas de arriba y los seis caben en una hoja con quince jugadores. */
-  .paneles{grid-template-columns:repeat(3,1fr);gap:6px;align-items:start}
-  .panel{padding:6px 8px;background:#fff;border:1px solid #D4D8E0;border-radius:8px}
-  .panel h3{font-size:10px;line-height:1.2}
-  .avgline{margin-bottom:3px;font-size:7.5px}
-  .avgline b{font-size:12px}
-  .fila{grid-template-columns:58px 1fr 42px;padding:0;gap:5px;line-height:1.2}
-  .fila .nom{font-size:8px;color:#222}
-  .fila .val{font-size:8px}
-  .pista{height:7px;background:#EDEFF3}
-  .pista i{background:#8E98C8}
-  .pista i.cumple{background:#8FB3B4}
-  .pista u{background:#C0392B;width:1.5px}
-  .pie.cajas{margin-top:4px;padding-top:3px;border-top:1px solid #EDEFF3;gap:3px}
-  .caja{background:#F1F3F7 !important;border:none;padding:1px 6px;font-size:6.5px;color:#6B7384;white-space:nowrap}
-  .caja b{font-size:8px;color:#3B414E}
-  .leyPaneles{color:#6B7384;font-size:7.5px;gap:12px;margin-top:4px}
-  .leyPaneles i{width:8px;height:8px;background:#8FB3B4}
-  .leyPaneles i.raya{width:2px;height:9px;background:#C0392B}
-  .leyPaneles span:nth-child(2) i{background:#8E98C8}
+     las reglas de arriba. Dos por página, que una columna agrupada necesita
+     ancho para que quepan los nombres girados. */
+  /* Una columna agrupada necesita el ancho de la hoja, así que van de una en
+     una: dos paneles por página. */
+  .paneles{grid-template-columns:1fr;gap:7px;align-items:start}
+  .panel{padding:7px 10px;background:#fff;border:1px solid #D4D8E0;border-radius:8px}
+  .panel h3{font-size:11px;line-height:1.2;color:#14161C}
+  .panel .cajasMedia{gap:5px;margin-bottom:7px}
+  .cm{background:#F4F6FA !important;border:1px solid #E2E6EE;border-left:3px solid #C9CED8;padding:4px 9px;min-width:88px}
+  .cm span{color:#6B7384;font-size:7px}
+  .cm b{color:#14161C;font-size:12px}
+  .cm.eq{background:#FBF0F1 !important;border:1px solid #EBD3D5}
+  .cm.eq b{color:#9C4B52;font-size:14px}
+  svg.cols text{fill:#3B414E}
+  svg.cols line[stroke="#1B263B"]{stroke:#E6E9EF}
+  .leyPaneles{color:#6B7384;font-size:7.5px;gap:12px;margin-top:3px}
+  /* el minigráfico también se imprime */
+  .resumen.cinco .kpi .chispa{display:block;height:26px}
+  .delta.sube{color:#2F5F60}
+  .delta.baja{color:#9C4B52}
 }
 </style>
 </head>
