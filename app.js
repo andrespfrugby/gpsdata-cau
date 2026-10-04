@@ -94,12 +94,27 @@ const RESUMEN = [
 /* Los nombres se dejan tal cual salen en el Sheets, para que no haya dudas
    de qué columna es cada cosa. Solo se les añade el rango cuando lo tienes
    configurado, porque el export no lo trae. */
-const RANGOS_ZONA = (C.zonasVelocidad) || {};
+/**
+ * Los umbrales de Catapult se configuran por jugador, así que cada equipo
+ * puede tener los suyos. Si el ajuste trae "_defecto" se entiende que está
+ * repartido por equipo; si no, vale para todos.
+ */
+function porEquipo(ajuste, squad) {
+  if (ajuste == null) return null;
+  if (typeof ajuste !== "object") return ajuste;
+  if (!("_defecto" in ajuste) && !(squad in ajuste)) return ajuste;
+  return ajuste[squad] !== undefined ? ajuste[squad] : ajuste._defecto;
+}
+const zonasDe = () => porEquipo(C.zonasVelocidad, F.squad) || {};
+const impactoDe = () => porEquipo(C.umbralImpacto, F.squad);
+
 const nombreMetrica = c => {
+  const RANGOS_ZONA = zonasDe();
   if (c === HMLD) return "HMLD (m)  ·  > 25 w/kg";
   const z = c.match(/Speed Zone (\d)/);
   if (z && RANGOS_ZONA[z[1]]) return c + "  ·  " + RANGOS_ZONA[z[1]];
-  if (c === "Impacts" && C.umbralImpacto) return "Impacts  ·  > " + C.umbralImpacto + " G";
+  const g = impactoDe();
+  if (c === "Impacts" && g) return "Impacts  ·  > " + g + " G";
   return c;
 };
 /* Versión corta para las cabeceras de la tabla. */
@@ -112,7 +127,8 @@ const CORTOS = {
   [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min", [ACDC3MIN]: "ACC+DECC / min",
   "Impacts": "Impactos", [HMLD]: "HMLD", [ACC3]: "ACC > 3", [DEC3]: "DECC > 3",
   "Distance (metres)": "Distancia", "Sprint Distance (m)": "Sprint dist.",
-  "Player Load": "Player load", "Power Plays": "Power plays"
+  "Player Load": "Player load", "Power Plays": "Power plays",
+  "Distance Per Min (m/min)": "Dist. / min", "Energy (kcal)": "Energía", "Hr Load": "Carga HR"
 };
 const nombreCorto = c => CORTOS[c] || (CALCULADAS.includes(c) ? c : c)
   .replace(/Accelerations Zone Count: (.*) m\/s\/s/, "ACC $1 m/s²")
@@ -1721,8 +1737,255 @@ function tabla(filas) {
   </section>`;
 }
 
+/* ---------- evolución individual de un jugador ---------- */
+const FJ = { jugador:"", tipo:"todo", metrica:"Distance (metres)", ventana:10, marcadas:[] };
+
+/** Las sesiones del jugador elegido, ya filtradas por tipo de evento y ventana. */
+function sesionesJugador() {
+  const todas = DATOS.filter(r => r.squad === F.squad && r.jugador === FJ.jugador)
+    .sort((a, b) => a.fechaMs - b.fechaMs);
+  let v = todas;
+  if (FJ.tipo === "partido") v = v.filter(r => r.esPartido);
+  else if (FJ.tipo === "entreno") v = v.filter(r => !r.esPartido);
+  else if (FJ.tipo === "elegir") v = v.filter(r => FJ.marcadas.includes(idSesion(r)));
+  // La ventana cuenta sesiones, no días: con parones de meses los días engañan.
+  if (FJ.ventana && FJ.tipo !== "elegir") v = v.slice(-FJ.ventana);
+  return { todas, v };
+}
+
+const valorJug = (r, col) => col === "__min" ? r.minutos : Math.abs(r.crudo[col] || 0);
+const diaCorto = d => String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+
+/**
+ * La gráfica: línea de la métrica y, debajo y en el mismo eje de tiempo,
+ * los minutos de cada sesión. Un pico de HMLD se lee distinto si ese día
+ * jugó 90 minutos o 17.
+ */
+function graficaJugador(v, col) {
+  if (v.length < 2) return `<p class="empty">Hacen falta al menos dos sesiones para dibujar la línea.</p>`;
+  const W = 1120, H = 320, L = 60, R = 20, T = 22, B = 104;
+  const iw = W - L - R, ih = H - T - B;
+  const vals = v.map(r => valorJug(r, col));
+  const dec = col === "__min" ? 0 : decimales(vals);
+  const alto = Math.max(...vals), bajo = Math.min(...vals);
+  const suelo = Math.max(0, bajo - (alto - bajo) * 0.25);
+  const techo = alto + (alto - bajo) * 0.12 || alto * 1.1 || 1;
+  const media = vals.reduce((t, n) => t + n, 0) / vals.length;
+  const x = i => L + (v.length === 1 ? iw / 2 : iw * i / (v.length - 1));
+  const y = n => T + ih - (n - suelo) / ((techo - suelo) || 1) * ih;
+  const maxMin = Math.max(...v.map(r => r.minutos), 1);
+  const anchoB = Math.min(30, iw / v.length * 0.5);
+  const base = H - 30, cima = H - B + 30, altoBarra = base - cima;
+
+  let g = "";
+  for (let i = 0; i <= 4; i++) {
+    const n = suelo + (techo - suelo) * i / 4, yy = y(n);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#1B263B"/>
+          <text x="${L - 9}" y="${yy + 4}" fill="#6B7A94" font-size="11" text-anchor="end">${nf(n, dec ? 1 : 0)}</text>`;
+  }
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(media)}" y2="${y(media)}" stroke="#6E9A9B" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="${W - R}" y="${y(media) - 7}" fill="#6E9A9B" font-size="11" text-anchor="end">media ${nf(media, dec)}</text>`;
+
+  const d = v.map((r, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(valorJug(r, col)).toFixed(1)}`).join(" ");
+  g += `<path d="${d} L${x(v.length - 1).toFixed(1)},${T + ih} L${L},${T + ih} Z" fill="url(#degJug)"/>
+        <path d="${d}" fill="none" stroke="#A0A7D8" stroke-width="2.2" stroke-linejoin="round"/>`;
+
+  g += `<line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" stroke="#26344F"/>
+        <text x="${L - 9}" y="${base + 4}" fill="#6B7A94" font-size="10" text-anchor="end">min</text>`;
+  v.forEach((r, i) => {
+    const h = Math.max(2, r.minutos / maxMin * altoBarra);
+    g += `<rect x="${(x(i) - anchoB / 2).toFixed(1)}" y="${(base - h).toFixed(1)}" width="${anchoB.toFixed(1)}"
+           height="${h.toFixed(1)}" rx="3" fill="${r.esPartido ? "#3B3346" : "#26344F"}"/>
+          <text x="${x(i).toFixed(1)}" y="${H - 12}" fill="#6B7A94" font-size="10.5" text-anchor="middle">${diaCorto(r.fecha)}</text>`;
+    if (v.length <= 18) g += `<text x="${x(i).toFixed(1)}" y="${(base - h - 5).toFixed(1)}"
+           fill="#9EABC2" font-size="10.5" text-anchor="middle">${nf(r.minutos)}'</text>`;
+  });
+  v.forEach((r, i) => {
+    g += `<circle class="ptJug" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(valorJug(r, col)).toFixed(1)}"
+           r="${r.esPartido ? 6 : 4.5}" fill="${r.esPartido ? "#EFB5B9" : "#A0A7D8"}" stroke="#151F33" stroke-width="2"/>`;
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="svgJug" role="img" aria-label="Evolución de ${esc(nombreMetrica(col))}">
+    <defs><linearGradient id="degJug" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#A0A7D8" stop-opacity=".22"/>
+      <stop offset="100%" stop-color="#A0A7D8" stop-opacity="0"/></linearGradient></defs>${g}</svg>`;
+}
+
+/** Cómo se llama el filtro activo, para el encabezado del PDF. */
+function lblFiltro() {
+  const t = { todo:"todas las sesiones", partido:"solo partidos",
+              entreno:"solo entrenamientos", elegir:"eventos elegidos a mano" }[FJ.tipo];
+  const v = FJ.ventana && FJ.tipo !== "elegir" ? "últimas " + FJ.ventana : "histórico completo";
+  return t + " · " + v;
+}
+
+function vistaJugador() {
+  $("#selectores").innerHTML = "";
+  $("#tabla").innerHTML = "";
+  $("#resumen").innerHTML = "";
+
+  const delEquipo = DATOS.filter(r => r.squad === F.squad);
+  const jugadores = [...new Set(delEquipo.map(r => r.jugador))].sort();
+  if (!jugadores.length) {
+    $("#cab").innerHTML = "";
+    $("#paneles").innerHTML = `<p class="empty">No hay datos de ${esc(F.squad)} todavía.</p>`;
+    return;
+  }
+  if (!jugadores.includes(FJ.jugador)) {
+    // Por defecto, el que más sesiones tiene: es con quien vas a querer empezar.
+    const cuenta = {};
+    for (const r of delEquipo) cuenta[r.jugador] = (cuenta[r.jugador] || 0) + 1;
+    FJ.jugador = jugadores.slice().sort((a, b) => cuenta[b] - cuenta[a])[0];
+  }
+  const selJ = $("#fJugador");
+  selJ.innerHTML = jugadores.map(j =>
+    `<option value="${esc(j)}"${j === FJ.jugador ? " selected" : ""}>${esc(j)}</option>`).join("");
+
+  const { todas, v } = sesionesJugador();
+  const disponibles = todasMetricas();
+  if (FJ.metrica !== "__min" && !disponibles.includes(FJ.metrica)) FJ.metrica = disponibles[0] || "__min";
+  const col = FJ.metrica;
+  const dec = col === "__min" ? 0 : decimales(todas.map(r => valorJug(r, col)));
+
+  const ultima = todas[todas.length - 1];
+  $("#cab").innerHTML = `
+    <h2>${esc(FJ.jugador)}<span class="md">${esc(ultima.posicion)}</span></h2>
+    <span class="meta">${todas.length} ${todas.length === 1 ? "sesión" : "sesiones"} en el histórico ·
+      de ${esc(fechaLarga(todas[0].fecha))} a ${esc(fechaLarga(ultima.fecha))}</span>`;
+
+  const grupos = METRICAS.map(([g, cols]) => `<optgroup label="${esc(g)}">` +
+    cols.map(c => `<option value="${esc(c)}"${c === col ? " selected" : ""}>${esc(nombreMetrica(c))}</option>`).join("") +
+    `</optgroup>`).join("") +
+    `<optgroup label="Otros"><option value="__min"${col === "__min" ? " selected" : ""}>Minutos</option></optgroup>`;
+
+  const tipos = [["todo","Todo"],["partido","Partidos"],["entreno","Entrenos"],["elegir","Elegir eventos"]];
+  const ventanas = [[10,"Últimas 10 sesiones"],[20,"Últimas 20 sesiones"],[0,"Todo el histórico"]];
+
+  // En papel la cabecera de la app no se imprime, así que el nombre va aquí.
+  const tituloPdf = `<div class="soloPdf cabPdf"><b>${esc(FJ.jugador)}</b> · ${esc(ultima.posicion)} ·
+    ${esc(F.squad)} · ${esc(lblFiltro())}</div>`;
+  const barra = tituloPdf + `<div class="barraJug">
+    <div class="segm" id="jTipo">${tipos.map(([k, t]) =>
+      `<button data-v="${k}" class="${FJ.tipo === k ? "on" : ""}">${t}</button>`).join("")}</div>
+    <div class="field"><label for="jMet">Métrica</label><select id="jMet">${grupos}</select></div>
+    <div class="field"><label for="jVent">Ventana</label><select id="jVent">${ventanas.map(([n, t]) =>
+      `<option value="${n}"${FJ.ventana === n ? " selected" : ""}>${t}</option>`).join("")}</select></div>
+  </div>`;
+
+  if (!v.length) {
+    $("#paneles").innerHTML = barra + `<p class="empty">Ninguna sesión suya encaja con este filtro.</p>`;
+    engancharJugador();
+    return;
+  }
+
+  const vals = v.map(r => valorJug(r, col));
+  const media = vals.reduce((t, n) => t + n, 0) / vals.length;
+  const mejor = Math.max(...vals);
+  const diaMejor = v[vals.indexOf(mejor)];
+  const mins = v.reduce((t, r) => t + r.minutos, 0);
+  const partidos = v.filter(r => r.esPartido).length;
+  const ult = v[v.length - 1];
+  const delta = media ? (valorJug(ult, col) / media - 1) * 100 : null;
+  const lbl = col === "__min" ? "Minutos" : nombreMetrica(col);
+  const uni = col === "__min" ? "min" : unidad(col);
+
+  const kpis = `<div class="resumen cinco">
+    <div class="kpi"><span class="k">Sesiones</span><b>${v.length}</b>
+      <span class="s">${partidos} ${partidos === 1 ? "partido" : "partidos"} ·
+        ${v.length - partidos} ${v.length - partidos === 1 ? "entreno" : "entrenos"}</span></div>
+    <div class="kpi int"><span class="k">Minutos totales</span><b>${nf(mins)}<i> min</i></b>
+      <span class="s">media ${nf(mins / v.length)} min por sesión</span></div>
+    <div class="kpi"><span class="k">${esc(lbl)} · media</span><b>${fmt(col, media, decMedia(dec))}<i>${uni ? " " + uni : ""}</i></b>
+      <span class="s">en esta ventana</span></div>
+    <div class="kpi pico"><span class="k">${esc(lbl)} · su mejor</span><b>${fmt(col, mejor, dec)}<i>${uni ? " " + uni : ""}</i></b>
+      <span class="s">${esc(fechaLarga(diaMejor.fecha))}</span></div>
+    <div class="kpi int"><span class="k">Última sesión</span><b>${fmt(col, valorJug(ult, col), dec)}</b>
+      <span class="s">${delta == null ? "" : (delta >= 0 ? "+" : "") + nf(delta) + "% sobre su media"}</span></div>
+  </div>`;
+
+  const marcadas = FJ.marcadas.length;
+  const filas = todas.slice().reverse().map(r => {
+    const dentro = v.includes(r);
+    const id = idSesion(r);
+    return `<tr class="${dentro ? "" : "fuera"}">
+      <td><input type="checkbox" class="chkJug" data-id="${esc(id)}" ${FJ.marcadas.includes(id) ? "checked" : ""}
+           aria-label="Incluir ${esc(r.sesion)}"></td>
+      <td>${esc(fechaLarga(r.fecha))}</td>
+      <td class="ses" title="${esc(r.sesion)}">${esc(r.sesion)}</td>
+      <td><span class="tipoEv${r.esPartido ? " p" : ""}">${r.esPartido ? "Partido" : "Entreno"}</span></td>
+      <td class="n minc">${nf(r.minutos)}</td>
+      ${COLS_JUG.map(c => `<td class="n">${c in r.crudo ? fmt(c, Math.abs(r.crudo[c]), c === "Top Speed (m/s)" ? 2 : 0) : "–"}</td>`).join("")}
+    </tr>`;
+  }).join("");
+
+  $("#paneles").innerHTML = barra + kpis + `
+    <section class="panel ancho">
+      <h3>Evolución · ${esc(lbl)}</h3>
+      <p class="sub">Cada punto es una sesión completa. Las barras de abajo son los minutos de ese día.</p>
+      ${graficaJugador(v, col)}
+      <div class="leyenda">
+        <span><i class="sw" style="background:#EFB5B9"></i> Partido</span>
+        <span><i class="sw" style="background:#A0A7D8"></i> Entrenamiento</span>
+        <span><i class="sw ln" style="background:#6E9A9B"></i> Su media en la ventana</span>
+        <span><i class="sw" style="background:#26344F"></i> Minutos</span>
+      </div>
+    </section>
+    <section class="panel ancho">
+      <h3>Sesiones</h3>
+      <p class="sub">${marcadas
+        ? `${marcadas} ${marcadas === 1 ? "evento marcado" : "eventos marcados"} · la gráfica muestra solo esos`
+        : "Marca las que quieras comparar y la gráfica se queda solo con esas"}</p>
+      <div class="scroll"><table class="datos jug">
+        <thead><tr><th></th><th>Fecha</th><th>Sesión</th><th>Tipo</th><th class="n minc">Min</th>
+          ${COLS_JUG.map(c => `<th class="n">${esc(nombreCorto(c))}</th>`).join("")}</tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </section>`;
+
+  engancharJugador(v);
+}
+
+/* Las columnas de la tabla del jugador: las que de verdad se miran sesión a sesión. */
+const COLS_JUG = ["Distance (metres)", HMLD, "Sprint Distance (m)", "Distance Per Min (m/min)",
+                  "Top Speed (m/s)", ACC3, DEC3, "Player Load"];
+
+function engancharJugador(v) {
+  const sel = $("#jMet"); if (sel) sel.onchange = e => { FJ.metrica = e.target.value; pintar(); };
+  const vent = $("#jVent"); if (vent) vent.onchange = e => { FJ.ventana = +e.target.value; pintar(); };
+  document.querySelectorAll("#jTipo button").forEach(b => b.onclick = () => {
+    FJ.tipo = b.dataset.v;
+    if (FJ.tipo !== "elegir") FJ.marcadas = [];
+    pintar();
+  });
+  document.querySelectorAll(".chkJug").forEach(c => c.onchange = () => {
+    const id = c.dataset.id;
+    FJ.marcadas = c.checked ? FJ.marcadas.concat([id]) : FJ.marcadas.filter(x => x !== id);
+    // Marcar una casilla ya dice lo que quieres: no hace falta tocar también el filtro.
+    if (FJ.marcadas.length) FJ.tipo = "elegir";
+    pintar();
+  });
+  if (!v) return;
+  const tip = $("#tipJug");
+  document.querySelectorAll(".ptJug").forEach(p => {
+    const r = v[+p.dataset.i];
+    p.onmouseenter = () => {
+      const dec = FJ.metrica === "__min" ? 0 : decimales(v.map(x => valorJug(x, FJ.metrica)));
+      tip.innerHTML = `<b>${fmt(FJ.metrica, valorJug(r, FJ.metrica), dec)}</b>
+        <em>${esc(fechaLarga(r.fecha))} · ${nf(r.minutos)} min</em><br>${esc(r.sesion)}`;
+      tip.style.opacity = 1;
+    };
+    p.onmousemove = e => { tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY - 10) + "px"; };
+    p.onmouseleave = () => { tip.style.opacity = 0; };
+  });
+}
+
 function pintar() {
   recordar();
+  // La pestaña se recuerda entre recargas: el resaltado tiene que ir con ella.
+  document.querySelectorAll(".tab").forEach(t =>
+    t.setAttribute("aria-selected", t.id === "tab-" + F.pestana));
+  document.body.classList.toggle("sinSesion", F.pestana === "jugador");
+  if (F.pestana === "jugador") return vistaJugador();
   if (F.pestana === "acwr") return vistaAcwr();
   if (F.pestana === "carga") return vistaCarga();
   if (F.pestana === "drill") return vistaDrill();
@@ -1777,6 +2040,7 @@ function pintar() {
 function eventos() {
   $("#fSquad").onchange = e => { F.squad = e.target.value; poblarFechas(); pintar(); };
   $("#fFecha").onchange = e => { F.fecha = e.target.value; pintar(); };
+  $("#fJugador").onchange = e => { FJ.jugador = e.target.value; FJ.marcadas = []; pintar(); };
   $("#btnPdf").onclick = () => window.print();
   document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
     document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
@@ -1836,7 +2100,7 @@ function recordar() {
   try {
     localStorage.setItem(GUARDA, JSON.stringify({
       squad:F.squad, fecha:F.fecha, metricas:F.metricas, pestana:F.pestana, escenario:FC.escenario,
-      metricaAcwr:FA.metrica,
+      metricaAcwr:FA.metrica, jugador:FJ,
       parejas:PAREJAS, ordenDrill:FD.orden
     }));
   } catch (e) { /* navegador sin almacenamiento, no pasa nada */ }
@@ -1850,6 +2114,8 @@ function recuperar() {
     if (p.ordenDrill) FD.orden = p.ordenDrill;
     if (p.escenario) FC.escenario = p.escenario;
     if (p.metricaAcwr) FA.metrica = p.metricaAcwr;
+    if (p.jugador) Object.assign(FJ, p.jugador);
+    if (p.pestana) F.pestana = p.pestana;
     if (p.parejas) Object.assign(PAREJAS, p.parejas);
   } catch (e) { /* preferencias corruptas: se ignoran */ }
 }
