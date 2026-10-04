@@ -85,10 +85,21 @@ const TODAS_COLUMNAS = () => CATALOGO.concat(TABLA).flatMap(([, c]) => c);
 
 /* Los cuatro números fijos de la cabecera: vista general de la sesión. */
 const RESUMEN = [
-  { col:"Distance (metres)", titulo:"Distancia", uni:"m",   tipo:"vol" },
-  { col:HMLD,                titulo:"HMLD",      uni:"m",   tipo:"vol" },
-  { col:ACC3,                titulo:"ACC > 3",   uni:"m/s²", tipo:"int" },
-  { col:"Player Load",       titulo:"Player load", uni:"",  tipo:"vol" }
+  { col:"Distance (metres)",        titulo:"Distancia",            uni:"m",     tipo:"vol" },
+  { col:"Sprint Distance (m)",      titulo:"Dist. alta velocidad", uni:"m",     tipo:"vol" },
+  { col:"Distance Per Min (m/min)", titulo:"Distancia por min",    uni:"m/min", tipo:"int", sinTotal:true },
+  { col:ACC3,                       titulo:"ACC > 3 m/s²",         uni:"nº",    tipo:"int" },
+  { col:"Player Load",              titulo:"Player load",          uni:"",      tipo:"vol" }
+];
+
+/* Las cinco tarjetas de podio. Cada una mide algo distinto: dos de velocidad,
+   una mecánica, una de contacto y el volumen al final. */
+const TOP3 = [
+  { col:"Sprint Distance (m)",      ico:"🚀",  titulo:"Distancia alta velocidad (m)", corto:"Dist. alta vel." },
+  { col:"Top Speed (m/s)",          ico:"⚡",  titulo:"Velocidad máxima (m/s)",       corto:"Vel. máx m/s" },
+  { col:ACC3,                       ico:"🏎️", titulo:"Aceleraciones > 3 m/s²",       corto:"ACC > 3 m/s²" },
+  { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" },
+  { col:"Distance (metres)",        ico:"🛳️", titulo:"Distancia total (m)",          corto:"Distancia (m)" }
 ];
 
 /* Los nombres se dejan tal cual salen en el Sheets, para que no haya dudas
@@ -106,6 +117,14 @@ function porEquipo(ajuste, squad) {
   return ajuste[squad] !== undefined ? ajuste[squad] : ajuste._defecto;
 }
 const zonasDe = () => porEquipo(C.zonasVelocidad, F.squad) || {};
+/* A la velocidad punta se llega más a menudo que a la aceleración máxima, así
+   que cada una lleva su propio listón: con 90 y 85 el verde salta en torno a
+   un tercio de las sesiones en las dos, que es lo que hace que signifique igual. */
+const umbralDe = col => {
+  const u = C.umbralExposicion;
+  if (u && typeof u === "object") return col === PCTVEL ? (u.velocidad ?? 90) : (u.aceleracion ?? 85);
+  return u ?? (col === PCTVEL ? 90 : 85);
+};
 const impactoDe = () => porEquipo(C.umbralImpacto, F.squad);
 
 const nombreMetrica = c => {
@@ -115,6 +134,7 @@ const nombreMetrica = c => {
   if (z && RANGOS_ZONA[z[1]]) return c + "  ·  " + RANGOS_ZONA[z[1]];
   const g = impactoDe();
   if (c === "Impacts" && g) return "Impacts  ·  > " + g + " G";
+  if (c === "Sprint Distance (m)") return "Distancia alta velocidad (m)";
   return c;
 };
 /* Versión corta para las cabeceras de la tabla. */
@@ -126,7 +146,7 @@ const CORTOS = {
   "Deceleration Zone Count: 3 - 4 m/s/s": "DECC 3-4", "Deceleration Zone Count: > 4 m/s/s": "DECC > 4",
   [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min", [ACDC3MIN]: "ACC+DECC / min",
   "Impacts": "Impactos", [HMLD]: "HMLD", [ACC3]: "ACC > 3", [DEC3]: "DECC > 3",
-  "Distance (metres)": "Distancia", "Sprint Distance (m)": "Sprint dist.",
+  "Distance (metres)": "Distancia", "Sprint Distance (m)": "Dist. alta velocidad",
   "Player Load": "Player load", "Power Plays": "Power plays",
   "Distance Per Min (m/min)": "Dist. / min", "Energy (kcal)": "Energía", "Hr Load": "Carga HR"
 };
@@ -506,18 +526,39 @@ const sesion = () => DATOS.filter(r => r.squad === F.squad && idSesion(r) === F.
 /* ---------- pintado ---------- */
 /** Cuatro cifras fijas para leer la sesión antes de entrar en detalle. */
 function resumen(filas) {
-  return `<div class="resumen">${RESUMEN.map(r => {
+  return `<div class="resumen cinco">${RESUMEN.map(r => {
     if (!filas.some(x => r.col in x.crudo)) return "";
     const vals = filas.map(x => Math.abs(x.crudo[r.col] || 0));
     const media = vals.reduce((t, v) => t + v, 0) / (vals.length || 1);
     const total = vals.reduce((t, v) => t + v, 0);
     const dec = decMedia(decimales(vals));
-    return `<div class="kpi ${r.tipo}">
-      <span class="k">${r.tipo === "vol" ? "Volumen" : "Intensidad"}</span>
+    // El nombre de la métrica va arriba: "Volumen 4042" obliga a bajar la vista
+    // para enterarte de qué es ese 4042.
+    return `<div class="kpi ${r.tipo}" title="${esc(r.titulo)}">
+      <span class="k">${esc(r.titulo)}</span>
       <b>${nf(media, dec)}<i>${r.uni ? " " + r.uni : ""}</i></b>
-      <span class="s">${esc(r.titulo)} media · ${nf(total, 0)} total</span>
+      <span class="s"><em>${r.tipo === "vol" ? "Volumen" : "Intensidad"}</em>${
+        r.sinTotal ? " · media del equipo" : " · " + nf(total, 0) + " total"}</span>
     </div>`;
   }).join("")}</div>`;
+}
+
+/** Las cinco tarjetas de podio de la sesión. */
+function medallas(filas) {
+  const tarjetas = TOP3.filter(t => filas.some(r => t.col in r.crudo)).map(t => {
+    const orden = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[t.col] || 0) }))
+      .sort((a, b) => b.v - a.v).slice(0, 3);
+    const dec = decimales(filas.map(r => Math.abs(r.crudo[t.col] || 0)));
+    return `<div class="medalla">
+      <div class="top"><span class="ico">${t.ico}</span>
+        <span class="tit" title="${esc(t.titulo)}">
+          <b><span class="larga">${esc(t.titulo)}</span><span class="corta">${esc(t.corto)}</span></b></span></div>
+      <ol>${orden.map((d, i) => `<li class="p${i + 1}"><span class="pos">${i + 1}</span>
+        <span class="qui" title="${esc(d.pos)}">${esc(d.nom)}</span>
+        <span class="val">${fmt(t.col, d.v, dec)}</span></li>`).join("")}</ol>
+    </div>`;
+  }).join("");
+  return tarjetas ? `<div class="medallas">${tarjetas}</div>` : "";
 }
 
 function cabecera() {
@@ -529,7 +570,7 @@ function cabecera() {
   $("#cab").innerHTML = `
     <h2>${esc(titulos.join(" · ") || "Sesión")}${md ? `<span class="md${filas[0].esPartido ? " partido" : ""}">${md}</span>` : ""}</h2>
     <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
-  $("#resumen").innerHTML = resumen(filas);
+  $("#resumen").innerHTML = medallas(filas) + resumen(filas);
 }
 
 /** Decimales según el tamaño del número, para no enseñar 2569,68 ni 6 pelado. */
@@ -570,7 +611,7 @@ function panel(col, filas, indice) {
 
   const puestos = [...new Set(filas.map(r => r.posicion))].sort();
   const pie = puestos.length < 2 ? "" : `<div class="pie cajas">
-    ${puestos.map(p => `<span class="caja"><b>${fmt(col, mediaPuesto[p], decMedia(met.dec))}</b>${esc(puestoCorto(p))}</span>`).join("")}
+    ${puestos.map(p => `<span class="caja">Avg ${esc(p)}<b>${fmt(col, mediaPuesto[p], decMedia(met.dec))}</b></span>`).join("")}
   </div>`;
 
   return `<section class="panel">
@@ -1653,6 +1694,23 @@ function desvio(jugador, col, valor) {
   return (valor / mediana - 1) * 100;
 }
 
+/* Semáforo de cuatro paradas. Se usa la POSICIÓN del valor dentro de su columna,
+   no la escala cruda: con un dato disparado (69 impactos frente a ceros) la
+   escala lineal apelotona a todos los demás en el mismo tono. */
+const PARADAS = [[106,170,150], [224,205,110], [230,150,86], [224,88,96]];
+function semaforo(t) {
+  t = Math.max(0, Math.min(1, t));
+  const p = t * (PARADAS.length - 1), i = Math.min(PARADAS.length - 2, Math.floor(p)), f = p - i;
+  return PARADAS[i].map((c, j) => Math.round(c + (PARADAS[i + 1][j] - c) * f)).join(",");
+}
+/** Posición relativa de cada valor dentro de una lista, con empates promediados. */
+function posiciones(vals) {
+  const orden = vals.slice().sort((a, b) => a - b), mapa = {};
+  orden.forEach((v, i) => { if (!(v in mapa)) mapa[v] = [i, i]; else mapa[v][1] = i; });
+  for (const v in mapa) { const [a, b] = mapa[v]; mapa[v] = (a + b) / 2 / Math.max(1, vals.length - 1); }
+  return mapa;
+}
+
 /* Bandas sacadas del reparto real de tus sesiones: el 25% de las veces se baja
    de -17% y el 25% se pasa de +20%, así que fuera de esas bandas es día raro. */
 function bandaColor(p) {
@@ -1687,11 +1745,24 @@ function tabla(filas) {
   const grupos = cols.map(([g, c]) => `<th colspan="${c.length}" class="grupo">${esc(g)}</th>`).join("");
   const sub = planas.map(c => `<th class="n orden" data-c="${esc(c)}">${esc(nombreCorto(c))}${flechaJ(c)}</th>`).join("");
 
-  // Solo se sombrean el ritmo de aceleración, el de deceleración y los impactos.
-  const conSemaforo = c => c === ACC3MIN || c === DEC3MIN || c === "Impacts";
-
-  const tope = {};
-  for (const c of planas) tope[c] = Math.max(...filas.map(r => Math.abs(r.crudo[c] || 0)));
+  // Solo llevan degradado los dos ritmos por minuto. Ahí mucho es bueno, así
+  // que la escala va al revés: verde arriba.
+  const RITMO = [ACC3MIN, DEC3MIN];
+  const tope = {}, orden = {};
+  for (const c of planas) {
+    const vals = filas.map(r => Math.abs(r.crudo[c] || 0));
+    tope[c] = Math.max(...vals);
+    if (RITMO.includes(c)) orden[c] = posiciones(vals);
+  }
+  // En impactos casi todo el mundo está a cero, así que un degradado fingiría
+  // una escala que no existe: se marcan solo los tres que más recibieron.
+  const golpeados = filas.filter(r => Math.abs(r.crudo["Impacts"] || 0) > 0)
+    .sort((a, b) => Math.abs(b.crudo["Impacts"] || 0) - Math.abs(a.crudo["Impacts"] || 0))
+    .slice(0, 3).map(r => r.jugador);
+  const BANDAS_ALTAS = ["Impact Zones: 10 - 15 G (Impacts)", "Impact Zones: 15 - 20 G (Impacts)",
+                        "Impact Zones: > 20 G (Impacts)"];
+  // El icono del mejor de la sesión, el mismo que en su tarjeta de podio.
+  const ICONO = { "Top Speed (m/s)":"⚡", "Max Acceleration (m/s/s)":"🏎️" };
 
   let puestoPrevio = null;
   const cuerpo = jugadores.map(r => {
@@ -1701,28 +1772,42 @@ function tabla(filas) {
       <td>${esc(r.jugador)}</td><td class="pos">${esc(r.posicion)}</td>
       ${planas.map(c => {
         if (!(c in r.crudo) && (c === PCTVEL || c === PCTACC)) {
-          return `<td class="n" title="Necesita al menos ${C.minSesionesTecho ?? 4} sesiones">–</td>`;
+          return `<td class="n" title="Necesita al menos ${C.minSesionesTecho ?? 4} sesiones suyas">–</td>`;
         }
         const v = Math.abs(r.crudo[c] || 0);
-        // Cada celda se tiñe según su valor dentro de su columna, no entre columnas.
         let fondo = "";
-        if (conSemaforo(c)) {
-          const p = desvio(r.jugador, c, v);   // % respecto a lo habitual en él
-          if (p !== null) fondo = `background:rgba(${bandaColor(p)},.15)`;
+        if (RITMO.includes(c) && tope[c] > 0) {
+          fondo = `background:rgba(${semaforo(1 - orden[c][v])},.24)`;
+        } else if (c === "Impacts") {
+          const p = golpeados.indexOf(r.jugador);
+          if (p !== -1) fondo = `background:rgba(224,88,96,${[.34, .22, .13][p]})`;
         }
-        // Exposición: verde a partir del umbral, porque ahí sí hubo estímulo.
+        // Exposición: verde a partir de su umbral, porque ahí sí hubo estímulo.
         const esPct = c === PCTVEL || c === PCTACC;
-        const expuesto = esPct && v >= (C.umbralExposicion ?? 85);
+        const expuesto = esPct && v >= umbralDe(c);
         if (esPct) fondo = expuesto ? "background:rgba(110,154,155,.28)" : "";
-        // El líder de cada columna, en negrita y sin color.
         const lider = v === tope[c] && v > 0;
-        return `<td class="n${expuesto ? " verde" : ""}${lider ? " lider" : ""}" style="${fondo}">${fmt(c, v, dec[c])}</td>`;
+        // La alerta va en la banda de G que la provoca, no en el total.
+        const avisa = BANDAS_ALTAS.includes(c) && v > 0;
+        return `<td class="n${expuesto ? " verde" : ""}${lider ? " lider" : ""}" style="${fondo}">${
+          fmt(c, v, dec[c])}${
+          lider && ICONO[c] ? `<span class="icoMejor" title="El mejor de la sesión">${ICONO[c]}</span>` : ""}${
+          avisa ? `<span class="alertaG" title="${nf(v)} impacto${v === 1 ? "" : "s"} en esta banda">!</span>` : ""}</td>`;
       }).join("")}
     </tr>`;
   }).join("");
 
 
 
+
+  const ley = `<div class="leyTabla">
+    <span><i style="background:rgba(${semaforo(0)},.24)"></i>más acciones por minuto</span>
+    <span><i style="background:rgba(${semaforo(1)},.24)"></i>menos acciones por minuto</span>
+    <span><i style="background:rgba(224,88,96,.34)"></i>los tres que más impactos recibieron</span>
+    <span><b>negrita</b> el mejor de su columna</span>
+    <span><i class="sw verde"></i>llega al ${umbralDe(PCTVEL)}% de su top speed o al ${umbralDe(PCTACC)}% de su ACC máx</span>
+    <span><span class="alertaG">!</span> impactos en esa banda de G</span>
+  </div>`;
 
   return `<section class="panel tablon">
     <h3>Velocidad, aceleraciones e impactos</h3>
@@ -1734,6 +1819,7 @@ function tabla(filas) {
       </thead>
       <tbody>${cuerpo}</tbody>
     </table></div>
+    ${ley}
   </section>`;
 }
 
@@ -2023,7 +2109,12 @@ function pintar() {
   F.metricas = F.metricas.map((m, i) => disponibles.includes(m) ? m : (disponibles[i] || disponibles[0]));
 
   $("#selectores").innerHTML = "";
-  $("#paneles").innerHTML = F.metricas.map((m, i) => panel(m, filas, i)).join("");
+  $("#paneles").innerHTML = F.metricas.map((m, i) => panel(m, filas, i)).join("") + `
+    <div class="leyPaneles">
+      <span><i style="background:var(--teal)"></i>llega a la media de su posición</span>
+      <span><i style="background:var(--lav)"></i>por debajo de la media de su posición</span>
+      <span><i class="raya"></i>media del equipo</span>
+    </div>`;
   document.querySelectorAll(".selMet").forEach(sel => sel.onchange = e => {
     F.metricas[+e.target.dataset.i] = e.target.value;
     pintar();
