@@ -415,6 +415,20 @@ function detectarMetricas() {
 const todasMetricas = () => METRICAS.flatMap(([, c]) => c);
 
 /**
+ * Catálogo completo para la pestaña del jugador: lo de los paneles más todo lo
+ * que solo vivía en la tabla — velocidad punta, % de su techo, los conteos de
+ * aceleración y deceleración y las bandas de impacto.
+ */
+function catalogoJugador() {
+  const hay = c => DATOS.some(r => c in r.crudo);
+  const fuera = new Set(METRICAS.flatMap(([, c]) => c));
+  const extra = TABLA.map(([g, cols]) => [g, cols.filter(c => !fuera.has(c) && hay(c))])
+                     .filter(([, c]) => c.length);
+  return METRICAS.concat(extra);
+}
+const metricasJugador = () => catalogoJugador().flatMap(([, c]) => c);
+
+/**
  * Segunda vía de lectura, para cuando fetch falla por permisos entre dominios.
  * Carga el script con una etiqueta <script>, que el navegador nunca bloquea.
  */
@@ -691,11 +705,14 @@ function panel(col, filas, indice) {
   const tope = Math.max(...vals) * 1.12 || 1;
   const y = n => T + ih - n / tope * ih;
 
-  let g = "";
+  let g = "", previa = null;
   for (let i = 1; i <= 4; i++) {
-    const n = tope * i / 4;
-    g += `<line x1="${L}" x2="${W - R}" y1="${y(n).toFixed(1)}" y2="${y(n).toFixed(1)}" stroke="#1B263B"/>
-          <text x="${L - 9}" y="${(y(n) + 4).toFixed(1)}" fill="#6B7A94" font-size="11" text-anchor="end">${nf(n, dec ? 1 : 0)}</text>`;
+    const n = tope * i / 4, etq = nf(n, dec ? 1 : 0);
+    g += `<line x1="${L}" x2="${W - R}" y1="${y(n).toFixed(1)}" y2="${y(n).toFixed(1)}" stroke="#1B263B"/>`;
+    if (etq !== previa) {
+      g += `<text x="${L - 9}" y="${(y(n) + 4).toFixed(1)}" fill="#6B7A94" font-size="11" text-anchor="end">${etq}</text>`;
+      previa = etq;
+    }
   }
   let x = L + margen;
   for (const p of puestos) {
@@ -1969,11 +1986,17 @@ function graficaJugador(v, col) {
   const anchoB = Math.min(30, iw / v.length * 0.5);
   const base = H - 30, cima = H - B + 30, altoBarra = base - cima;
 
-  let g = "";
+  let g = "", previa = null;
   for (let i = 0; i <= 4; i++) {
     const n = suelo + (techo - suelo) * i / 4, yy = y(n);
-    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#1B263B"/>
-          <text x="${L - 9}" y="${yy + 4}" fill="#6B7A94" font-size="11" text-anchor="end">${nf(n, dec ? 1 : 0)}</text>`;
+    // Con métricas enteras de rango corto (impactos, power plays) cuatro cortes
+    // dan la misma cifra repetida: se escribe solo cuando cambia.
+    const etq = nf(n, dec ? 1 : 0);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#1B263B"/>`;
+    if (etq !== previa) {
+      g += `<text x="${L - 9}" y="${yy + 4}" fill="#6B7A94" font-size="11" text-anchor="end">${etq}</text>`;
+      previa = etq;
+    }
   }
   g += `<line x1="${L}" x2="${W - R}" y1="${y(media)}" y2="${y(media)}" stroke="#6E9A9B" stroke-width="1.5" stroke-dasharray="5 4"/>
         <text x="${W - R}" y="${y(media) - 7}" fill="#6E9A9B" font-size="11" text-anchor="end">media ${nf(media, dec)}</text>`;
@@ -2043,7 +2066,7 @@ function vistaJugador() {
     `<option value="${esc(j)}"${j === FJ.jugador ? " selected" : ""}>${esc(j)}</option>`).join("");
 
   const { todas, v } = sesionesJugador();
-  const disponibles = todasMetricas();
+  const disponibles = metricasJugador();
   if (FJ.metrica !== "__min" && !disponibles.includes(FJ.metrica)) FJ.metrica = disponibles[0] || "__min";
   const col = FJ.metrica;
   const dec = col === "__min" ? 0 : decimales(todas.map(r => valorJug(r, col)));
@@ -2054,7 +2077,7 @@ function vistaJugador() {
     <span class="meta">${todas.length} ${todas.length === 1 ? "sesión" : "sesiones"} en el histórico ·
       de ${esc(fechaLarga(todas[0].fecha))} a ${esc(fechaLarga(ultima.fecha))}</span>`;
 
-  const grupos = METRICAS.map(([g, cols]) => `<optgroup label="${esc(g)}">` +
+  const grupos = catalogoJugador().map(([g, cols]) => `<optgroup label="${esc(g)}">` +
     cols.map(c => `<option value="${esc(c)}"${c === col ? " selected" : ""}>${esc(nombreMetrica(c))}</option>`).join("") +
     `</optgroup>`).join("") +
     `<optgroup label="Otros"><option value="__min"${col === "__min" ? " selected" : ""}>Minutos</option></optgroup>`;
@@ -2169,7 +2192,8 @@ function vistaJugador() {
 
 /* Las columnas de la tabla del jugador: las que de verdad se miran sesión a sesión. */
 const COLS_JUG = ["Distance (metres)", HMLD, "Sprint Distance (m)", "Distance Per Min (m/min)",
-                  "Top Speed (m/s)", ACC3, DEC3, "Player Load"];
+                  "Player Load", "Top Speed (m/s)", PCTVEL, "Max Acceleration (m/s/s)", PCTACC,
+                  ACC3, DEC3, "Impacts"];
 
 function engancharJugador(v) {
   const sel = $("#jMet"); if (sel) sel.onchange = e => { FJ.metrica = e.target.value; pintar(); };
