@@ -806,6 +806,7 @@ function porcentajeCarga() {
 
 function vistaCarga() {
   cabecera();
+  $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = "";
   $("#tabla").innerHTML = porcentajeCarga();
@@ -874,6 +875,7 @@ function semanasHasta(hasta, n) {
 
 function vistaAcwr() {
   cabecera();
+  $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = "";
 
@@ -1159,6 +1161,7 @@ function drillAnalysis() {
 
 function vistaDrill() {
   cabecera();
+  $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = "";
   $("#tabla").innerHTML = drillAnalysis();
@@ -1498,6 +1501,7 @@ function evolucionBip() {
 
 function vistaBip() {
   $("#cab").innerHTML = "";
+  $("#notas").innerHTML = "";
   $("#resumen").innerHTML = "";
   $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = "";
@@ -1620,6 +1624,7 @@ let ULTIMO = null;   // resultado del último fichero leído
 
 function vistaCargar() {
   $("#cab").innerHTML = "";
+  $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
   $("#tabla").innerHTML = "";
   $("#paneles").innerHTML = `<div class="solo">
@@ -1924,7 +1929,7 @@ function tabla(filas) {
 }
 
 /* ---------- evolución individual de un jugador ---------- */
-const FJ = { jugador:"", tipo:"todo", metrica:"Distance (metres)", ventana:10, marcadas:[] };
+const FJ = { jugador:"", tipo:"todo", metrica:"Distance (metres)", metricas:[], ventana:10, marcadas:[] };
 
 /** Las sesiones del jugador elegido, ya filtradas por tipo de evento y ventana. */
 function sesionesJugador() {
@@ -1988,7 +1993,15 @@ function graficaJugador(v, col) {
            fill="#9EABC2" font-size="10.5" text-anchor="middle">${nf(r.minutos)}'</text>`;
   });
   v.forEach((r, i) => {
-    g += `<circle class="ptJug" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(valorJug(r, col)).toFixed(1)}"
+    const n = valorJug(r, col);
+    // El valor va escrito sobre el punto: al exportar no puedes pasar el ratón.
+    if (v.length <= 16) {
+      // En los extremos se ancla al borde, que si no la cifra se sale del lienzo.
+      const anc = i === 0 ? "start" : i === v.length - 1 ? "end" : "middle";
+      g += `<text x="${x(i).toFixed(1)}" y="${(y(n) - 11).toFixed(1)}" fill="#C8D2E4" font-size="10.5"
+             text-anchor="${anc}">${fmt(col, n, dec)}</text>`;
+    }
+    g += `<circle class="ptJug" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(n).toFixed(1)}"
            r="${r.esPartido ? 6 : 4.5}" fill="${r.esPartido ? "#EFB5B9" : "#A0A7D8"}" stroke="#151F33" stroke-width="2"/>`;
   });
 
@@ -2008,6 +2021,7 @@ function lblFiltro() {
 
 function vistaJugador() {
   $("#selectores").innerHTML = "";
+  $("#notas").innerHTML = "";
   $("#tabla").innerHTML = "";
   $("#resumen").innerHTML = "";
 
@@ -2052,13 +2066,23 @@ function vistaJugador() {
   // En papel la cabecera de la app no se imprime, así que el nombre va aquí.
   const tituloPdf = `<div class="soloPdf cabPdf"><b>${esc(FJ.jugador)}</b> · ${esc(ultima.posicion)} ·
     ${esc(F.squad)} · ${esc(lblFiltro())}</div>`;
+  // Las métricas extra del informe, con su chip para quitarlas.
+  const extrasActivas = FJ.metricas.filter(m => m !== col);
+  const chips = !extrasActivas.length ? "" : `<div class="chipsJug">
+    <span class="et">También en el informe</span>
+    ${extrasActivas.map(m => `<button class="chip" data-m="${esc(m)}" title="Quitar del informe">
+      ${esc(m === "__min" ? "Minutos" : nombreCorto(m))} <i>×</i></button>`).join("")}
+  </div>`;
+
   const barra = tituloPdf + `<div class="barraJug">
     <div class="segm" id="jTipo">${tipos.map(([k, t]) =>
       `<button data-v="${k}" class="${FJ.tipo === k ? "on" : ""}">${t}</button>`).join("")}</div>
     <div class="field"><label for="jMet">Métrica</label><select id="jMet">${grupos}</select></div>
     <div class="field"><label for="jVent">Ventana</label><select id="jVent">${ventanas.map(([n, t]) =>
       `<option value="${n}"${FJ.ventana === n ? " selected" : ""}>${t}</option>`).join("")}</select></div>
-  </div>`;
+    <div class="field"><label for="jMas">Añadir</label><select id="jMas">
+      <option value="" selected>Otra métrica…</option>${grupos.replace(/ selected/g, "")}</select></div>
+  </div>` + chips;
 
   if (!v.length) {
     $("#paneles").innerHTML = barra + `<p class="empty">Ninguna sesión suya encaja con este filtro.</p>`;
@@ -2110,18 +2134,22 @@ function vistaJugador() {
     </tr>`;
   }).join("");
 
-  $("#paneles").innerHTML = barra + kpis + `
-    <section class="panel ancho">
-      <h3>Evolución · ${esc(lbl)}</h3>
-      <p class="sub">Cada punto es una sesión completa. Las barras de abajo son los minutos de ese día.</p>
-      ${graficaJugador(v, col)}
-      <div class="leyenda">
-        <span><i class="sw" style="background:#EFB5B9"></i> Partido</span>
-        <span><i class="sw" style="background:#A0A7D8"></i> Entrenamiento</span>
-        <span><i class="sw ln" style="background:#6E9A9B"></i> Su media en la ventana</span>
-        <span><i class="sw" style="background:#26344F"></i> Minutos</span>
-      </div>
-    </section>
+  // El informe puede llevar varias métricas: la principal y las que añadas.
+  const extras = FJ.metricas.filter(m => m !== col && (m === "__min" || disponibles.includes(m)));
+  const leyenda = `<div class="leyenda">
+    <span><i class="sw" style="background:#EFB5B9"></i> Partido</span>
+    <span><i class="sw" style="background:#A0A7D8"></i> Entrenamiento</span>
+    <span><i class="sw ln" style="background:#6E9A9B"></i> Su media en la ventana</span>
+    <span><i class="sw" style="background:#26344F"></i> Minutos</span>
+  </div>`;
+  const grafico = (c, principal) => `<section class="panel ancho">
+      <h3>${principal ? "Evolución · " : ""}${esc(c === "__min" ? "Minutos" : nombreMetrica(c))}</h3>
+      ${principal ? `<p class="sub">Cada punto es una sesión completa. Las barras de abajo son los minutos de ese día.</p>` : ""}
+      ${graficaJugador(v, c)}
+      ${principal ? leyenda : ""}
+    </section>`;
+
+  $("#paneles").innerHTML = barra + kpis + grafico(col, true) + extras.map(c => grafico(c, false)).join("") + `
     <section class="panel ancho">
       <h3>Sesiones</h3>
       <p class="sub">${marcadas
@@ -2146,6 +2174,16 @@ const COLS_JUG = ["Distance (metres)", HMLD, "Sprint Distance (m)", "Distance Pe
 function engancharJugador(v) {
   const sel = $("#jMet"); if (sel) sel.onchange = e => { FJ.metrica = e.target.value; pintar(); };
   const vent = $("#jVent"); if (vent) vent.onchange = e => { FJ.ventana = +e.target.value; pintar(); };
+  const mas = $("#jMas");
+  if (mas) mas.onchange = e => {
+    const m = e.target.value;
+    if (m && m !== FJ.metrica && !FJ.metricas.includes(m)) FJ.metricas.push(m);
+    pintar();
+  };
+  document.querySelectorAll(".chipsJug .chip").forEach(c => c.onclick = () => {
+    FJ.metricas = FJ.metricas.filter(m => m !== c.dataset.m);
+    pintar();
+  });
   document.querySelectorAll("#jTipo button").forEach(b => b.onclick = () => {
     FJ.tipo = b.dataset.v;
     pintar();
@@ -2226,6 +2264,13 @@ function pintar() {
     pintar();
   });
   $("#tabla").innerHTML = tabla(filas);
+  $("#notas").innerHTML = cajaComentarios();
+  const caja = $("#coment");
+  if (caja) {
+    // Se guarda al salir del campo, no en cada tecla: así no se escribe en
+    // disco quince veces por frase.
+    caja.addEventListener("blur", () => guardarComentario(caja.dataset.clave, caja.innerText));
+  }
   document.querySelectorAll("#tabla .orden").forEach(th => th.onclick = () => {
     const c = th.dataset.c;
     FD.ordenJug = { col:c, asc: FD.ordenJug.col === c ? !FD.ordenJug.asc : (c === "jugador" || c === "posicion") };
@@ -2292,6 +2337,36 @@ function demo() {
 }
 
 /* ---------- memoria de la sesión de trabajo ---------- */
+/* ---------- comentarios escritos a mano ---------- */
+const COMENTARIOS = "cau_gps_comentarios";
+const leerComentarios = () => {
+  try { return JSON.parse(localStorage.getItem(COMENTARIOS) || "{}"); } catch (e) { return {}; }
+};
+const comentarioDe = clave => leerComentarios()[clave] || "";
+function guardarComentario(clave, texto) {
+  try {
+    const todos = leerComentarios();
+    if (texto.trim()) todos[clave] = texto; else delete todos[clave];
+    localStorage.setItem(COMENTARIOS, JSON.stringify(todos));
+  } catch (e) { /* navegador sin almacenamiento */ }
+}
+
+/**
+ * Caja de comentarios de la sesión. Se escribe a mano, se guarda en este
+ * navegador y sale en el PDF. Va al final porque se escribe después de mirar
+ * los datos, no antes.
+ */
+function cajaComentarios() {
+  const clave = F.squad + "|" + F.fecha;
+  const texto = comentarioDe(clave);
+  return `<section class="panel comentarios">
+    <h3>Comentarios de la sesión</h3>
+    <p class="sub noPdf">Lo que escribas aquí se guarda en este navegador y sale en el PDF</p>
+    <div id="coment" class="coment" contenteditable="true" role="textbox" aria-multiline="true"
+      data-clave="${esc(clave)}" data-vacio="Escribe aquí lo que quieras que salga en el reporte…">${esc(texto)}</div>
+  </section>`;
+}
+
 const GUARDA = "cau_gps_prefs";
 function recordar() {
   try {
