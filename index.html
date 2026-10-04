@@ -274,6 +274,58 @@ table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer
   padding:8px 11px;font-size:12px;opacity:0;transition:opacity .1s;z-index:50;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .tip b{font-family:'Chivo Mono';font-size:13px;display:block}
 .tip em{font-style:normal;color:var(--text-3)}
+
+/* ---- Podio de la sesión y promedios en cinco ---- */
+.medallas{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:10px}
+@media(max-width:620px){.medallas{grid-template-columns:repeat(2,1fr)}}
+.medalla{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:10px;padding:8px 9px;
+  display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.medalla .top{display:flex;align-items:center;gap:6px;margin-bottom:5px;min-height:28px}
+.medalla .ico{font-size:17px;line-height:1;width:19px;text-align:center;flex:none}
+.medalla .tit{min-width:0}
+.medalla .tit b{display:block;font-size:10.5px;font-weight:600;line-height:1.22;letter-spacing:-.01em}
+.medalla ol{list-style:none;margin:auto 0 0;padding:0}
+.medalla li{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:5px;
+  padding:2px 0;font-size:11px}
+.medalla li+li{border-top:1px solid var(--ink-800)}
+.medalla li .pos{font-family:'Chivo Mono';font-size:8.5px;color:var(--ink-900);background:var(--ink-600);
+  width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-weight:600}
+.medalla li.p1 .pos{background:var(--sand)}
+.medalla li.p2 .pos{background:var(--text-2)}
+.medalla li.p3 .pos{background:var(--peach)}
+.medalla li .qui{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.medalla li.p1 .qui{color:var(--text);font-weight:500}
+.medalla li .val{font-family:'Chivo Mono';color:var(--text);font-size:11px;letter-spacing:-.02em}
+.larga{display:inline}.corta{display:none}
+@media(max-width:1280px){.larga{display:none}.corta{display:inline}}
+
+.resumen.cinco{grid-template-columns:repeat(5,1fr);gap:8px;padding:11px 12px}
+@media(max-width:620px){.resumen.cinco{grid-template-columns:repeat(2,1fr)}}
+.resumen.cinco .kpi{padding:8px 10px;min-width:0;overflow:hidden;border-radius:9px}
+.resumen.cinco .kpi .k{font-size:9px;letter-spacing:.1em;color:var(--text-2);font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.resumen.cinco .kpi b{font-size:21px;letter-spacing:-.025em;white-space:nowrap;margin:1px 0}
+.resumen.cinco .kpi b i{font-size:11px}
+.resumen.cinco .kpi .s{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.resumen.cinco .kpi .s em{font-style:normal;color:var(--teal)}
+.resumen.cinco .kpi.int .s em{color:var(--lav)}
+
+/* ---- Semáforo, alertas e iconos de la tabla ---- */
+table.datos td.n{text-align:center}
+table.datos th.n{text-align:center}
+.icoMejor{font-size:11px;margin-left:5px;vertical-align:-1px}
+.alertaG{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
+  background:var(--sand);color:#3A2F0B;font-size:10px;font-weight:700;margin-left:5px;
+  cursor:help;vertical-align:-3px;line-height:1}
+.leyTabla{display:flex;gap:15px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-3);
+  margin-top:12px;padding-top:10px;border-top:1px solid var(--ink-800)}
+.leyTabla i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.leyTabla i.sw.verde{background:rgba(110,154,155,.45)}
+.leyTabla b{color:var(--text-2)}
+.leyPaneles{grid-column:1/-1;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:11px;
+  color:var(--text-3);margin-top:2px}
+.leyPaneles i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.leyPaneles i.raya{width:2px;height:11px;border-radius:0;background:var(--pink)}
 @media print{
   @page{margin:9mm;size:landscape}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -287,6 +339,44 @@ table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer
   .c,.c.dest{background:#f4f4f4 !important;border:1px solid #bbb}
   .panel .selMet{display:none}
   .resumen{grid-template-columns:repeat(4,1fr);gap:6px}
+  /* El reporte en papel: podio y promedios arriba, tabla, y los paneles después. */
+  .medallas{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:7px;break-inside:avoid}
+  .medalla{background:#FBFCFD !important;border:1px solid #D4D8E0;border-radius:7px;padding:6px 8px}
+  .medalla .ico{font-size:13px;width:16px}
+  .medalla .top{min-height:0;margin-bottom:4px}
+  .medalla .tit b{font-size:9px;color:#14161C}
+  .larga{display:inline}.corta{display:none}
+  .medalla li{font-size:9px;padding:1px 0;grid-template-columns:13px minmax(0,1fr) auto}
+  .medalla li+li{border-top:1px solid #EDEFF3}
+  .medalla li .pos{width:13px;height:13px;font-size:7.5px;background:#D9DDE4;color:#14161C}
+  .medalla li.p1 .pos{background:#E8CF6E}.medalla li.p2 .pos{background:#C3C8D2}
+  .medalla li.p3 .pos{background:#E6B795}
+  .medalla li .qui{color:#3B414E}.medalla li.p1 .qui{color:#14161C;font-weight:600}
+  .medalla li .val{color:#14161C;font-size:9px}
+  .resumen.cinco{grid-template-columns:repeat(5,1fr);gap:6px;background:#fff !important;
+    border:none;padding:0;margin-bottom:7px;break-inside:avoid}
+  .resumen.cinco .kpi{background:#FBFCFD !important;border:1px solid #D4D8E0;border-left:3px solid #5A8B8C;padding:5px 9px}
+  .resumen.cinco .kpi.int{border-left-color:#7F8BBF}
+  .resumen.cinco .kpi .k{color:#5A6171;font-size:8px}
+  .resumen.cinco .kpi b{color:#14161C;font-size:17px}
+  .resumen.cinco .kpi b i{color:#5A6171;font-size:10px}
+  .resumen.cinco .kpi .s{color:#8A909C;font-size:8.5px}
+  .resumen.cinco .kpi .s em{color:#5A8B8C;font-weight:600}
+  .resumen.cinco .kpi.int .s em{color:#7F8BBF}
+  /* En pantalla la tabla va al final, pero en papel cierra la primera página:
+     primero el resumen de la sesión, los paneles después. */
+  .wrap{display:flex;flex-direction:column}
+  #resumen{order:1}
+  #tabla{order:2;break-after:page;page-break-after:always}
+  #paneles{order:3}
+  .tablon{border:none;padding:0;margin-bottom:0}
+  .leyTabla{color:#6B7384;font-size:7.5px;gap:12px;margin-top:6px;padding-top:5px;border-top:1px solid #EDEFF3}
+  .leyTabla i{width:8px;height:8px}
+  .leyTabla i.sw.verde{background:#D8E8E4}
+  .leyTabla b{color:#14161C}
+  table.datos td.n.verde{background:#D8E8E4;color:#2F5F60;font-weight:600}
+  .icoMejor{font-size:9px}
+  .alertaG{width:12px;height:12px;font-size:8px;background:#E8CF6E;color:#4A3B06}
   .kpi{border:1px solid #ccc;background:#f7f7f7}
   .kpi b{color:#111;font-size:18px}
   .kpi .k,.kpi .s{color:#555}
@@ -370,6 +460,28 @@ table.datos.drills .dur span{font-size:10.5px;color:var(--text-3)}
 table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
 
   table.datos td.pos{color:#555}
+
+  /* Los paneles van al final del bloque de impresión a propósito: así ganan a
+     las reglas de arriba y los seis caben en una hoja con quince jugadores. */
+  .paneles{grid-template-columns:repeat(3,1fr);gap:6px;align-items:start}
+  .panel{padding:6px 8px;background:#fff;border:1px solid #D4D8E0;border-radius:8px}
+  .panel h3{font-size:10px;line-height:1.2}
+  .avgline{margin-bottom:3px;font-size:7.5px}
+  .avgline b{font-size:12px}
+  .fila{grid-template-columns:58px 1fr 42px;padding:0;gap:5px;line-height:1.2}
+  .fila .nom{font-size:8px;color:#222}
+  .fila .val{font-size:8px}
+  .pista{height:7px;background:#EDEFF3}
+  .pista i{background:#8E98C8}
+  .pista i.cumple{background:#8FB3B4}
+  .pista u{background:#C0392B;width:1.5px}
+  .pie.cajas{margin-top:4px;padding-top:3px;border-top:1px solid #EDEFF3;gap:3px}
+  .caja{background:#F1F3F7 !important;border:none;padding:1px 6px;font-size:6.5px;color:#6B7384;white-space:nowrap}
+  .caja b{font-size:8px;color:#3B414E}
+  .leyPaneles{color:#6B7384;font-size:7.5px;gap:12px;margin-top:4px}
+  .leyPaneles i{width:8px;height:8px;background:#8FB3B4}
+  .leyPaneles i.raya{width:2px;height:9px;background:#C0392B}
+  .leyPaneles span:nth-child(2) i{background:#8E98C8}
 }
 </style>
 </head>
