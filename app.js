@@ -95,7 +95,7 @@ const RESUMEN = [
 /* Las cinco tarjetas de podio. Cada una mide algo distinto: dos de velocidad,
    una mecánica, una de contacto y el volumen al final. */
 const TOP3 = [
-  { col:"Sprint Distance (m)",      ico:"🚀",  titulo:"Distancia alta velocidad (m)", corto:"Dist. alta vel." },
+  { col:"Sprint Distance (m)",      ico:"🚀",  corto:"Dist. alta vel." },
   { col:"Top Speed (m/s)",          ico:"⚡",  titulo:"Velocidad máxima (m/s)",       corto:"Vel. máx m/s" },
   { col:ACC3,                       ico:"🏎️", titulo:"Aceleraciones > 3 m/s²",       corto:"ACC > 3 m/s²" },
   { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" },
@@ -134,7 +134,10 @@ const nombreMetrica = c => {
   if (z && RANGOS_ZONA[z[1]]) return c + "  ·  " + RANGOS_ZONA[z[1]];
   const g = impactoDe();
   if (c === "Impacts" && g) return "Impacts  ·  > " + g + " G";
-  if (c === "Sprint Distance (m)") return "Distancia alta velocidad (m)";
+  if (c === "Sprint Distance (m)") {
+    const u = porEquipo(C.umbralSprint, F.squad);
+    return "Distancia alta velocidad (m)" + (u ? "  ·  " + u : "");
+  }
   return c;
 };
 /* Versión corta para las cabeceras de la tabla. */
@@ -146,7 +149,7 @@ const CORTOS = {
   "Deceleration Zone Count: 3 - 4 m/s/s": "DECC 3-4", "Deceleration Zone Count: > 4 m/s/s": "DECC > 4",
   [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min", [ACDC3MIN]: "ACC+DECC / min",
   "Impacts": "Impactos", [HMLD]: "HMLD", [ACC3]: "ACC > 3", [DEC3]: "DECC > 3",
-  "Distance (metres)": "Distancia", "Sprint Distance (m)": "Dist. alta velocidad",
+  "Distance (metres)": "Distancia", "Sprint Distance (m)": "Dist. alta vel.",
   "Player Load": "Player load", "Power Plays": "Power plays",
   "Distance Per Min (m/min)": "Dist. / min", "Energy (kcal)": "Energía", "Hr Load": "Carga HR"
 };
@@ -593,10 +596,12 @@ function medallas(filas) {
     const orden = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[t.col] || 0) }))
       .sort((a, b) => b.v - a.v).slice(0, 3);
     const dec = decimales(filas.map(r => Math.abs(r.crudo[t.col] || 0)));
+    // El título sale del catálogo, así lleva el umbral que tengas configurado.
+    const titulo = t.titulo || nombreMetrica(t.col);
     return `<div class="medalla">
       <div class="top"><span class="ico">${t.ico}</span>
-        <span class="tit" title="${esc(t.titulo)}">
-          <b><span class="larga">${esc(t.titulo)}</span><span class="corta">${esc(t.corto)}</span></b></span></div>
+        <span class="tit" title="${esc(titulo)}">
+          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(t.corto)}</span></b></span></div>
       <ol>${orden.map((d, i) => `<li class="p${i + 1}"><span class="pos">${i + 1}</span>
         <span class="qui" title="${esc(d.pos)}">${esc(d.nom)}</span>
         <span class="val">${fmt(t.col, d.v, dec)}</span></li>`).join("")}</ol>
@@ -671,10 +676,18 @@ function panel(col, filas, indice) {
       <span>${esc(p)}</span><b>${fmt(col, mediaDe(grupos[p], col), decMedia(dec))}</b></div>`).join("")}
   </div>`;
 
-  // Geometría: los nombres van girados, que en horizontal no caben.
-  const W = 1180, L = 58, R = 18, T = 28, B = 86, HUECO = 20;
-  const H = T + 200 + B, ih = H - T - B, iw = W - L - R;
-  const util = iw - HUECO * (puestos.length - 1), paso = util / filas.length;
+  // Geometría. Los nombres van girados: en horizontal no caben, y el hueco de
+  // abajo tiene que dar para el más largo o se corta.
+  const W = 1180, L = 58, R = 18, T = 28, HUECO = 20;
+  const largo = Math.max(...filas.map(r => r.jugador.length), 10);
+  const B = Math.min(150, Math.round(18 + largo * 6.9));
+  const H = T + 170 + B, ih = H - T - B, iw = W - L - R;
+  // Con pocos jugadores las columnas salían gigantes: se limita el ancho y el
+  // grupo entero se centra, en vez de estirarse de lado a lado.
+  const util = iw - HUECO * (puestos.length - 1);
+  const paso = Math.min(util / filas.length, 78);
+  const usado = paso * filas.length + HUECO * (puestos.length - 1);
+  const margen = Math.max(0, (iw - usado) / 2);
   const tope = Math.max(...vals) * 1.12 || 1;
   const y = n => T + ih - n / tope * ih;
 
@@ -684,7 +697,7 @@ function panel(col, filas, indice) {
     g += `<line x1="${L}" x2="${W - R}" y1="${y(n).toFixed(1)}" y2="${y(n).toFixed(1)}" stroke="#1B263B"/>
           <text x="${L - 9}" y="${(y(n) + 4).toFixed(1)}" fill="#6B7A94" font-size="11" text-anchor="end">${nf(n, dec ? 1 : 0)}</text>`;
   }
-  let x = L;
+  let x = L + margen;
   for (const p of puestos) {
     const l = grupos[p], ancho = paso * l.length, c = colorPuesto(p, puestos);
     const m = mediaDe(l, col);
@@ -695,11 +708,11 @@ function panel(col, filas, indice) {
           <line x1="${(x + 3).toFixed(1)}" x2="${(x + ancho - 3).toFixed(1)}" y1="${y(m).toFixed(1)}" y2="${y(m).toFixed(1)}"
             stroke="${c}" stroke-width="2" stroke-dasharray="6 3"/>`;
     l.forEach((r, i) => {
-      const v = Math.abs(r.crudo[col] || 0), cx = x + paso * (i + 0.5), an = paso * 0.68;
+      const v = Math.abs(r.crudo[col] || 0), cx = x + paso * (i + 0.5), an = Math.min(paso * 0.68, 54);
       g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${an.toFixed(1)}"
               height="${(T + ih - y(v)).toFixed(1)}" rx="3" fill="${c}" opacity=".85"/>
             <text x="${cx.toFixed(1)}" y="${(y(v) - 6).toFixed(1)}" fill="#E9EEF7" font-size="10" text-anchor="middle">${fmt(col, v, dec)}</text>
-            <text x="${cx.toFixed(1)}" y="${T + ih + 10}" fill="#9EABC2" font-size="11.5" text-anchor="end"
+            <text x="${cx.toFixed(1)}" y="${T + ih + 10}" fill="#9EABC2" font-size="11" text-anchor="end"
               transform="rotate(-90 ${cx.toFixed(1)} ${T + ih + 10})">${esc(r.jugador)}</text>`;
     });
     x += ancho + HUECO;
