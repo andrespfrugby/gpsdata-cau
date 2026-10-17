@@ -123,21 +123,29 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .medalla .cab b{display:block;font-family:Chivo;font-weight:500;font-size:13px}
 .medalla .cab span{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em}
 .medalla ol{list-style:none;margin:0;padding:0}
-.medalla li{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:8px;padding:4px 0;font-size:12px}
-.medalla li + li{border-top:1px solid var(--ink-700)}
-.medalla li .pos{font-family:Chivo;font-size:11px;color:var(--ink-900);background:var(--ink-600);
-  width:18px;height:18px;border-radius:50%;display:grid;place-items:center}
-.medalla li.p1 .pos{background:var(--sand)}
-.medalla li.p2 .pos{background:var(--text-2)}
-.medalla li.p3 .pos{background:var(--peach)}
-.medalla li .qui{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.medalla li.p1 .qui{color:var(--text)}
-.medalla li .val{font-family:'Chivo Mono';color:var(--text)}
+
 .medalla li.porpos{grid-template-columns:52px 1fr auto}
 .medalla li.porpos .qui{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
 .medalla li .nom2{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .medalla li.vacio{color:var(--text-3);grid-template-columns:1fr}
 .panel .sub{font-size:12px;color:var(--text-3);margin:2px 0 14px}
+/* Pie de los KPI: contra cuántas sesiones se compara, o que no hay histórico. */
+.kpi .vs{display:block;font-size:9px;color:var(--text-3);margin:2px 0 1px}
+.kpi .vs.sola{color:var(--text-3);font-style:italic;margin-top:6px}
+/* Chips para marcar las métricas de la matriz. */
+.chipsMet{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 14px;max-height:66px;overflow-y:auto}
+.chM{font-size:10.5px;padding:4px 9px;border-radius:6px;background:var(--ink-800);
+  border:1px solid var(--ink-600);color:var(--text-3);cursor:pointer;font-family:inherit;white-space:nowrap}
+.chM:hover{color:var(--text-2)}
+.chM.on{background:rgba(110,154,155,.18);border-color:var(--teal,#6E9A9B);color:var(--text);font-weight:600}
+/* Los dos desplegables del scatter. */
+.ejes{display:flex;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.ejeSel span{display:block;font-size:9px;letter-spacing:.12em;color:var(--text-3);margin-bottom:4px}
+.ejeSel select{background:var(--ink-800);color:var(--text);border:1px solid var(--ink-600);
+  border-radius:9px;padding:8px 12px;font-size:13px;min-width:200px;font-family:inherit}
+.leyDisp{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-3)}
+.leyDisp span{display:flex;align-items:center;gap:6px}
+.leyDisp i{width:12px;height:12px;border-radius:3px;display:inline-block}
 .scroll{overflow-x:auto}
 table.datos{width:100%;border-collapse:collapse;font-size:13.5px;white-space:nowrap}
 table.datos th{font-weight:400;font-size:12px;color:var(--text-3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-700)}
@@ -285,17 +293,19 @@ table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer
 .medalla .tit{min-width:0}
 .medalla .tit b{display:block;font-size:10.5px;font-weight:600;line-height:1.22;letter-spacing:-.01em}
 .medalla ol{list-style:none;margin:auto 0 0;padding:0}
-.medalla li{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:5px;
-  padding:2px 0;font-size:11px}
+/* Cada puesto es una fila: medalla, nombre, barra recta con el color de su
+   línea y el dato. La barra es la que deja comparar de un vistazo. */
+.medalla li{display:grid;grid-template-columns:19px minmax(56px,78px) minmax(26px,1fr) auto;
+  align-items:center;gap:6px;padding:3px 0;font-size:12.5px}
 .medalla li+li{border-top:1px solid var(--ink-800)}
-.medalla li .pos{font-family:'Chivo Mono';font-size:8.5px;color:var(--ink-900);background:var(--ink-600);
-  width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-weight:600}
-.medalla li.p1 .pos{background:var(--sand)}
-.medalla li.p2 .pos{background:var(--text-2)}
-.medalla li.p3 .pos{background:var(--peach)}
+.medalla li .pos{font-size:13.5px;line-height:1;text-align:center}
+.medalla li .pos em{font-style:normal;font-family:'Chivo Mono';font-size:9.5px;color:var(--text-3)}
 .medalla li .qui{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.medalla li.p1 .qui{color:var(--text);font-weight:500}
-.medalla li .val{font-family:'Chivo Mono';color:var(--text);font-size:11px;letter-spacing:-.02em}
+.medalla li .bar{height:15px;background:var(--ink-700);border-radius:2px;overflow:hidden;min-width:20px}
+.medalla li .bar i{display:block;height:100%;border-radius:2px}
+.medalla li .val{font-family:'Chivo Mono';color:var(--text);font-size:11.5px;letter-spacing:-.02em;
+  text-align:right;white-space:nowrap}
+.medalla .uniR{margin-left:auto;font-size:9px;color:var(--text-3);flex:none}
 .larga{display:inline}.corta{display:none}
 @media(max-width:1280px){.larga{display:none}.corta{display:inline}}
 
@@ -383,13 +393,15 @@ svg.cols text{font-family:'Chivo Mono',monospace}
   .medalla .top{min-height:0;margin-bottom:4px}
   .medalla .tit b{font-size:9px;color:#14161C}
   .larga{display:inline}.corta{display:none}
-  .medalla li{font-size:9px;padding:1px 0;grid-template-columns:13px minmax(0,1fr) auto}
+  .medalla li{font-size:9px;padding:1px 0;gap:4px;
+    grid-template-columns:14px minmax(44px,58px) minmax(18px,1fr) auto}
   .medalla li+li{border-top:1px solid #EDEFF3}
-  .medalla li .pos{width:13px;height:13px;font-size:7.5px;background:#D9DDE4;color:#14161C}
-  .medalla li.p1 .pos{background:#E8CF6E}.medalla li.p2 .pos{background:#C3C8D2}
-  .medalla li.p3 .pos{background:#E6B795}
-  .medalla li .qui{color:#3B414E}.medalla li.p1 .qui{color:#14161C;font-weight:600}
+  .medalla li .pos{font-size:10px}
+  .medalla li .pos em{font-size:8px;color:#6B7384}
+  .medalla li .qui{color:#3B414E}
+  .medalla li .bar{height:10px;background:#E8EAF0}
   .medalla li .val{color:#14161C;font-size:9px}
+  .medalla .uniR{font-size:7.5px;color:#6B7384}
   .resumen.cinco{grid-template-columns:repeat(5,1fr);gap:6px;background:#fff !important;
     border:none;padding:0;margin-bottom:7px;break-inside:avoid}
   .resumen.cinco .kpi{background:#FBFCFD !important;border:1px solid #D4D8E0;border-left:3px solid #5A8B8C;padding:5px 9px}
@@ -511,10 +523,8 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   table.datos td.pos{color:#555}
 
   /* Los paneles van al final del bloque de impresión a propósito: así ganan a
-     las reglas de arriba. Dos por página, que una columna agrupada necesita
-     ancho para que quepan los nombres girados. */
-  /* Una columna agrupada necesita el ancho de la hoja, así que van de una en
-     una: dos paneles por página. */
+     las reglas de arriba. Las barras horizontales necesitan el ancho de la
+     hoja para que quepa el nombre entero, así que van de una en una. */
   .paneles{grid-template-columns:1fr;gap:7px;align-items:start}
   .panel{padding:7px 10px;background:#fff;border:1px solid #D4D8E0;border-radius:8px}
   .panel h3{font-size:11px;line-height:1.2;color:#14161C}
@@ -526,8 +536,14 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   .cm.eq b{color:#9C4B52;font-size:14px}
   svg.cols text{fill:#3B414E}
   svg.cols line[stroke="#1B263B"]{stroke:#E6E9EF}
+  svg.cols rect[fill="#fff"]{fill:none}
   /* La nota de los paneles se iba sola a una página en blanco al final. */
   .leyPaneles{display:none}
+  .chipsMet,.ejes{display:none}
+  .medalla li .bar{background:#E8EAF0}
+  .medalla li .val,.medalla li .qui{color:#14161C}
+  .leyDisp{color:#6B7384}
+  .panel.matriz,.panel.disp{page-break-inside:avoid;break-inside:avoid}
   /* el minigráfico también se imprime */
   .resumen.cinco .kpi .chispa{display:block;height:20px}
   .delta.sube{color:#2F5F60}
