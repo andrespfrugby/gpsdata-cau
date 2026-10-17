@@ -194,7 +194,11 @@ let EQUIPO_CARGA = "";             // equipo elegido al arrastrar un CSV sin col
 const F = { squad:"", fecha:"", pestana:"reporte",
   // Cuatro paneles, como los cuatro selectores del Session Report de Power BI.
   metricas:["Distance (metres)", HMLD, "Sprint Distance (m)",
-            ACC3, "Player Load", "Distance in Speed Zone 5  (metres)"] };
+            ACC3, "Player Load", "Distance in Speed Zone 5  (metres)"],
+  // Las filas de la matriz: se marcan y desmarcan y el bloque crece o encoge.
+  matriz:["Distance (metres)", HMLD, "Sprint Distance (m)", ACC3],
+  // Los dos ejes del gráfico de dispersión.
+  sc:{ x:HMLD, y:"Power Plays" } };
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -552,15 +556,20 @@ function resumen(filas) {
     // El nombre de la métrica va arriba: "Volumen 4042" obliga a bajar la vista
     // para enterarte de qué es ese 4042.
     const serie = serieEquipo(r.col);
-    const previa = serie.length > 1 ? serie[serie.length - 2] : null;
+    // Se compara con la MEDIA de las anteriores del mismo tipo, no solo con la
+    // última: una sesión suelta rara desviaba el % entero.
+    const antes = serie.slice(0, -1);
+    const previa = antes.length ? antes.reduce((t, v) => t + v, 0) / antes.length : null;
     const delta = previa ? (media / previa - 1) * 100 : null;
     return `<div class="kpi ${r.tipo}" title="${esc(r.titulo)}">
       <span class="k">${esc(r.titulo)}</span>
       <b>${nf(media, dec)}<i>${r.uni ? " " + r.uni : ""}</i></b>
       <span class="s"><em>${r.tipo === "vol" ? "Volumen" : "Intensidad"}</em>${
         delta == null ? "" : `<span class="delta ${delta >= 0 ? "sube" : "baja"}">${
-          delta >= 0 ? "▲" : "▼"} ${nf(Math.abs(delta))}%</span>`}</span>
-      ${chispa(serie, r.tipo)}
+          delta >= 0 ? "▲" : "▼"} ${nf(Math.abs(delta), Math.abs(delta) < 10 ? 1 : 0)}%</span>`}</span>
+      ${antes.length
+        ? `<span class="vs">vs ${antes.length} ${filas[0].esPartido ? "partido" : "sesión"}${antes.length > 1 ? (filas[0].esPartido ? "s" : "es") : ""} anterior${antes.length > 1 ? "es" : ""}</span>${chispa(serie, r.tipo)}`
+        : `<span class="vs sola">primer${filas[0].esPartido ? " partido" : "a sesión"} registrad${filas[0].esPartido ? "o" : "a"}</span>`}
     </div>`;
   }).join("")}</div>`;
 }
@@ -604,20 +613,25 @@ function chispa(vals, tipo) {
   </svg>`;
 }
 
-/** Las cinco tarjetas de podio de la sesión. */
+/** Rankings de la sesión: barra, medalla y emoji de la métrica. */
+const MEDALLA = ["🥇", "🥈", "🥉"];
 function medallas(filas) {
   const tarjetas = TOP3.filter(t => filas.some(r => t.col in r.crudo)).map(t => {
     const orden = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[t.col] || 0) }))
-      .sort((a, b) => b.v - a.v).slice(0, 3);
+      .sort((a, b) => b.v - a.v).slice(0, 5);
     const dec = decimales(filas.map(r => Math.abs(r.crudo[t.col] || 0)));
-    // El título sale del catálogo, así lleva el umbral que tengas configurado.
+    const tope = orden[0] ? orden[0].v : 0;
     const titulo = t.titulo || nombreMetrica(t.col);
+    const puestos = [...new Set(filas.map(r => r.posicion))].sort();
     return `<div class="medalla">
       <div class="top"><span class="ico">${t.ico}</span>
         <span class="tit" title="${esc(titulo)}">
-          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(t.corto)}</span></b></span></div>
-      <ol>${orden.map((d, i) => `<li class="p${i + 1}"><span class="pos">${i + 1}</span>
+          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(t.corto)}</span></b></span>
+        <span class="uniR">${esc(unidad(t.col) || "")}</span></div>
+      <ol>${orden.map((d, i) => `<li>
+        <span class="pos">${i < 3 ? MEDALLA[i] : `<em>${i + 1}</em>`}</span>
         <span class="qui" title="${esc(d.pos)}">${esc(d.nom)}</span>
+        <span class="bar"><i style="width:${tope ? (d.v / tope * 100).toFixed(1) : 0}%;background:${colorPuesto(d.pos, puestos)}"></i></span>
         <span class="val">${fmt(t.col, d.v, dec)}</span></li>`).join("")}</ol>
     </div>`;
   }).join("");
@@ -690,49 +704,36 @@ function panel(col, filas, indice) {
       <span>${esc(p)}</span><b>${fmt(col, mediaDe(grupos[p], col), decMedia(dec))}</b></div>`).join("")}
   </div>`;
 
-  // Geometría. Los nombres van girados: en horizontal no caben, y el hueco de
-  // abajo tiene que dar para el más largo o se corta.
-  const W = 1180, L = 58, R = 18, T = 28, HUECO = 20;
-  const largo = Math.max(...filas.map(r => r.jugador.length), 10);
-  const B = Math.min(150, Math.round(18 + largo * 6.9));
-  const H = T + 170 + B, ih = H - T - B, iw = W - L - R;
-  // Con pocos jugadores las columnas salían gigantes: se limita el ancho y el
-  // grupo entero se centra, en vez de estirarse de lado a lado.
-  const util = iw - HUECO * (puestos.length - 1);
-  const paso = Math.min(util / filas.length, 78);
-  const usado = paso * filas.length + HUECO * (puestos.length - 1);
-  const margen = Math.max(0, (iw - usado) / 2);
-  const tope = Math.max(...vals) * 1.12 || 1;
-  const y = n => T + ih - n / tope * ih;
+  // Barras horizontales agrupadas por posición: el nombre va entero y sin
+  // girar a la izquierda, y el valor justo al final de su barra.
+  const W = 1180, R = 92, T = 6, ALTO = 19, CAB = 17, HUECO = 15;
+  const largo = Math.max(...filas.map(r => r.jugador.length), 8);
+  const L = Math.min(210, Math.round(26 + largo * 7.2));
+  const H = T + puestos.reduce((t, p) => t + CAB + grupos[p].length * ALTO, 0)
+              + HUECO * (puestos.length - 1) + 6;
+  const iw = W - L - R;
+  const tope = Math.max(...vals) * 1.04 || 1;
+  const x = v => L + v / tope * iw;
 
-  let g = "", previa = null;
-  for (let i = 1; i <= 4; i++) {
-    const n = tope * i / 4, etq = nf(n, dec ? 1 : 0);
-    g += `<line x1="${L}" x2="${W - R}" y1="${y(n).toFixed(1)}" y2="${y(n).toFixed(1)}" stroke="#1B263B"/>`;
-    if (etq !== previa) {
-      g += `<text x="${L - 9}" y="${(y(n) + 4).toFixed(1)}" fill="#6B7A94" font-size="11" text-anchor="end">${etq}</text>`;
-      previa = etq;
-    }
-  }
-  let x = L + margen;
+  let g = "";
+  let y = T;
   for (const p of puestos) {
-    const l = grupos[p], ancho = paso * l.length, c = colorPuesto(p, puestos);
-    const m = mediaDe(l, col);
-    g += `<rect x="${x.toFixed(1)}" y="${T - 18}" width="${ancho.toFixed(1)}" height="${(ih + 18).toFixed(1)}"
-            fill="${c}" opacity=".05" rx="4"/>
-          <rect x="${x.toFixed(1)}" y="${T - 18}" width="${ancho.toFixed(1)}" height="16" fill="${c}" opacity=".18" rx="3"/>
-          <text x="${(x + ancho / 2).toFixed(1)}" y="${T - 6}" fill="${c}" font-size="10.5" text-anchor="middle">${esc(p)}</text>
-          <line x1="${(x + 3).toFixed(1)}" x2="${(x + ancho - 3).toFixed(1)}" y1="${y(m).toFixed(1)}" y2="${y(m).toFixed(1)}"
-            stroke="${c}" stroke-width="2" stroke-dasharray="6 3"/>`;
+    const l = grupos[p], c = colorPuesto(p, puestos), m = mediaDe(l, col);
+    const altoG = CAB + l.length * ALTO;
+    g += `<rect x="0" y="${y}" width="${W}" height="${altoG}" fill="${c}" opacity=".05" rx="4"/>
+          <text x="6" y="${y + 12}" fill="${c}" font-size="10.5" letter-spacing=".04em">${esc(p).toUpperCase()}</text>
+          <text x="${L}" y="${y + 12}" fill="#6B7A94" font-size="10">media ${fmt(col, m, decMedia(dec))}</text>`;
+    const y0 = y + CAB;
     l.forEach((r, i) => {
-      const v = Math.abs(r.crudo[col] || 0), cx = x + paso * (i + 0.5), an = Math.min(paso * 0.68, 54);
-      g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${an.toFixed(1)}"
-              height="${(T + ih - y(v)).toFixed(1)}" rx="3" fill="${c}" opacity=".85"/>
-            <text x="${cx.toFixed(1)}" y="${(y(v) - 6).toFixed(1)}" fill="#E9EEF7" font-size="10" text-anchor="middle">${fmt(col, v, dec)}</text>
-            <text x="${cx.toFixed(1)}" y="${T + ih + 10}" fill="#9EABC2" font-size="11" text-anchor="end"
-              transform="rotate(-90 ${cx.toFixed(1)} ${T + ih + 10})">${esc(r.jugador)}</text>`;
+      const v = Math.abs(r.crudo[col] || 0), fy = y0 + i * ALTO, an = x(v) - L;
+      g += `<text x="${L - 9}" y="${fy + 13}" fill="#9EABC2" font-size="11" text-anchor="end">${esc(r.jugador)}</text>
+            <rect x="${L}" y="${fy + 3}" width="${Math.max(0, an).toFixed(1)}" height="13" rx="3" fill="${c}" opacity=".85"/>
+            <text x="${(x(v) + 7).toFixed(1)}" y="${fy + 13.5}" fill="#E9EEF7" font-size="10.5">${fmt(col, v, dec)}</text>`;
     });
-    x += ancho + HUECO;
+    // La media de la línea cruza solo su propio bloque, no el gráfico entero.
+    g += `<line x1="${x(m).toFixed(1)}" x2="${x(m).toFixed(1)}" y1="${y0 + 1}" y2="${(y0 + l.length * ALTO - 2).toFixed(1)}"
+            stroke="${c}" stroke-width="2" stroke-dasharray="5 3"/>`;
+    y += altoG + HUECO;
   }
 
   return `<section class="panel">
@@ -741,6 +742,151 @@ function panel(col, filas, indice) {
     ${cajas}
     <svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(lbl)} por jugador">${g}</svg>
   </section>`;
+}
+
+/* ---------- matriz métricas x posiciones ---------- */
+
+/** Las métricas que de verdad están en los datos cargados, agrupadas. */
+function catalogoDisponible(filas) {
+  return METRICAS.map(([g, cols]) => [g, cols.filter(c => filas.some(r => c in r.crudo))])
+                 .filter(([, c]) => c.length);
+}
+
+/** Para chips y para la columna izquierda: sin el umbral, que no cabe. */
+const etiquetaChip = c => nombreCorto(c).split("·")[0].trim() || nombreCorto(c);
+
+/** Chips para marcar qué métricas entran en la matriz. */
+function chipsMatriz(filas) {
+  const cat = catalogoDisponible(filas);
+  return `<div class="chipsMet noPdf">${cat.map(([g, cols]) => cols.map(c =>
+    `<button class="chM${F.matriz.includes(c) ? " on" : ""}" data-c="${esc(c)}"
+      title="${esc(nombreMetrica(c))} · ${esc(g)}">${F.matriz.includes(c) ? "✓ " : ""}${esc(etiquetaChip(c))}</button>`).join("")).join("")}</div>`;
+}
+
+/**
+ * Una fila por métrica y una columna por línea, como el gráfico de la
+ * referencia: el valor va girado dentro de la barra y la discontinua es la
+ * media de esa línea. Los nombres se escriben una sola vez abajo porque el
+ * orden de jugadores se repite en todas las filas.
+ */
+function matriz(filas) {
+  const cols = F.matriz.filter(c => filas.some(r => c in r.crudo));
+  if (!cols.length) return `<p class="empty">Marca al menos una métrica.</p>`;
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const grupos = puestos.map(p => [p, filas.filter(r => r.posicion === p)
+    .sort((a, b) => Math.abs(b.crudo[cols[0]] || 0) - Math.abs(a.crudo[cols[0]] || 0))]);
+
+  const W = 1180, LG = 84, GAP = 10, TOP = 22, FH = 112, NOM = 36;
+  const n = filas.length, iw = W - LG - 8 - GAP * (puestos.length - 1);
+  const H = TOP + cols.length * (FH + 6) + NOM;
+  let g = "", x = LG;
+  const bloques = grupos.map(([p, rs]) => {
+    const w = iw * rs.length / n, b = { p, rs, x, w };
+    x += w + GAP;
+    return b;
+  });
+  for (const { p, rs, x, w } of bloques) {
+    const c = colorPuesto(p, puestos);
+    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - NOM + 4}" fill="${c}" opacity=".06" rx="5"/>
+          <text x="${(x + w / 2).toFixed(1)}" y="14" fill="${c}" font-size="10" text-anchor="middle">${esc(p)}</text>`;
+  }
+  cols.forEach((col, mi) => {
+    const vals = filas.map(r => Math.abs(r.crudo[col] || 0));
+    const bruto = decimales(vals);
+    // Dentro de una barra estrecha "6112,55" no cabe: con cifras grandes se
+    // quitan los decimales, que ahí no aportan nada.
+    const dec = Math.max(...vals) >= 100 ? 0 : bruto;
+    const tope = Math.max(...vals) * 1.12 || 1;
+    const y0 = TOP + mi * (FH + 6), ih = FH - 16;
+    g += `<text x="2" y="${(y0 + ih / 2).toFixed(0)}" fill="#E9EEF7" font-size="10.5">${esc(etiquetaChip(col))}<title>${esc(nombreMetrica(col))}</title></text>
+          <text x="2" y="${(y0 + ih / 2 + 12).toFixed(0)}" fill="#6B7A94" font-size="9">${esc(unidad(col) || "")}</text>
+          <line x1="${LG - 4}" x2="${W - 4}" y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
+    for (const { p, rs, x, w } of bloques) {
+      const c = colorPuesto(p, puestos), paso = w / rs.length;
+      const m = mediaDe(rs, col), ym = y0 + ih - m / tope * ih;
+      g += `<line x1="${(x + 2).toFixed(1)}" x2="${(x + w - 2).toFixed(1)}" y1="${ym.toFixed(1)}" y2="${ym.toFixed(1)}"
+              stroke="${c}" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+      rs.forEach((r, i) => {
+        const v = Math.abs(r.crudo[col] || 0), cx = x + paso * (i + 0.5);
+        const h = v / tope * ih, an = Math.min(paso * 0.72, 34);
+        g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${(y0 + ih - h).toFixed(1)}" width="${an.toFixed(1)}"
+                height="${Math.max(1, h).toFixed(1)}" rx="2" fill="${c}" opacity=".85"/>`;
+        // Si la barra da de sí, el número va girado dentro; si no, encima.
+        g += h > 28
+          ? `<text x="${cx.toFixed(1)}" y="${(y0 + ih - 5).toFixed(1)}" fill="#101828" font-size="8.6"
+               transform="rotate(-90 ${cx.toFixed(1)} ${(y0 + ih - 5).toFixed(1)})">${fmt(col, v, dec)}</text>`
+          : `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 4).toFixed(1)}" fill="#9EABC2" font-size="8.4"
+               text-anchor="middle">${fmt(col, v, dec)}</text>`;
+      });
+    }
+  });
+  const yb = TOP + cols.length * (FH + 6);
+  for (const { rs, x, w } of bloques) {
+    const paso = w / rs.length;
+    rs.forEach((r, i) => {
+      const cx = x + paso * (i + 0.5), tr = r.jugador.split(" ");
+      g += `<text x="${cx.toFixed(1)}" y="${yb + 9}" fill="#6B7A94" font-size="8" text-anchor="middle">${esc(tr[0])}</text>
+            <text x="${cx.toFixed(1)}" y="${yb + 19}" fill="#C9D3E4" font-size="8.2" text-anchor="middle">${esc(tr.slice(1).join(" ").slice(0, 10))}</text>`;
+    });
+  }
+  return `<svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="Métricas por posición">${g}</svg>`;
+}
+
+/* ---------- dispersión normalizada por posición ---------- */
+
+/**
+ * Los dos ejes van en % de la media de SU puesto, no en valor bruto: así un
+ * primera línea no se queda siempre abajo a la izquierda solo por ser primera.
+ */
+function scatter(filas) {
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const hayX = filas.some(r => F.sc.x in r.crudo), hayY = filas.some(r => F.sc.y in r.crudo);
+  if (!hayX || !hayY) return `<p class="empty">Esa pareja de métricas no está en estos datos.</p>`;
+  const pts = [];
+  for (const p of puestos) {
+    const rs = filas.filter(r => r.posicion === p);
+    const mx = mediaDe(rs, F.sc.x) || 1, my = mediaDe(rs, F.sc.y) || 1;
+    for (const r of rs) {
+      pts.push({ nom:r.jugador, pos:p, c:colorPuesto(p, puestos),
+                 a:Math.abs(r.crudo[F.sc.x] || 0) / mx * 100,
+                 b:Math.abs(r.crudo[F.sc.y] || 0) / my * 100 });
+    }
+  }
+  const W = 1180, H = 430, L = 56, R = 16, T = 14, B = 38;
+  const iw = W - L - R, ih = H - T - B;
+  const tope = Math.max(100, ...pts.map(p => Math.max(p.a, p.b))) + 15;
+  const x = v => L + v / tope * iw, y = v => T + ih - v / tope * ih;
+  const cx = x(100), cy = y(100);
+  let g = `<rect x="${cx.toFixed(1)}" y="${T}" width="${(W - R - cx).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#6AAA96" opacity=".22"/>
+    <rect x="${L}" y="${T}" width="${(cx - L).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#E0CD6E" opacity=".22"/>
+    <rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${(W - R - cx).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#E69656" opacity=".22"/>
+    <rect x="${L}" y="${cy.toFixed(1)}" width="${(cx - L).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#E05860" opacity=".22"/>`;
+  for (let v = 0; v <= tope; v += 50) {
+    g += `<line x1="${x(v).toFixed(1)}" x2="${x(v).toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#1B263B"/>
+          <line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#1B263B"/>
+          <text x="${x(v).toFixed(1)}" y="${T + ih + 13}" fill="#6B7A94" font-size="9" text-anchor="middle">${v}%</text>
+          <text x="${L - 6}" y="${(y(v) + 3).toFixed(1)}" fill="#6B7A94" font-size="9" text-anchor="end">${v}%</text>`;
+  }
+  g += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>
+        <line x1="${L}" x2="${W - R}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>`;
+  for (const p of pts) {
+    g += `<circle cx="${x(p.a).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="6" fill="${p.c}" stroke="#0D1420" stroke-width="1.2"><title>${esc(p.nom)} · ${esc(p.pos)}</title></circle>
+          <text x="${x(p.a).toFixed(1)}" y="${(y(p.b) - 10).toFixed(1)}" fill="#E9EEF7" font-size="8.6" text-anchor="middle">${esc(p.nom)}</text>`;
+  }
+  g += `<text x="${(L + iw / 2).toFixed(0)}" y="${H - 4}" fill="#C9D3E4" font-size="11" text-anchor="middle">${esc(nombreMetrica(F.sc.x))}</text>
+        <text x="13" y="${(T + ih / 2).toFixed(0)}" fill="#C9D3E4" font-size="11" text-anchor="middle"
+          transform="rotate(-90 13 ${(T + ih / 2).toFixed(0)})">${esc(nombreMetrica(F.sc.y))}</text>`;
+  return `<svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dispersión por posición">${g}</svg>`;
+}
+
+/** Los dos desplegables del scatter, nativos del navegador. */
+function selectorEje(eje, filas) {
+  const cat = catalogoDisponible(filas);
+  const act = F.sc[eje];
+  const op = cat.map(([g, cols]) => `<optgroup label="${esc(g)}">` + cols.map(c =>
+    `<option value="${esc(c)}"${c === act ? " selected" : ""}>${esc(nombreMetrica(c))}</option>`).join("") + `</optgroup>`).join("");
+  return `<label class="ejeSel"><span>Eje ${eje.toUpperCase()}</span>
+    <select class="selEje" data-e="${eje}">${op}</select></label>`;
 }
 
 /* ---------- % de carga sobre las demandas de juego ---------- */
@@ -2278,14 +2424,40 @@ function pintar() {
   F.metricas = F.metricas.map((m, i) => disponibles.includes(m) ? m : (disponibles[i] || disponibles[0]));
 
   $("#selectores").innerHTML = "";
-  $("#paneles").innerHTML = F.metricas.map((m, i) => panel(m, filas, i)).join("") + `
+  F.matriz = F.matriz.filter(c => disponibles.includes(c));
+  if (!F.matriz.length) F.matriz = disponibles.slice(0, 4);
+  if (!disponibles.includes(F.sc.x)) F.sc.x = disponibles[0];
+  if (!disponibles.includes(F.sc.y)) F.sc.y = disponibles[1] || disponibles[0];
+  $("#paneles").innerHTML = `
+    <section class="panel matriz">
+      <h3>Métricas por posición</h3>
+      ${chipsMatriz(filas)}
+      ${matriz(filas)}
+    </section>
+    <section class="panel disp">
+      <h3>Dispersión por posición <span class="uni">% de la media de su puesto</span></h3>
+      <div class="ejes noPdf">${selectorEje("x", filas)}${selectorEje("y", filas)}</div>
+      <p class="sub soloPdf">${esc(nombreMetrica(F.sc.x))} (horizontal) × ${esc(nombreMetrica(F.sc.y))} (vertical), cada uno en % de la media de su puesto</p>
+      ${scatter(filas)}
+      <div class="leyDisp">
+        <span><i style="background:#6AAA96"></i>las dos por encima de su puesto</span>
+        <span><i style="background:#E0CD6E"></i>solo el eje vertical</span>
+        <span><i style="background:#E69656"></i>solo el eje horizontal</span>
+        <span><i style="background:#E05860"></i>las dos por debajo</span>
+      </div>
+    </section>
     <div class="leyPaneles">
       <span>Cada bloque es una línea, con su color y su media punteada dentro</span>
-      <span>La media del equipo está en la caja rosa de cada panel</span>
+      <span>El 100% del scatter es la media de la línea del jugador, no la del equipo</span>
     </div>`;
-  document.querySelectorAll(".selMet").forEach(sel => sel.onchange = e => {
-    F.metricas[+e.target.dataset.i] = e.target.value;
-    pintar();
+  document.querySelectorAll(".chM").forEach(b => b.onclick = () => {
+    const c = b.dataset.c;
+    F.matriz = F.matriz.includes(c) ? F.matriz.filter(x => x !== c) : F.matriz.concat(c);
+    recordar(); pintar();
+  });
+  document.querySelectorAll(".selEje").forEach(sel => sel.onchange = e => {
+    F.sc[e.target.dataset.e] = e.target.value;
+    recordar(); pintar();
   });
   $("#tabla").innerHTML = tabla(filas);
   $("#notas").innerHTML = cajaComentarios();
@@ -2395,7 +2567,8 @@ const GUARDA = "cau_gps_prefs";
 function recordar() {
   try {
     localStorage.setItem(GUARDA, JSON.stringify({
-      squad:F.squad, fecha:F.fecha, metricas:F.metricas, pestana:F.pestana, escenario:FC.escenario,
+      squad:F.squad, fecha:F.fecha, metricas:F.metricas, matriz:F.matriz, sc:F.sc,
+      pestana:F.pestana, escenario:FC.escenario,
       metricaAcwr:FA.metrica, jugador:FJ,
       parejas:PAREJAS, ordenDrill:FD.orden
     }));
@@ -2407,6 +2580,8 @@ function recuperar() {
     if (p.squad) F.squad = p.squad;
     if (p.fecha) F.fecha = p.fecha;
     if (Array.isArray(p.metricas) && p.metricas.length) F.metricas = p.metricas;
+    if (Array.isArray(p.matriz) && p.matriz.length) F.matriz = p.matriz;
+    if (p.sc && p.sc.x && p.sc.y) F.sc = p.sc;
     if (p.ordenDrill) FD.orden = p.ordenDrill;
     if (p.escenario) FC.escenario = p.escenario;
     if (p.metricaAcwr) FA.metrica = p.metricaAcwr;
