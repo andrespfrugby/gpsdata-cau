@@ -752,6 +752,12 @@ function catalogoDisponible(filas) {
                  .filter(([, c]) => c.length);
 }
 
+/** Solo el apellido, que es lo que cabe debajo de una barra estrecha. */
+const apellido = j => {
+  const t = String(j).trim().split(/\s+/);
+  return (t.length > 1 ? t.slice(1).join(" ") : t[0]).slice(0, 10);
+};
+
 /** Para chips y para la columna izquierda: sin el umbral, que no cabe. */
 const etiquetaChip = c => nombreCorto(c).split("·")[0].trim() || nombreCorto(c);
 
@@ -776,9 +782,12 @@ function matriz(filas) {
   const grupos = puestos.map(p => [p, filas.filter(r => r.posicion === p)
     .sort((a, b) => Math.abs(b.crudo[cols[0]] || 0) - Math.abs(a.crudo[cols[0]] || 0))]);
 
-  const W = 1180, LG = 84, GAP = 10, TOP = 22, FH = 112, NOM = 36;
+  // Cada métrica lleva su propia línea de apellidos pegada al eje: con varias
+  // métricas el bloque pasa de una hoja y, si los nombres fueran solo al final,
+  // la página de en medio no habría quien la leyera.
+  const W = 1180, LG = 84, GAP = 10, TOP = 22, FH = 112, PIE = 17;
   const n = filas.length, iw = W - LG - 8 - GAP * (puestos.length - 1);
-  const H = TOP + cols.length * (FH + 6) + NOM;
+  const H = TOP + cols.length * (FH + PIE + 6) + 4;
   let g = "", x = LG;
   const bloques = grupos.map(([p, rs]) => {
     const w = iw * rs.length / n, b = { p, rs, x, w };
@@ -787,7 +796,7 @@ function matriz(filas) {
   });
   for (const { p, rs, x, w } of bloques) {
     const c = colorPuesto(p, puestos);
-    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - NOM + 4}" fill="${c}" opacity=".06" rx="5"/>
+    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 6}" fill="${c}" opacity=".06" rx="5"/>
           <text x="${(x + w / 2).toFixed(1)}" y="14" fill="${c}" font-size="10" text-anchor="middle">${esc(p)}</text>`;
   }
   cols.forEach((col, mi) => {
@@ -797,7 +806,7 @@ function matriz(filas) {
     // quitan los decimales, que ahí no aportan nada.
     const dec = Math.max(...vals) >= 100 ? 0 : bruto;
     const tope = Math.max(...vals) * 1.12 || 1;
-    const y0 = TOP + mi * (FH + 6), ih = FH - 16;
+    const y0 = TOP + mi * (FH + PIE + 6), ih = FH - 16;
     g += `<text x="2" y="${(y0 + ih / 2).toFixed(0)}" fill="#E9EEF7" font-size="10.5">${esc(etiquetaChip(col))}<title>${esc(nombreMetrica(col))}</title></text>
           <text x="2" y="${(y0 + ih / 2 + 12).toFixed(0)}" fill="#6B7A94" font-size="9">${esc(unidad(col) || "")}</text>
           <line x1="${LG - 4}" x2="${W - 4}" y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
@@ -817,18 +826,11 @@ function matriz(filas) {
                transform="rotate(-90 ${cx.toFixed(1)} ${(y0 + ih - 5).toFixed(1)})">${fmt(col, v, dec)}</text>`
           : `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 4).toFixed(1)}" fill="#9EABC2" font-size="8.4"
                text-anchor="middle">${fmt(col, v, dec)}</text>`;
+        g += `<text x="${cx.toFixed(1)}" y="${y0 + ih + 12}" fill="#9EABC2" font-size="8"
+                text-anchor="middle">${esc(apellido(r.jugador))}<title>${esc(r.jugador)}</title></text>`;
       });
     }
   });
-  const yb = TOP + cols.length * (FH + 6);
-  for (const { rs, x, w } of bloques) {
-    const paso = w / rs.length;
-    rs.forEach((r, i) => {
-      const cx = x + paso * (i + 0.5), tr = r.jugador.split(" ");
-      g += `<text x="${cx.toFixed(1)}" y="${yb + 9}" fill="#6B7A94" font-size="8" text-anchor="middle">${esc(tr[0])}</text>
-            <text x="${cx.toFixed(1)}" y="${yb + 19}" fill="#C9D3E4" font-size="8.2" text-anchor="middle">${esc(tr.slice(1).join(" ").slice(0, 10))}</text>`;
-    });
-  }
   return `<svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="Métricas por posición">${g}</svg>`;
 }
 
