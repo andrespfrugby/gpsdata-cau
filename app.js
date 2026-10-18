@@ -752,11 +752,15 @@ function catalogoDisponible(filas) {
                  .filter(([, c]) => c.length);
 }
 
-/** Solo el apellido, que es lo que cabe debajo de una barra estrecha. */
-const apellido = j => {
-  const t = String(j).trim().split(/\s+/);
-  return (t.length > 1 ? t.slice(1).join(" ") : t[0]).slice(0, 10);
-};
+/**
+ * Tamaño de letra para que el nombre entero quepa en el ancho de su columna.
+ * En Chivo Mono cada letra ocupa algo más de medio cuerpo, así que de ahí sale
+ * el tamaño que hace falta; por debajo de 6 no se lee, así que ahí se recorta.
+ */
+function letraNombre(nombre, ancho) {
+  // Se deja un 20% de aire entre columnas o los nombres se tocan.
+  return Math.min(8.4, (ancho * 0.8) / (Math.max(1, nombre.length) * 0.62));
+}
 
 /** Para chips y para la columna izquierda: sin el umbral, que no cabe. */
 const etiquetaChip = c => nombreCorto(c).split("·")[0].trim() || nombreCorto(c);
@@ -775,19 +779,47 @@ function chipsMatriz(filas) {
  * media de esa línea. Los nombres se escriben una sola vez abajo porque el
  * orden de jugadores se repite en todas las filas.
  */
+/* Cuántas métricas caben en una hoja apaisada sin que el bloque se parta.
+   Más de esto y la matriz se trocea sola en varios bloques. */
+const POR_HOJA = 5;
+
 function matriz(filas) {
-  const cols = F.matriz.filter(c => filas.some(r => c in r.crudo));
-  if (!cols.length) return `<p class="empty">Marca al menos una métrica.</p>`;
+  const todas = F.matriz.filter(c => filas.some(r => c in r.crudo));
+  if (!todas.length) return `<p class="empty">Marca al menos una métrica.</p>`;
+  // Los nombres van una sola vez, al pie de cada bloque: repetirlos en cada
+  // métrica ensuciaba el gráfico. Para que nunca se queden en otra página, la
+  // matriz se corta en trozos que caben enteros en una hoja.
+  const trozos = [];
+  for (let i = 0; i < todas.length; i += POR_HOJA) trozos.push(todas.slice(i, i + POR_HOJA));
+  return trozos.map((t, i) => `<section class="panel matriz">
+    <h3>Métricas por posición${trozos.length > 1 ? ` <span class="uni">${i + 1} de ${trozos.length}</span>` : ""}</h3>
+    ${i === 0 ? chipsMatriz(filas) : ""}
+    ${bloqueMatriz(filas, t, todas[0])}
+  </section>`).join("");
+}
+
+function bloqueMatriz(filas, cols, ordenPor) {
   const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  // Se ordena siempre por la misma métrica, la primera de las marcadas: si cada
+  // bloque se ordenase por la suya, el jugador cambiaría de sitio entre páginas.
+  const orden = ordenPor || cols[0];
   const grupos = puestos.map(p => [p, filas.filter(r => r.posicion === p)
-    .sort((a, b) => Math.abs(b.crudo[cols[0]] || 0) - Math.abs(a.crudo[cols[0]] || 0))]);
+    .sort((a, b) => Math.abs(b.crudo[orden] || 0) - Math.abs(a.crudo[orden] || 0))]);
 
   // Cada métrica lleva su propia línea de apellidos pegada al eje: con varias
   // métricas el bloque pasa de una hoja y, si los nombres fueran solo al final,
   // la página de en medio no habría quien la leyera.
-  const W = 1180, LG = 84, GAP = 10, TOP = 22, FH = 112, PIE = 17;
+  const W = 1180, LG = 84, GAP = 10, TOP = 22, FH = 112;
   const n = filas.length, iw = W - LG - 8 - GAP * (puestos.length - 1);
-  const H = TOP + cols.length * (FH + PIE + 6) + 4;
+  // Todos los bloques reparten el mismo ancho por jugador, así que el paso es
+  // el mismo en los cuatro y basta decidir una vez cómo caben los nombres.
+  const paso0 = iw / n;
+  const mini = Math.min(...filas.map(r => letraNombre(r.jugador, paso0)));
+  // Si el nombre entero no cabe legible en una línea, se parte en dos: la
+  // inicial arriba y el apellido debajo, que así cada uno tiene la columna entera.
+  const dosLineas = mini < 7;
+  const PIE = dosLineas ? 28 : 19;
+  const H = TOP + cols.length * (FH + 6) + PIE;
   let g = "", x = LG;
   const bloques = grupos.map(([p, rs]) => {
     const w = iw * rs.length / n, b = { p, rs, x, w };
@@ -796,7 +828,7 @@ function matriz(filas) {
   });
   for (const { p, rs, x, w } of bloques) {
     const c = colorPuesto(p, puestos);
-    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 6}" fill="${c}" opacity=".06" rx="5"/>
+    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}" fill="${c}" opacity=".06" rx="5"/>
           <text x="${(x + w / 2).toFixed(1)}" y="14" fill="${c}" font-size="10" text-anchor="middle">${esc(p)}</text>`;
   }
   cols.forEach((col, mi) => {
@@ -806,7 +838,7 @@ function matriz(filas) {
     // quitan los decimales, que ahí no aportan nada.
     const dec = Math.max(...vals) >= 100 ? 0 : bruto;
     const tope = Math.max(...vals) * 1.12 || 1;
-    const y0 = TOP + mi * (FH + PIE + 6), ih = FH - 16;
+    const y0 = TOP + mi * (FH + 6), ih = FH - 16;
     g += `<text x="2" y="${(y0 + ih / 2).toFixed(0)}" fill="#E9EEF7" font-size="10.5">${esc(etiquetaChip(col))}<title>${esc(nombreMetrica(col))}</title></text>
           <text x="2" y="${(y0 + ih / 2 + 12).toFixed(0)}" fill="#6B7A94" font-size="9">${esc(unidad(col) || "")}</text>
           <line x1="${LG - 4}" x2="${W - 4}" y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
@@ -826,11 +858,31 @@ function matriz(filas) {
                transform="rotate(-90 ${cx.toFixed(1)} ${(y0 + ih - 5).toFixed(1)})">${fmt(col, v, dec)}</text>`
           : `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 4).toFixed(1)}" fill="#9EABC2" font-size="8.4"
                text-anchor="middle">${fmt(col, v, dec)}</text>`;
-        g += `<text x="${cx.toFixed(1)}" y="${y0 + ih + 12}" fill="#9EABC2" font-size="8"
-                text-anchor="middle">${esc(apellido(r.jugador))}<title>${esc(r.jugador)}</title></text>`;
       });
     }
   });
+  // Una sola fila de nombres al pie, con el cuerpo de letra que les permita
+  // caber en su columna sin tocarse.
+  const yb = TOP + cols.length * (FH + 6);
+  for (const { rs, x, w } of bloques) {
+    const paso = w / rs.length;
+    rs.forEach((r, i) => {
+      const cx = x + paso * (i + 0.5);
+      if (dosLineas) {
+        const t = r.jugador.trim().split(/\s+/);
+        const ini = t.length > 1 ? t[0] : "", ape = t.length > 1 ? t.slice(1).join(" ") : t[0];
+        const fz = Math.max(6.4, Math.min(9, letraNombre(ape, paso)));
+        g += `<text x="${cx.toFixed(1)}" y="${yb + 10}" fill="#6B7A94" font-size="${(fz - 0.6).toFixed(1)}"
+                text-anchor="middle">${esc(ini)}</text>
+              <text x="${cx.toFixed(1)}" y="${yb + 21}" fill="#C9D3E4" font-size="${fz.toFixed(1)}"
+                text-anchor="middle">${esc(ape)}<title>${esc(r.jugador)}</title></text>`;
+      } else {
+        g += `<text x="${cx.toFixed(1)}" y="${yb + 13}" fill="#C9D3E4"
+                font-size="${Math.max(7, letraNombre(r.jugador, paso)).toFixed(1)}"
+                text-anchor="middle">${esc(r.jugador)}</text>`;
+      }
+    });
+  }
   return `<svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="Métricas por posición">${g}</svg>`;
 }
 
@@ -2431,11 +2483,7 @@ function pintar() {
   if (!disponibles.includes(F.sc.x)) F.sc.x = disponibles[0];
   if (!disponibles.includes(F.sc.y)) F.sc.y = disponibles[1] || disponibles[0];
   $("#paneles").innerHTML = `
-    <section class="panel matriz">
-      <h3>Métricas por posición</h3>
-      ${chipsMatriz(filas)}
-      ${matriz(filas)}
-    </section>
+    ${matriz(filas)}
     <section class="panel disp">
       <h3>Dispersión por posición <span class="uni">% de la media de su puesto</span></h3>
       <div class="ejes noPdf">${selectorEje("x", filas)}${selectorEje("y", filas)}</div>
