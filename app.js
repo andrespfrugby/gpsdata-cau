@@ -752,6 +752,12 @@ function catalogoDisponible(filas) {
                  .filter(([, c]) => c.length);
 }
 
+/* Forma corta de cada puesto, para cuando la banda es estrecha. */
+const PUESTO_CORTO = {
+  "Primera línea":"1ª línea", "Segunda línea":"2ª línea",
+  "Tercera línea":"3ª línea", "Tres cuartos":"3/4"
+};
+
 /**
  * Tamaño de letra para que el nombre entero quepa en el ancho de su columna.
  * En Chivo Mono cada letra ocupa algo más de medio cuerpo, así que de ahí sale
@@ -813,23 +819,45 @@ function bloqueMatriz(filas, cols, ordenPor) {
   const n = filas.length, iw = W - LG - 8 - GAP * (puestos.length - 1);
   // Todos los bloques reparten el mismo ancho por jugador, así que el paso es
   // el mismo en los cuatro y basta decidir una vez cómo caben los nombres.
-  const paso0 = iw / n;
+  // Ancho máximo por jugador: con pocos jugadores las barras salían enormes y
+  // separadísimas. Se limita el paso y el grupo se centra dentro de su banda,
+  // así las barras quedan juntas y estrechas haya 6 jugadores o haya 25.
+  const PASO_MAX = 34;
+  const paso0 = Math.min(iw / n, PASO_MAX);
   const mini = Math.min(...filas.map(r => letraNombre(r.jugador, paso0)));
+  // Un único cuerpo de letra para todos los nombres, el que necesita el más
+  // largo: con uno por jugador la fila quedaba desigual.
+  const soloApellido = r => { const t = r.jugador.trim().split(/\s+/); return t.length > 1 ? t.slice(1).join(" ") : t[0]; };
+  const fzNom = Math.max(6, Math.min(9, Math.min(...filas.map(r => letraNombre(soloApellido(r), paso0)))));
   // Si el nombre entero no cabe legible en una línea, se parte en dos: la
   // inicial arriba y el apellido debajo, que así cada uno tiene la columna entera.
   const dosLineas = mini < 7;
   const PIE = dosLineas ? 28 : 19;
   const H = TOP + cols.length * (FH + 6) + PIE;
+  // Cada banda mide lo que ocupan sus barras más un poco de aire, en vez de
+  // repartirse el ancho entero: así no quedan bandas medio vacías cuando una
+  // línea tiene dos jugadores y otra tiene diez.
+  const PAD = 12;
+  const anchoDe = rs => paso0 * rs.length + PAD * 2;
+  const total = grupos.reduce((t, [, rs]) => t + anchoDe(rs), 0) + GAP * (grupos.length - 1);
+  // Pegado al margen de las etiquetas: centrarlo dejaba un hueco enorme entre
+  // el nombre de la métrica y la primera barra cuando hay pocos jugadores.
   let g = "", x = LG;
   const bloques = grupos.map(([p, rs]) => {
-    const w = iw * rs.length / n, b = { p, rs, x, w };
+    const w = anchoDe(rs), b = { p, rs, x, w };
     x += w + GAP;
     return b;
   });
   for (const { p, rs, x, w } of bloques) {
     const c = colorPuesto(p, puestos);
+    // Con bandas estrechas el nombre del puesto se pisaba con el de al lado:
+    // se prueba el nombre entero, luego el corto, y si aún no cabe se encoge.
+    const corto = PUESTO_CORTO[p] || p.split(" ")[0];
+    const etq = letraNombre(p, w) >= 9.5 ? p : corto;
+    const fz = Math.max(7.5, Math.min(10, letraNombre(etq, w)));
     g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}" fill="${c}" opacity=".06" rx="5"/>
-          <text x="${(x + w / 2).toFixed(1)}" y="14" fill="${c}" font-size="10" text-anchor="middle">${esc(p)}</text>`;
+          <text x="${(x + w / 2).toFixed(1)}" y="14" fill="${c}" font-size="${fz.toFixed(1)}"
+            text-anchor="middle">${esc(etq)}<title>${esc(p)}</title></text>`;
   }
   cols.forEach((col, mi) => {
     const vals = filas.map(r => Math.abs(r.crudo[col] || 0));
@@ -841,15 +869,18 @@ function bloqueMatriz(filas, cols, ordenPor) {
     const y0 = TOP + mi * (FH + 6), ih = FH - 16;
     g += `<text x="2" y="${(y0 + ih / 2).toFixed(0)}" fill="#E9EEF7" font-size="10.5">${esc(etiquetaChip(col))}<title>${esc(nombreMetrica(col))}</title></text>
           <text x="2" y="${(y0 + ih / 2 + 12).toFixed(0)}" fill="#6B7A94" font-size="9">${esc(unidad(col) || "")}</text>
-          <line x1="${LG - 4}" x2="${W - 4}" y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
+          <line x1="${(bloques[0].x - 6).toFixed(1)}" x2="${(bloques[bloques.length - 1].x + bloques[bloques.length - 1].w + 6).toFixed(1)}"
+            y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
     for (const { p, rs, x, w } of bloques) {
-      const c = colorPuesto(p, puestos), paso = w / rs.length;
+      const c = colorPuesto(p, puestos), paso = paso0;
+      const dentro = x + (w - paso * rs.length) / 2;
       const m = mediaDe(rs, col), ym = y0 + ih - m / tope * ih;
-      g += `<line x1="${(x + 2).toFixed(1)}" x2="${(x + w - 2).toFixed(1)}" y1="${ym.toFixed(1)}" y2="${ym.toFixed(1)}"
+      g += `<line x1="${(dentro - 4).toFixed(1)}" x2="${(dentro + paso * rs.length + 4).toFixed(1)}"
+              y1="${ym.toFixed(1)}" y2="${ym.toFixed(1)}"
               stroke="${c}" stroke-width="1.6" stroke-dasharray="4 3"/>`;
       rs.forEach((r, i) => {
-        const v = Math.abs(r.crudo[col] || 0), cx = x + paso * (i + 0.5);
-        const h = v / tope * ih, an = Math.min(paso * 0.72, 34);
+        const v = Math.abs(r.crudo[col] || 0), cx = dentro + paso * (i + 0.5);
+        const h = v / tope * ih, an = paso * 0.86;
         g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${(y0 + ih - h).toFixed(1)}" width="${an.toFixed(1)}"
                 height="${Math.max(1, h).toFixed(1)}" rx="2" fill="${c}" opacity=".85"/>`;
         // Si la barra da de sí, el número va girado dentro; si no, encima.
@@ -865,20 +896,18 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // caber en su columna sin tocarse.
   const yb = TOP + cols.length * (FH + 6);
   for (const { rs, x, w } of bloques) {
-    const paso = w / rs.length;
+    const paso = paso0, dentro = x + (w - paso * rs.length) / 2;
     rs.forEach((r, i) => {
-      const cx = x + paso * (i + 0.5);
+      const cx = dentro + paso * (i + 0.5);
       if (dosLineas) {
         const t = r.jugador.trim().split(/\s+/);
         const ini = t.length > 1 ? t[0] : "", ape = t.length > 1 ? t.slice(1).join(" ") : t[0];
-        const fz = Math.max(6.4, Math.min(9, letraNombre(ape, paso)));
-        g += `<text x="${cx.toFixed(1)}" y="${yb + 10}" fill="#6B7A94" font-size="${(fz - 0.6).toFixed(1)}"
+        g += `<text x="${cx.toFixed(1)}" y="${yb + 10}" fill="#6B7A94" font-size="${(fzNom - 0.6).toFixed(1)}"
                 text-anchor="middle">${esc(ini)}</text>
-              <text x="${cx.toFixed(1)}" y="${yb + 21}" fill="#C9D3E4" font-size="${fz.toFixed(1)}"
+              <text x="${cx.toFixed(1)}" y="${yb + 21}" fill="#C9D3E4" font-size="${fzNom.toFixed(1)}"
                 text-anchor="middle">${esc(ape)}<title>${esc(r.jugador)}</title></text>`;
       } else {
-        g += `<text x="${cx.toFixed(1)}" y="${yb + 13}" fill="#C9D3E4"
-                font-size="${Math.max(7, letraNombre(r.jugador, paso)).toFixed(1)}"
+        g += `<text x="${cx.toFixed(1)}" y="${yb + 13}" fill="#C9D3E4" font-size="${mini.toFixed(1)}"
                 text-anchor="middle">${esc(r.jugador)}</text>`;
       }
     });
