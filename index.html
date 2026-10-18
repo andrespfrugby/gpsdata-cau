@@ -25,7 +25,9 @@ aside .brand{display:flex;align-items:center;gap:9px;padding:0 5px;margin-bottom
 aside .brand b{font-family:Sora;font-weight:600;font-size:15px}
 aside nav{display:flex;flex-direction:column;gap:3px;border:none;padding:0;margin:0;overflow:visible}
 main{min-width:0}
-.wrap{max-width:none;margin:0;padding:18px 22px 64px}
+.wrap{max-width:none;margin:0;padding:18px 22px 64px;display:flex;flex-direction:column}
+/* El orden de lectura: resumen, ranking, cuadrante, tabla y gráficas. */
+#resumen{order:1}#selectores{order:2}#cuadrante{order:3}#tabla{order:4}#paneles{order:5}#notas{order:6}
 
 header{border-bottom:1px solid var(--ink-700);background:var(--ink-850);position:sticky;top:0;z-index:20}
 .ctx{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:15px 22px;flex-wrap:wrap}
@@ -128,7 +130,8 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .medalla li.porpos .qui{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
 .medalla li .nom2{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .medalla li.vacio{color:var(--text-3);grid-template-columns:1fr}
-.panel .sub{font-size:12px;color:var(--text-3);margin:2px 0 14px}
+.panel .sub{font-size:13px;line-height:1.6;color:var(--text-2);margin:2px 0 14px}
+.panel .sub b{color:var(--text);font-weight:600}
 /* Pie de los KPI: contra cuántas sesiones se compara, o que no hay histórico. */
 .kpi .vs{display:block;font-size:9px;color:var(--text-3);margin:2px 0 1px}
 .kpi .vs.sola{color:var(--text-3);font-style:italic;margin-top:6px}
@@ -143,9 +146,18 @@ nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700)
 .ejeSel span{display:block;font-size:9px;letter-spacing:.12em;color:var(--text-3);margin-bottom:4px}
 .ejeSel select{background:var(--ink-800);color:var(--text);border:1px solid var(--ink-600);
   border-radius:9px;padding:8px 12px;font-size:13px;min-width:200px;font-family:inherit}
-.leyDisp{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--text-3)}
-.leyDisp span{display:flex;align-items:center;gap:6px}
-.leyDisp i{width:12px;height:12px;border-radius:3px;display:inline-block}
+/* Qué vale el 100% de cada línea, en metros y en número. */
+.cajas100{display:flex;flex-wrap:wrap;gap:7px;align-items:stretch;margin:0 0 14px}
+.t100{width:100%;font-size:8.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--text-3);margin-bottom:1px}
+.c100{background:var(--ink-800);border-left:3px solid var(--ink-600);border-radius:8px;padding:6px 12px;min-width:126px}
+.c100>span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:2px}
+.c100 .par{display:flex;align-items:baseline;gap:5px}
+.c100 .par b{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.c100 .par i{font-style:normal;font-size:9.5px;color:var(--text-3)}
+.leyDisp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 20px;margin-top:12px;font-size:12.5px;color:var(--text-2)}
+.leyDisp span{display:flex;align-items:flex-start;gap:7px;line-height:1.35}
+.leyDisp b{color:var(--text);font-weight:600}
+.leyDisp i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none;margin-top:2px}
 .scroll{overflow-x:auto}
 table.datos{width:100%;border-collapse:collapse;font-size:13.5px;white-space:nowrap}
 table.datos th{font-weight:400;font-size:12px;color:var(--text-3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-700)}
@@ -346,7 +358,7 @@ table.datos th.n{text-align:center}
 .cm.eq{background:rgba(239,181,185,.14);border:1px solid rgba(239,181,185,.3);border-left:1px solid rgba(239,181,185,.3)}
 .cm.eq b{color:var(--pink);font-size:20px}
 svg.cols{width:100%;height:auto;display:block}
-svg.cols text{font-family:'Chivo Mono',monospace}
+svg.cols text{font-family:Sora,system-ui,sans-serif}
 .leyPaneles{grid-column:1/-1;display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin-top:2px}
 
 /* ---- Minigráfico en las cajas de promedio ---- */
@@ -416,12 +428,10 @@ svg.cols text{font-family:'Chivo Mono',monospace}
      primero el resumen de la sesión, los paneles después. */
   .wrap{display:flex;flex-direction:column}
   #resumen{order:1}
-  /* Sin saltos forzados: el resumen y la tabla llenan la primera hoja y los
-     comentarios siguen justo detrás, compartiendo página con el primer panel
-     si queda sitio. Forzar el salto dejaba una hoja casi vacía. */
-  #tabla{order:2}
-  #notas{order:3}
-  #paneles{order:4}
+  #cuadrante{order:3}
+  #tabla{order:4}
+  #paneles{order:5}
+  #notas{order:6}
   .tablon{border:none;padding:0;margin-bottom:0}
   .leyTabla{color:#6B7384;font-size:7.5px;gap:12px;margin-top:6px;padding-top:5px;border-top:1px solid #EDEFF3}
   .leyTabla i{width:8px;height:8px}
@@ -542,7 +552,15 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   .chipsMet,.ejes{display:none}
   .medalla li .bar{background:#E8EAF0}
   .medalla li .val,.medalla li .qui{color:#14161C}
-  .leyDisp{color:#6B7384}
+  .cajas100{gap:5px;margin-bottom:7px;break-inside:avoid}
+  .t100{color:#6B7384;font-size:7px}
+  .c100{background:#F4F6FA !important;border:1px solid #E2E6EE;border-left:3px solid #C9CED8;padding:4px 9px;min-width:104px}
+  .c100>span{color:#6B7384;font-size:7px}
+  .c100 .par b{color:#14161C;font-size:11px}
+  .c100 .par i{color:#6B7384;font-size:8px}
+  .leyDisp{color:#3B414E;font-size:9px;gap:3px 14px}
+  .leyDisp b{color:#14161C}
+  .panel.disp .sub{font-size:9px;color:#3B414E;margin:0 0 6px}
   .panel.matriz,.panel.disp{page-break-inside:avoid;break-inside:avoid}
   /* el minigráfico también se imprime */
   .resumen.cinco .kpi .chispa{display:block;height:20px}
@@ -582,6 +600,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
     <div class="wrap">
       <div id="resumen"></div>
       <div class="selectores" id="selectores"></div>
+      <div id="cuadrante"></div>
       <div class="paneles" id="paneles"></div>
       <div id="tabla"></div>
       <div id="notas"></div>
