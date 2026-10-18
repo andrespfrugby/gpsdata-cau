@@ -568,7 +568,11 @@ function resumen(filas) {
         delta == null ? "" : `<span class="delta ${delta >= 0 ? "sube" : "baja"}">${
           delta >= 0 ? "▲" : "▼"} ${nf(Math.abs(delta), Math.abs(delta) < 10 ? 1 : 0)}%</span>`}</span>
       ${antes.length
-        ? `<span class="vs">vs ${antes.length} ${filas[0].esPartido ? "partido" : "sesión"}${antes.length > 1 ? (filas[0].esPartido ? "s" : "es") : ""} anterior${antes.length > 1 ? "es" : ""}</span>${chispa(serie, r.tipo)}`
+        ? `<span class="vs">vs ${antes.length} ${
+            antes.length > 1
+              ? (filas[0].esPartido ? "partidos anteriores" : "sesiones anteriores")
+              : (filas[0].esPartido ? "partido anterior" : "sesión anterior")
+          }</span>${chispa(serie, r.tipo)}`
         : `<span class="vs sola">primer${filas[0].esPartido ? " partido" : "a sesión"} registrad${filas[0].esPartido ? "o" : "a"}</span>`}
     </div>`;
   }).join("")}</div>`;
@@ -797,8 +801,16 @@ function matriz(filas) {
   // Los nombres van una sola vez, al pie de cada bloque: repetirlos en cada
   // métrica ensuciaba el gráfico. Para que nunca se queden en otra página, la
   // matriz se corta en trozos que caben enteros en una hoja.
+  // Se reparten a partes iguales: con 7 métricas salen 4 y 3, no 5 y 2, que
+  // dejaba una hoja casi vacía.
+  const hojas = Math.ceil(todas.length / POR_HOJA);
   const trozos = [];
-  for (let i = 0; i < todas.length; i += POR_HOJA) trozos.push(todas.slice(i, i + POR_HOJA));
+  let desde = 0;
+  for (let h = 0; h < hojas; h++) {
+    const cuantas = Math.ceil((todas.length - desde) / (hojas - h));
+    trozos.push(todas.slice(desde, desde + cuantas));
+    desde += cuantas;
+  }
   return trozos.map((t, i) => `<section class="panel matriz">
     <h3>Métricas por posición${trozos.length > 1 ? ` <span class="uni">${i + 1} de ${trozos.length}</span>` : ""}</h3>
     ${i === 0 ? chipsMatriz(filas) : ""}
@@ -817,7 +829,11 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // Cada métrica lleva su propia línea de apellidos pegada al eje: con varias
   // métricas el bloque pasa de una hoja y, si los nombres fueran solo al final,
   // la página de en medio no habría quien la leyera.
-  const W = 1180, LG = 84, GAP = 10, TOP = 22, FH = 112;
+  // Alto de cada fila: se estira para llenar la hoja apaisada cuando hay pocas
+  // métricas marcadas, en vez de dejar media página en blanco.
+  const W = 1180, LG = 84, GAP = 10, TOP = 22;
+  const HOJA = 752;   // alto útil del SVG en una hoja apaisada, ya descontado
+                      // el marco del panel y su título
   const n = filas.length, iw = W - LG - 8 - GAP * (puestos.length - 1);
   // Todos los bloques reparten el mismo ancho por jugador, así que el paso es
   // el mismo en los cuatro y basta decidir una vez cómo caben los nombres.
@@ -835,6 +851,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // inicial arriba y el apellido debajo, que así cada uno tiene la columna entera.
   const dosLineas = mini < 7;
   const PIE = dosLineas ? 28 : 19;
+  const FH = Math.min(170, Math.max(112, (HOJA - TOP - PIE) / cols.length - 6));
   const H = TOP + cols.length * (FH + 6) + PIE;
   // Cada banda mide lo que ocupan sus barras más un poco de aire, en vez de
   // repartirse el ancho entero: así no quedan bandas medio vacías cuando una
@@ -1006,12 +1023,6 @@ const companeras = () => esFem() ? "compañeras" : "compañeros";
 function explicaScatter() {
   return `<p class="sub">Cada ${esFem() ? "jugadora" : "jugador"} se compara con ${esFem() ? "las" : "los"} de su misma posición.
     El 100% es el promedio de su línea ese día, no un objetivo.</p>`;
-}
-
-/** Lo que el gráfico NO mide, que es lo que evita que el rojo se lea como nota. */
-function leyendaScatter() {
-  return `<p class="avisoDisp">El gráfico mide carrera y esfuerzos. No mide placajes, rucks, pases
-    ni decisiones: se puede hacer un partidazo en contacto y estar abajo a la izquierda.</p>`;
 }
 
 /* Cómo se llama cada métrica cuando se habla con las jugadoras, y qué hay que
@@ -2687,7 +2698,6 @@ function pintar() {
       ${explicaScatter()}
       ${cajas100(filas)}
       ${scatter(filas)}
-      ${leyendaScatter()}
     </section>`;
   $("#paneles").innerHTML = `
     ${matriz(filas)}
