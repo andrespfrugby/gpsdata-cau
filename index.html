@@ -429,11 +429,13 @@ svg.cols text{font-family:Sora,system-ui,sans-serif}
   /* En pantalla la tabla va al final, pero en papel cierra la primera página:
      primero el resumen de la sesión, los paneles después. */
   .wrap{display:flex;flex-direction:column}
+  /* En papel la tabla sube a la primera hoja, con el resumen y el ranking, y
+     el cuadrante se queda solo en la segunda. */
   #resumen{order:1}
+  #tabla{order:2}
   #cuadrante{order:3}
-  #tabla{order:4}
-  #paneles{order:5}
-  #notas{order:6}
+  #paneles{order:4}
+  #notas{order:5}
   .tablon{border:none;padding:0;margin-bottom:0}
   .leyTabla{color:#6B7384;font-size:7.5px;gap:12px;margin-top:6px;padding-top:5px;border-top:1px solid #EDEFF3}
   .leyTabla i{width:8px;height:8px}
