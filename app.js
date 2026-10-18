@@ -954,6 +954,62 @@ function scatter(filas) {
   }
   g += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>
         <line x1="${L}" x2="${W - R}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>`;
+
+  // Los carteles de cada cuadrante. Se prueban las dos esquinas libres y se
+  // queda con la que menos bolitas tape: con pocos jugadores siempre hay sitio.
+  const TX = textosCuadrante();
+  const quads = [
+    ["verde", "#6AAA96", cx, T, W - R - cx, cy - T, "end"],
+    ["amar",  "#E0CD6E", L, T, cx - L, cy - T, "start"],
+    ["nara",  "#E69656", cx, cy, W - R - cx, T + ih - cy, "end"],
+    ["rojo",  "#E05860", L, cy, cx - L, T + ih - cy, "start"]
+  ];
+  for (const [k, col, qx, qy, qw, qh, anc] of quads) {
+    const t = TX[k];
+    const ancho = Math.max(t.tit.length * 8.6 + 26,
+      ...t.desc.map(l => l.length * 5.7), ...t.foco.map(l => l.length * 6)) + 20;
+    const alto = 20 + (1 + t.desc.length + t.foco.length) * 12.6 + 6;
+    if (qw < ancho + 10 || qh < alto + 10) continue;
+    // Se prueban las cuatro esquinas del cuadrante y se queda con la que menos
+    // bolitas tapa; a igualdad, la de fuera, que es donde se espera el cartel.
+    const izq = qx + 6, der = qx + qw - ancho - 6;
+    const arr = qy + 8, abj = qy + qh - alto - 8;
+    const fuera = anc === "start" ? izq : der;
+    const dentro = anc === "start" ? der : izq;
+    const cand = [[fuera, arr], [fuera, abj], [dentro, arr], [dentro, abj]];
+    const tapa = (bx, by) => pts.filter(p => {
+      const px = x(p.a), py = y(p.b);
+      // El nombre va encima de la bolita y ocupa a los lados, así que se mira
+      // una zona más ancha que el propio cartel.
+      return px > bx - 42 && px < bx + ancho + 42 && py > by - 24 && py < by + alto + 8;
+    }).length;
+    let mejor = cand[0], suyo = tapa(cand[0][0], cand[0][1]);
+    for (const c of cand.slice(1)) {
+      const n = tapa(c[0], c[1]);
+      if (n < suyo) { mejor = c; suyo = n; }
+    }
+    const [bx, by] = mejor;
+    const tx = anc === "start" ? bx + 10 : bx + ancho - 10;
+    let ty = by + 20;
+    g += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${ancho.toFixed(1)}" height="${alto.toFixed(1)}"
+            rx="8" fill="#0D1420" opacity=".82"/>`;
+    const cab = anc === "start"
+      ? `<tspan font-size="19">${t.emo}</tspan><tspan dx="6">${esc(t.tit)}</tspan>`
+      : `<tspan>${esc(t.tit)}</tspan><tspan dx="6" font-size="19">${t.emo}</tspan>`;
+    g += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${col}" font-size="13.5" font-weight="700"
+            text-anchor="${anc}" letter-spacing=".03em">${cab}</text>`;
+    ty += 16;
+    for (const l of t.desc) {
+      g += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="#C9D3E4" font-size="10.5" text-anchor="${anc}">${esc(l)}</text>`;
+      ty += 12.6;
+    }
+    ty += 4;
+    t.foco.forEach((l, i) => {
+      g += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${col}" font-size="10.5" font-weight="600"
+              text-anchor="${anc}">${i === 0 ? "→ Foco en " : ""}${esc(l)}</text>`;
+      ty += 12.6;
+    });
+  }
   for (const p of pts) {
     g += `<circle cx="${x(p.a).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="6" fill="${p.c}" stroke="#0D1420" stroke-width="1.2"><title>${esc(p.nom)} · ${esc(p.pos)}</title></circle>
           <text x="${x(p.a).toFixed(1)}" y="${(y(p.b) - 10).toFixed(1)}" fill="#E9EEF7" font-size="8.6" text-anchor="middle">${esc(p.nom)}</text>`;
@@ -976,15 +1032,62 @@ function explicaScatter() {
     El 100% es el promedio de su línea ese día, no un objetivo.</p>`;
 }
 
-/** Qué quiere decir caer en cada cuadrante, con el nombre de las métricas. */
+/** Lo que el gráfico NO mide, que es lo que evita que el rojo se lea como nota. */
 function leyendaScatter() {
-  const x = etiquetaChip(F.sc.x), y = etiquetaChip(F.sc.y);
-  return `<div class="leyDisp">
-    <span><i style="background:#6AAA96"></i>Más ${esc(x)} y más ${esc(y)} que su misma posición</span>
-    <span><i style="background:#E0CD6E"></i>Buenos ${esc(y)}, menos ${esc(x)}</span>
-    <span><i style="background:#E69656"></i>Buen ${esc(x)}, menos ${esc(y)}</span>
-    <span><i style="background:#E05860"></i>Por debajo del promedio de su misma posición</span>
-  </div>`;
+  return `<p class="avisoDisp">El gráfico mide carrera y esfuerzos. No mide placajes, rucks, pases
+    ni decisiones: se puede hacer un partidazo en contacto y estar abajo a la izquierda.</p>`;
+}
+
+/* Cómo se llama cada métrica cuando se habla con las jugadoras, y qué hay que
+   hacer para subirla. Es lo que se escribe dentro de los cuadrantes. */
+const CLARO = {
+  [HMLD]:"distancia explosiva", "Power Plays":"esfuerzos de alta intensidad",
+  "Sprint Distance (m)":"metros a alta velocidad", [ACC3]:"aceleraciones",
+  [DEC3]:"deceleraciones", "Distance (metres)":"distancia total",
+  "Player Load":"carga", "Impacts":"contactos", "Top Speed (m/s)":"velocidad punta",
+  "Distance Per Min (m/min)":"metros por minuto"
+};
+const FOCO = {
+  [HMLD]:"sumar metros de distancia explosiva:|con, sin y alrededor del balón",
+  "Power Plays":"repetir esfuerzos|de alta intensidad",
+  "Sprint Distance (m)":"buscar los metros|a alta velocidad",
+  [ACC3]:"arrancar más veces|desde parada",
+  [DEC3]:"frenar y recolocarse|más veces"
+};
+const claro = c => CLARO[c] || etiquetaChip(c).toLowerCase();
+const foco = c => FOCO[c] || ("sumar " + claro(c));
+
+/** Los cuatro carteles de dentro del gráfico. */
+function textosCuadrante() {
+  const ex = claro(F.sc.x), ey = claro(F.sc.y);
+  return {
+    verde:{ emo:"🏎️", tit:"MOTOR",
+            desc:envuelve(cap(ex) + " y " + ey + " por encima de su posición"),
+            foco:envuelve("ser consistente con este motor") },
+    amar: { emo:"🏍️", tit:"↑ " + etiquetaChip(F.sc.y).toUpperCase(),
+            desc:envuelve("Más " + ey + ", menos " + ex),
+            foco:envuelve(foco(F.sc.x).replace("|", " ")) },
+    nara: { emo:"🚤", tit:"↑ " + etiquetaChip(F.sc.x).toUpperCase(),
+            desc:envuelve("Más " + ex + ", menos " + ey),
+            foco:envuelve(foco(F.sc.y).replace("|", " ")) },
+    rojo: { emo:"⛽", tit:"ENTRAR EN JUEGO",
+            desc:envuelve("Menos " + ex + " y menos " + ey + " que su posición"),
+            foco:envuelve("aparecer en más jugadas: apoyo, patada y recolocación") }
+  };
+}
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Parte un texto en líneas cortas para que el cartel no se coma el cuadrante. */
+function envuelve(txt, max = 28) {
+  const out = [];
+  let linea = "";
+  for (const p of String(txt).split(/\s+/)) {
+    if (!linea) linea = p;
+    else if ((linea + " " + p).length <= max) linea += " " + p;
+    else { out.push(linea); linea = p; }
+  }
+  if (linea) out.push(linea);
+  return out;
 }
 
 /**
