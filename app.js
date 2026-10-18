@@ -86,7 +86,7 @@ const TODAS_COLUMNAS = () => CATALOGO.concat(TABLA).flatMap(([, c]) => c);
 /* Los cuatro números fijos de la cabecera: vista general de la sesión. */
 const RESUMEN = [
   { col:"Distance (metres)",        titulo:"Distancia",            uni:"m",     tipo:"vol" },
-  { col:"Sprint Distance (m)",      titulo:"Dist. alta velocidad", uni:"m",     tipo:"vol" },
+  { col:"Sprint Distance (m)",      titulo:"HSR",                 uni:"m",     tipo:"vol" },
   { col:"Distance Per Min (m/min)", titulo:"Distancia por min",    uni:"m/min", tipo:"int", sinTotal:true },
   { col:ACC3,                       titulo:"ACC > 3 m/s²",         uni:"nº",    tipo:"int" },
   { col:"Player Load",              titulo:"Player load",          uni:"",      tipo:"vol" }
@@ -95,7 +95,7 @@ const RESUMEN = [
 /* Las cinco tarjetas de podio. Cada una mide algo distinto: dos de velocidad,
    una mecánica, una de contacto y el volumen al final. */
 const TOP3 = [
-  { col:"Sprint Distance (m)",      ico:"🚀",  corto:"Dist. alta vel." },
+  { col:"Sprint Distance (m)",      ico:"🚀",  titulo:"HSR · distancia a alta velocidad", corto:"HSR" },
   { col:"Top Speed (m/s)",          ico:"⚡",  titulo:"Velocidad máxima (m/s)",       corto:"Vel. máx m/s" },
   { col:ACC3,                       ico:"🏎️", titulo:"Aceleraciones > 3 m/s²",       corto:"ACC > 3 m/s²" },
   { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" },
@@ -136,7 +136,7 @@ const nombreMetrica = c => {
   if (c === "Impacts" && g) return "Impacts  ·  > " + g + " G";
   if (c === "Sprint Distance (m)") {
     const u = porEquipo(C.umbralSprint, F.squad);
-    return "Distancia alta velocidad (m)" + (u ? "  ·  " + u : "");
+    return "HSR (m)" + (u ? "  ·  " + u : "");
   }
   return c;
 };
@@ -149,7 +149,7 @@ const CORTOS = {
   "Deceleration Zone Count: 3 - 4 m/s/s": "DECC 3-4", "Deceleration Zone Count: > 4 m/s/s": "DECC > 4",
   [ACC3MIN]: "ACC > 3 / min", [DEC3MIN]: "DECC > 3 / min", [ACDC3MIN]: "ACC+DECC / min",
   "Impacts": "Impactos", [HMLD]: "HMLD", [ACC3]: "ACC > 3", [DEC3]: "DECC > 3",
-  "Distance (metres)": "Distancia", "Sprint Distance (m)": "Dist. alta vel.",
+  "Distance (metres)": "Distancia", "Sprint Distance (m)": "HSR",
   "Player Load": "Player load", "Power Plays": "Power plays",
   "Distance Per Min (m/min)": "Dist. / min", "Energy (kcal)": "Energía", "Hr Load": "Carga HR"
 };
@@ -654,8 +654,10 @@ function cabecera(conResumen) {
     <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
   // El podio solo tiene sentido en partido: en un entreno el que más corre
   // suele ser el que más rondos le han tocado, no una referencia.
+  // Primero el resumen de la sesión y después el ranking, que es el orden en
+  // que se mira: el dato del equipo y luego quién destacó.
   $("#resumen").innerHTML = !conResumen ? ""
-    : (filas[0].esPartido ? medallas(filas) : "") + resumen(filas);
+    : resumen(filas) + (filas[0].esPartido ? medallas(filas) : "");
 }
 
 /** Decimales según el tamaño del número, para no enseñar 2569,68 ni 6 pelado. */
@@ -962,6 +964,51 @@ function scatter(filas) {
   return `<svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dispersión por posición">${g}</svg>`;
 }
 
+/* El femenino lee el reporte igual que el resto: las explicaciones van en
+   femenino cuando el equipo elegido es el suyo. */
+const esFem = () => /fem/i.test(F.squad || "");
+const unaJugadora = () => esFem() ? "una jugadora" : "un jugador";
+const companeras = () => esFem() ? "compañeras" : "compañeros";
+
+/** Una línea, no un párrafo: lo demás lo cuentan los cuadrantes. */
+function explicaScatter() {
+  return `<p class="sub">Cada ${esFem() ? "jugadora" : "jugador"} se compara con ${esFem() ? "las" : "los"} de su misma posición.
+    El 100% es el promedio de su línea ese día, no un objetivo.</p>`;
+}
+
+/** Qué quiere decir caer en cada cuadrante, con el nombre de las métricas. */
+function leyendaScatter() {
+  const x = etiquetaChip(F.sc.x), y = etiquetaChip(F.sc.y);
+  return `<div class="leyDisp">
+    <span><i style="background:#6AAA96"></i>Más ${esc(x)} y más ${esc(y)} que su misma posición</span>
+    <span><i style="background:#E0CD6E"></i>Buenos ${esc(y)}, menos ${esc(x)}</span>
+    <span><i style="background:#E69656"></i>Buen ${esc(x)}, menos ${esc(y)}</span>
+    <span><i style="background:#E05860"></i>Por debajo del promedio de su misma posición</span>
+  </div>`;
+}
+
+/**
+ * Qué hay detrás del 100% de cada línea, en metros y en número: el gráfico va
+ * en porcentaje y sin esto no hay forma de saber de cuánto se habla.
+ */
+function cajas100(filas) {
+  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const x = F.sc.x, y = F.sc.y;
+  const dx = decMedia(decimales(filas.map(r => Math.abs(r.crudo[x] || 0))));
+  const dy = decMedia(decimales(filas.map(r => Math.abs(r.crudo[y] || 0))));
+  return `<div class="cajas100">
+    <span class="t100">El 100% de cada línea en esta sesión</span>
+    ${puestos.map(p => {
+      const rs = filas.filter(r => r.posicion === p);
+      return `<div class="c100" style="border-left-color:${colorPuesto(p, puestos)}">
+        <span>${esc(p)}</span>
+        <div class="par"><b>${fmt(x, mediaDe(rs, x), dx)}${unidad(x) ? " " + esc(unidad(x)) : ""}</b><i>${esc(etiquetaChip(x))}</i></div>
+        <div class="par"><b>${fmt(y, mediaDe(rs, y), dy)}${unidad(y) ? " " + esc(unidad(y)) : ""}</b><i>${esc(etiquetaChip(y))}</i></div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
 /** Los dos desplegables del scatter, nativos del navegador. */
 function selectorEje(eje, filas) {
   const cat = catalogoDisponible(filas);
@@ -1054,7 +1101,7 @@ function vistaCarga() {
   cabecera();
   $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
-  $("#paneles").innerHTML = "";
+  $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
   $("#tabla").innerHTML = porcentajeCarga();
   const sel = $("#fEscenario");
   if (sel) sel.onchange = e => { FC.escenario = e.target.value; pintar(); };
@@ -1065,7 +1112,7 @@ const FA = { metrica:"Distance (metres)", semanas:6 };
 const METRICAS_ACWR = [
   { id:"Distance (metres)", lbl:"Distancia", dec:0 },
   { id:HMLD,                lbl:"HMLD",      dec:0 },
-  { id:"Sprint Distance (m)", lbl:"Sprint distance", dec:0 },
+  { id:"Sprint Distance (m)", lbl:"HSR", dec:0 },
   { id:"Player Load",       lbl:"Player load", dec:0 },
   { id:ACC3,                lbl:"ACC > 3",   dec:0 },
   { id:DEC3,                lbl:"DECC > 3",  dec:0 }
@@ -1123,7 +1170,7 @@ function vistaAcwr() {
   cabecera();
   $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
-  $("#paneles").innerHTML = "";
+  $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
 
   const ref = sesion()[0];
   if (!ref) { $("#tabla").innerHTML = `<p class="empty">Elige una sesión para fijar la fecha de referencia.</p>`; return; }
@@ -1409,7 +1456,7 @@ function vistaDrill() {
   cabecera();
   $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
-  $("#paneles").innerHTML = "";
+  $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
   $("#tabla").innerHTML = drillAnalysis();
   document.querySelectorAll(".drills .orden").forEach(th => th.onclick = () => {
     const c = th.dataset.c;
@@ -1750,7 +1797,7 @@ function vistaBip() {
   $("#notas").innerHTML = "";
   $("#resumen").innerHTML = "";
   $("#selectores").innerHTML = "";
-  $("#paneles").innerHTML = "";
+  $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
 
   const partidos = [...new Set(BIP.map(f => f.partido))];
   if (!partidos.includes(FB.partido)) FB.partido = partidos[partidos.length - 1] || "";
@@ -2506,25 +2553,22 @@ function pintar() {
   }
   F.metricas = F.metricas.map((m, i) => disponibles.includes(m) ? m : (disponibles[i] || disponibles[0]));
 
-  $("#selectores").innerHTML = "";
   F.matriz = F.matriz.filter(c => disponibles.includes(c));
   if (!F.matriz.length) F.matriz = disponibles.slice(0, 4);
   if (!disponibles.includes(F.sc.x)) F.sc.x = disponibles[0];
   if (!disponibles.includes(F.sc.y)) F.sc.y = disponibles[1] || disponibles[0];
-  $("#paneles").innerHTML = `
-    ${matriz(filas)}
+  // El cuadrante va en su propio hueco, entre el ranking y la tabla.
+  $("#cuadrante").innerHTML = `
     <section class="panel disp">
       <h3>Dispersión por posición <span class="uni">% de la media de su puesto</span></h3>
       <div class="ejes noPdf">${selectorEje("x", filas)}${selectorEje("y", filas)}</div>
-      <p class="sub soloPdf">${esc(nombreMetrica(F.sc.x))} (horizontal) × ${esc(nombreMetrica(F.sc.y))} (vertical), cada uno en % de la media de su puesto</p>
+      ${explicaScatter()}
+      ${cajas100(filas)}
       ${scatter(filas)}
-      <div class="leyDisp">
-        <span><i style="background:#6AAA96"></i>las dos por encima de su puesto</span>
-        <span><i style="background:#E0CD6E"></i>solo el eje vertical</span>
-        <span><i style="background:#E69656"></i>solo el eje horizontal</span>
-        <span><i style="background:#E05860"></i>las dos por debajo</span>
-      </div>
-    </section>
+      ${leyendaScatter()}
+    </section>`;
+  $("#paneles").innerHTML = `
+    ${matriz(filas)}
     <div class="leyPaneles">
       <span>Cada bloque es una línea, con su color y su media punteada dentro</span>
       <span>El 100% del scatter es la media de la línea del jugador, no la del equipo</span>
