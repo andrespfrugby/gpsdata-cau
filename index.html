@@ -548,6 +548,10 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   .cm.eq b{color:#9C4B52;font-size:14px}
   svg.cols text{fill:#3B414E}
   svg.cols line[stroke="#1B263B"]{stroke:#E6E9EF}
+  /* Los carteles del cuadrante: en papel el fondo oscuro dejaba el texto
+     ilegible, porque la letra del SVG se imprime en gris oscuro. */
+  svg.cols g.cartel rect.fondo{fill:#FFFFFF;opacity:.93;stroke:#D4D8E0}
+  svg.cols g.cartel text{fill:#14161C}
   svg.cols rect[fill="#fff"]{fill:none}
   /* La nota de los paneles se iba sola a una página en blanco al final. */
   .leyPaneles{display:none}
