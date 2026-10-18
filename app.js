@@ -956,14 +956,27 @@ function scatter(filas) {
   }
   const W = 1180, H = 430, L = 56, R = 16, T = 14, B = 38;
   const iw = W - L - R, ih = H - T - B;
-  const tope = Math.max(100, ...pts.map(p => Math.max(p.a, p.b))) + 15;
-  const x = v => L + v / tope * iw, y = v => T + ih - v / tope * ih;
-  const cx = x(100), cy = y(100);
+  // Los dos ejes van simétricos alrededor del 100%, así el cruce cae siempre
+  // justo en el centro y los cuatro cuadrantes miden lo mismo: el cartel de
+  // cada uno tiene su sitio fijo y no depende de dónde hayan caído los puntos.
+  const lejos = Math.max(...pts.map(p => Math.max(Math.abs(p.a - 100), Math.abs(p.b - 100))), 40);
+  const m = lejos * 1.18;
+  // Simétrico de verdad: si se recortara por abajo en 0 el 100% dejaría de caer
+  // en el centro y las rayas no coincidirían con el cambio de color.
+  const bajo = 100 - m, alto = 100 + m;
+  const x = v => L + (v - bajo) / (alto - bajo) * iw;
+  const y = v => T + ih - (v - bajo) / (alto - bajo) * ih;
+  const cx = L + iw / 2, cy = T + ih / 2;
   let g = `<rect x="${cx.toFixed(1)}" y="${T}" width="${(W - R - cx).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#6AAA96" opacity=".22"/>
     <rect x="${L}" y="${T}" width="${(cx - L).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#E0CD6E" opacity=".22"/>
     <rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${(W - R - cx).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#E69656" opacity=".22"/>
     <rect x="${L}" y="${cy.toFixed(1)}" width="${(cx - L).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#E05860" opacity=".22"/>`;
-  for (let v = 0; v <= tope; v += 50) {
+  // Las rayas de referencia salen del 100% hacia los dos lados, con un paso
+  // redondo, para que la retícula siga siendo legible con cualquier rango.
+  const paso = [10, 20, 25, 50, 100, 200].find(p => m / p <= 3.5) || 500;
+  for (let k = -Math.floor(m / paso); k <= Math.floor(m / paso); k++) {
+    const v = 100 + k * paso;
+    if (v < 0 || v < bajo || v > alto) continue;
     g += `<line x1="${x(v).toFixed(1)}" x2="${x(v).toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#1B263B"/>
           <line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#1B263B"/>
           <text x="${x(v).toFixed(1)}" y="${T + ih + 13}" fill="#6B7A94" font-size="9" text-anchor="middle">${v}%</text>
@@ -1129,7 +1142,7 @@ function ajustaCarteles() {
     const cand = [[fuera, arr], [fuera, abj], [dentro, arr], [dentro, abj]];
     // El nombre del jugador va encima de su bolita y ocupa a los lados.
     const tapa = (bx, by) => bolas.filter(p =>
-      p.x > bx - 42 && p.x < bx + an + 42 && p.y > by - 24 && p.y < by + al + 8).length;
+      p.x > bx - 26 && p.x < bx + an + 26 && p.y > by - 20 && p.y < by + al + 6).length;
     let mejor = cand[0], suyo = tapa(cand[0][0], cand[0][1]);
     for (const c of cand.slice(1)) {
       const n = tapa(c[0], c[1]);
