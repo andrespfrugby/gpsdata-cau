@@ -955,8 +955,10 @@ function scatter(filas) {
   g += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>
         <line x1="${L}" x2="${W - R}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>`;
 
-  // Los carteles de cada cuadrante. Se prueban las dos esquinas libres y se
-  // queda con la que menos bolitas tape: con pocos jugadores siempre hay sitio.
+  // Los carteles de cada cuadrante. Se dibujan con el texto en su sitio pero
+  // sin colocar: el ancho real de una frase no se puede calcular contando
+  // letras, así que el hueco y el tamaño de la caja se ajustan después, ya
+  // pintados, en ajustaCarteles().
   const TX = textosCuadrante();
   const quads = [
     ["verde", "#6AAA96", cx, T, W - R - cx, cy - T, "end"],
@@ -966,50 +968,24 @@ function scatter(filas) {
   ];
   for (const [k, col, qx, qy, qw, qh, anc] of quads) {
     const t = TX[k];
-    const ancho = Math.max(t.tit.length * 8.6 + 26,
-      ...t.desc.map(l => l.length * 5.7), ...t.foco.map(l => l.length * 6)) + 20;
-    const alto = 20 + (1 + t.desc.length + t.foco.length) * 12.6 + 6;
-    if (qw < ancho + 10 || qh < alto + 10) continue;
-    // Se prueban las cuatro esquinas del cuadrante y se queda con la que menos
-    // bolitas tapa; a igualdad, la de fuera, que es donde se espera el cartel.
-    const izq = qx + 6, der = qx + qw - ancho - 6;
-    const arr = qy + 8, abj = qy + qh - alto - 8;
-    const fuera = anc === "start" ? izq : der;
-    const dentro = anc === "start" ? der : izq;
-    const cand = [[fuera, arr], [fuera, abj], [dentro, arr], [dentro, abj]];
-    const tapa = (bx, by) => pts.filter(p => {
-      const px = x(p.a), py = y(p.b);
-      // El nombre va encima de la bolita y ocupa a los lados, así que se mira
-      // una zona más ancha que el propio cartel.
-      return px > bx - 42 && px < bx + ancho + 42 && py > by - 24 && py < by + alto + 8;
-    }).length;
-    let mejor = cand[0], suyo = tapa(cand[0][0], cand[0][1]);
-    for (const c of cand.slice(1)) {
-      const n = tapa(c[0], c[1]);
-      if (n < suyo) { mejor = c; suyo = n; }
-    }
-    const [bx, by] = mejor;
-    const tx = anc === "start" ? bx + 10 : bx + ancho - 10;
-    let ty = by + 20;
-    g += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${ancho.toFixed(1)}" height="${alto.toFixed(1)}"
-            rx="8" fill="#0D1420" opacity=".82"/>`;
-    const cab = anc === "start"
-      ? `<tspan font-size="19">${t.emo}</tspan><tspan dx="6">${esc(t.tit)}</tspan>`
-      : `<tspan>${esc(t.tit)}</tspan><tspan dx="6" font-size="19">${t.emo}</tspan>`;
-    g += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${col}" font-size="13.5" font-weight="700"
-            text-anchor="${anc}" letter-spacing=".03em">${cab}</text>`;
-    ty += 16;
+    let c = `<rect class="fondo" x="0" y="0" width="10" height="10" rx="8" fill="#0D1420" opacity=".82"/>
+      <text x="10" y="20" fill="${col}" font-size="13.5" font-weight="700" letter-spacing=".03em"
+        ><tspan font-size="19">${t.emo}</tspan><tspan dx="6">${esc(t.tit)}</tspan></text>`;
+    let ty = 36;
     for (const l of t.desc) {
-      g += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="#C9D3E4" font-size="10.5" text-anchor="${anc}">${esc(l)}</text>`;
+      c += `<text x="10" y="${ty}" fill="#C9D3E4" font-size="10.5">${esc(l)}</text>`;
       ty += 12.6;
     }
     ty += 4;
     t.foco.forEach((l, i) => {
-      g += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${col}" font-size="10.5" font-weight="600"
-              text-anchor="${anc}">${i === 0 ? "→ Foco en " : ""}${esc(l)}</text>`;
+      c += `<text x="10" y="${ty}" fill="${col}" font-size="10.5" font-weight="600">${
+        i === 0 ? "→ Foco en " : ""}${esc(l)}</text>`;
       ty += 12.6;
     });
+    g += `<g class="cartel" data-qx="${qx.toFixed(1)}" data-qy="${qy.toFixed(1)}"
+            data-qw="${qw.toFixed(1)}" data-qh="${qh.toFixed(1)}" data-anc="${anc}">${c}</g>`;
   }
+
   for (const p of pts) {
     g += `<circle cx="${x(p.a).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="6" fill="${p.c}" stroke="#0D1420" stroke-width="1.2"><title>${esc(p.nom)} · ${esc(p.pos)}</title></circle>
           <text x="${x(p.a).toFixed(1)}" y="${(y(p.b) - 10).toFixed(1)}" fill="#E9EEF7" font-size="8.6" text-anchor="middle">${esc(p.nom)}</text>`;
@@ -1110,6 +1086,49 @@ function cajas100(filas) {
       </div>`;
     }).join("")}
   </div>`;
+}
+
+/**
+ * Coloca los carteles del scatter una vez pintados: mide el texto de verdad,
+ * ajusta la caja a ese tamaño y elige la esquina de su cuadrante que menos
+ * bolitas tape. Si no cabe en ninguna, el cartel se quita.
+ */
+function ajustaCarteles() {
+  const svg = document.querySelector("#cuadrante svg.cols");
+  if (!svg) return;
+  const bolas = [...svg.querySelectorAll("circle")].map(c => ({
+    x:+c.getAttribute("cx"), y:+c.getAttribute("cy")
+  }));
+  for (const g of svg.querySelectorAll("g.cartel")) {
+    const caja = g.getBBox();          // incluye el rect de 10x10, da igual
+    const textos = [...g.querySelectorAll("text")];
+    let an = 0, al = 0;
+    for (const t of textos) {
+      const b = t.getBBox();
+      an = Math.max(an, b.x + b.width);
+      al = Math.max(al, b.y + b.height);
+    }
+    an += 10; al += 8;                 // el mismo aire que lleva a la izquierda
+    const qx = +g.dataset.qx, qy = +g.dataset.qy;
+    const qw = +g.dataset.qw, qh = +g.dataset.qh, anc = g.dataset.anc;
+    if (qw < an + 12 || qh < al + 12) { g.remove(); continue; }
+    const izq = qx + 6, der = qx + qw - an - 6;
+    const arr = qy + 8, abj = qy + qh - al - 8;
+    const fuera = anc === "start" ? izq : der, dentro = anc === "start" ? der : izq;
+    const cand = [[fuera, arr], [fuera, abj], [dentro, arr], [dentro, abj]];
+    // El nombre del jugador va encima de su bolita y ocupa a los lados.
+    const tapa = (bx, by) => bolas.filter(p =>
+      p.x > bx - 42 && p.x < bx + an + 42 && p.y > by - 24 && p.y < by + al + 8).length;
+    let mejor = cand[0], suyo = tapa(cand[0][0], cand[0][1]);
+    for (const c of cand.slice(1)) {
+      const n = tapa(c[0], c[1]);
+      if (n < suyo) { mejor = c; suyo = n; }
+    }
+    const fondo = g.querySelector("rect.fondo");
+    fondo.setAttribute("width", an.toFixed(1));
+    fondo.setAttribute("height", al.toFixed(1));
+    g.setAttribute("transform", `translate(${mejor[0].toFixed(1)} ${mejor[1].toFixed(1)})`);
+  }
 }
 
 /** Los dos desplegables del scatter, nativos del navegador. */
@@ -2676,6 +2695,7 @@ function pintar() {
       <span>Cada bloque es una línea, con su color y su media punteada dentro</span>
       <span>El 100% del scatter es la media de la línea del jugador, no la del equipo</span>
     </div>`;
+  ajustaCarteles();
   document.querySelectorAll(".chM").forEach(b => b.onclick = () => {
     const c = b.dataset.c;
     F.matriz = F.matriz.includes(c) ? F.matriz.filter(x => x !== c) : F.matriz.concat(c);
