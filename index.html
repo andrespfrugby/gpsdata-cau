@@ -339,16 +339,24 @@ table.datos td.n{text-align:center}
 table.datos th.n{text-align:center}
 .icoMejor{font-size:18px;margin-left:6px;vertical-align:-4px}
 /* Marcas personales batidas en la sesión. */
-.records{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
-.recG{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:rgba(240,225,153,.10);
-  border:1px solid rgba(240,225,153,.34);border-radius:9px;padding:6px 13px;font-size:12px}
-.recG i{font-style:normal;font-size:19px;line-height:1}
-.recG b{font-weight:600;color:var(--sand,#F0E199)}
-.recG span{display:flex;align-items:baseline;gap:5px}
-.recG span + span{padding-left:9px;border-left:1px solid rgba(240,225,153,.24)}
-.recG em{font-style:normal;color:var(--text)}
-.recG u{text-decoration:none;font-family:'Chivo Mono';font-weight:600;color:var(--text)}
-.recG s{text-decoration:none;font-size:10.5px;color:var(--text-3)}
+.records{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 12px}
+/* Marca personal batida: rayo, aro lleno y el salto respecto a su registro. */
+.med{display:flex;align-items:center;gap:11px;background:rgba(240,225,153,.09);
+  border:1px solid rgba(240,225,153,.32);border-radius:11px;padding:8px 15px 8px 12px}
+.med .ico{font-size:21px;line-height:1}
+.med .rosco{width:40px;height:40px;flex:none}
+.med .txt s{display:block;text-decoration:none;font-size:9px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--sand,#F0E199);font-weight:600}
+.med .txt b{display:block;font-size:13px;line-height:1.3}
+.med .txt u{text-decoration:none;font-family:'Chivo Mono';font-weight:600;font-size:15px;letter-spacing:-.02em}
+.med .txt u i{font-style:normal;font-size:10px;color:var(--text-3);margin-left:2px;font-family:Sora}
+.med .txt em{font-style:normal;display:block;font-size:10px;color:var(--text-3);margin-top:1px}
+.med .sube{color:#6E9A9B;font-weight:600}
+/* El % de exposición, dibujado en la celda. */
+.rosco{width:30px;height:30px;display:block;margin:0 auto}
+.leyAro{align-items:center}
+.leyAro .rosco{width:22px;height:22px;margin:0 6px 0 0}
+td.anillo{padding-top:2px;padding-bottom:2px}
 .alertaG{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
   background:var(--sand);color:#3A2F0B;font-size:10px;font-weight:700;margin-left:5px;
   cursor:help;vertical-align:-3px;line-height:1}
@@ -455,10 +463,20 @@ svg.cols text{font-family:Sora,system-ui,sans-serif}
   table.datos td.n.verde{background:#D8E8E4;color:#2F5F60;font-weight:600}
   .icoMejor{font-size:14px;vertical-align:-3px}
   .records{gap:5px;margin-bottom:7px;break-inside:avoid}
-  .recG{background:#FDF8E6 !important;border:1px solid #E6DBA8;padding:3px 9px;font-size:9px;gap:6px}
-  .recG i{font-size:12px}
-  .recG b{color:#8A6D1F}.recG em,.recG u{color:#14161C}.recG s{color:#6B7384;font-size:8px}
-  .recG span + span{padding-left:6px;border-left:1px solid #E6DBA8}
+  .med{background:#FDF8E6 !important;border:1px solid #E6DBA8;padding:4px 10px;gap:7px}
+  .med .ico{font-size:14px}
+  .med .rosco{width:28px;height:28px}
+  .med .txt s{color:#8A6D1F;font-size:7px}
+  .med .txt b{font-size:9.5px;color:#14161C}
+  .med .txt u{font-size:11px;color:#14161C}
+  .med .txt u i{font-size:7.5px;color:#6B7384}
+  .med .txt em{font-size:7.5px;color:#6B7384}
+  .med .sube{color:#2F5F60}
+  .rosco{width:21px;height:21px}
+  .leyAro .rosco{width:15px;height:15px}
+  .rosco circle[stroke="#1F2B42"]{stroke:#E4E7EE}
+  .rosco text{fill:#14161C !important;font-size:12px}
+  .rosco line{stroke:#5C6678 !important;opacity:1}
   .alertaG{width:12px;height:12px;font-size:8px;background:#E8CF6E;color:#4A3B06}
   .kpi{border:1px solid #ccc;background:#f7f7f7}
   .kpi b{color:#111;font-size:18px}
