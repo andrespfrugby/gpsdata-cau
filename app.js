@@ -765,10 +765,17 @@ function catalogoDisponible(filas) {
                  .filter(([, c]) => c.length);
 }
 
-/* Forma corta de cada puesto, para cuando la banda es estrecha. */
-const PUESTO_CORTO = {
-  "Primera línea":"1ª línea", "Segunda línea":"2ª línea",
-  "Tercera línea":"3ª línea", "Tres cuartos":"3/4"
+/** Parte el rótulo del puesto por la mitad de sus palabras. */
+function partePuesto(t) {
+  const p = t.split(" ");
+  if (p.length < 2) return [t];
+  return [p.slice(0, Math.ceil(p.length / 2)).join(" "), p.slice(Math.ceil(p.length / 2)).join(" ")];
+}
+
+/* El rótulo de cada banda agrupa a varias jugadoras, así que va en plural. */
+const PUESTO_PLURAL = {
+  "Primera línea":"Primeras líneas", "Segunda línea":"Segundas líneas",
+  "Tercera línea":"Terceras líneas", "Tres cuartos":"Tres cuartos"
 };
 
 /**
@@ -777,8 +784,9 @@ const PUESTO_CORTO = {
  * el tamaño que hace falta; por debajo de 6 no se lee, así que ahí se recorta.
  */
 function letraNombre(nombre, ancho) {
-  // Se deja un 20% de aire entre columnas o los nombres se tocan.
-  return Math.min(8.4, (ancho * 0.8) / (Math.max(1, nombre.length) * 0.62));
+  // 0,54 em por letra es lo que ocupa Sora de media en minúscula; antes se
+  // calculaba con el ancho de la monoespaciada y salían nombres diminutos.
+  return Math.min(10.5, (ancho * 0.9) / (Math.max(1, nombre.length) * 0.54));
 }
 
 /** Para chips y para la columna izquierda: sin el umbral, que no cabe. */
@@ -838,7 +846,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // la página de en medio no habría quien la leyera.
   // Alto de cada fila: se estira para llenar la hoja apaisada cuando hay pocas
   // métricas marcadas, en vez de dejar media página en blanco.
-  const W = 1180, LG = 84, GAP = 10, TOP = 22;
+  const W = 1180, LG = 84, GAP = 10, TOP = 30;
   const HOJA = 752;   // alto útil del SVG en una hoja apaisada, ya descontado
                       // el marco del panel y su título
   const n = filas.length, iw = W - LG - 8 - GAP * (puestos.length - 1);
@@ -847,13 +855,15 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // Ancho máximo por jugador: con pocos jugadores las barras salían enormes y
   // separadísimas. Se limita el paso y el grupo se centra dentro de su banda,
   // así las barras quedan juntas y estrechas haya 6 jugadores o haya 25.
-  const PASO_MAX = 34;
+  // Se separa un poco más de lo que mide la barra para que el nombre de la
+  // jugadora pueda leerse: la barra sigue igual de estrecha, solo crece el aire.
+  const PASO_MAX = 42;
   const paso0 = Math.min(iw / n, PASO_MAX);
   const mini = Math.min(...filas.map(r => letraNombre(r.jugador, paso0)));
   // Un único cuerpo de letra para todos los nombres, el que necesita el más
   // largo: con uno por jugador la fila quedaba desigual.
   const soloApellido = r => { const t = r.jugador.trim().split(/\s+/); return t.length > 1 ? t.slice(1).join(" ") : t[0]; };
-  const fzNom = Math.max(6, Math.min(9, Math.min(...filas.map(r => letraNombre(soloApellido(r), paso0)))));
+  const fzNom = Math.max(7.6, Math.min(10, Math.min(...filas.map(r => letraNombre(soloApellido(r), paso0)))));
   // Si el nombre entero no cabe legible en una línea, se parte en dos: la
   // inicial arriba y el apellido debajo, que así cada uno tiene la columna entera.
   const dosLineas = mini < 7;
@@ -876,14 +886,16 @@ function bloqueMatriz(filas, cols, ordenPor) {
   });
   for (const { p, rs, x, w } of bloques) {
     const c = colorPuesto(p, puestos);
-    // Con bandas estrechas el nombre del puesto se pisaba con el de al lado:
-    // se prueba el nombre entero, luego el corto, y si aún no cabe se encoge.
-    const corto = PUESTO_CORTO[p] || p.split(" ")[0];
-    const etq = letraNombre(p, w) >= 9.5 ? p : corto;
-    const fz = Math.max(7.5, Math.min(10, letraNombre(etq, w)));
-    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}" fill="${c}" opacity=".06" rx="5"/>
-          <text x="${(x + w / 2).toFixed(1)}" y="14" fill="${c}" font-size="${fz.toFixed(1)}"
-            text-anchor="middle">${esc(etq)}<title>${esc(p)}</title></text>`;
+    // Con bandas estrechas el rótulo se pisaba con el de al lado: si no cabe
+    // entero se parte en dos líneas antes que encogerlo hasta no leerse.
+    const etq = PUESTO_PLURAL[p] || p;
+    const lineas = letraNombre(etq, w) >= 9 ? [etq] : partePuesto(etq);
+    const fz = Math.max(8, Math.min(10.5, Math.min(...lineas.map(l => letraNombre(l, w)))));
+    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}" fill="${c}" opacity=".06" rx="5"/>`;
+    lineas.forEach((l, i) => {
+      g += `<text x="${(x + w / 2).toFixed(1)}" y="${13 + i * 11}" fill="${c}" font-size="${fz.toFixed(1)}"
+              text-anchor="middle">${esc(l)}<title>${esc(p)}</title></text>`;
+    });
   }
   cols.forEach((col, mi) => {
     const vals = filas.map(r => Math.abs(r.crudo[col] || 0));
@@ -906,7 +918,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
               stroke="${c}" stroke-width="1.6" stroke-dasharray="4 3"/>`;
       rs.forEach((r, i) => {
         const v = Math.abs(r.crudo[col] || 0), cx = dentro + paso * (i + 0.5);
-        const h = v / tope * ih, an = paso * 0.86;
+        const h = v / tope * ih, an = Math.min(paso * 0.72, 30);
         g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${(y0 + ih - h).toFixed(1)}" width="${an.toFixed(1)}"
                 height="${Math.max(1, h).toFixed(1)}" rx="2" fill="${c}" opacity=".85"/>`;
         // Siempre horizontal y encima de la barra: girado dentro quedaba
