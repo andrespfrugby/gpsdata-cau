@@ -337,7 +337,18 @@ table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer
 /* ---- Semáforo, alertas e iconos de la tabla ---- */
 table.datos td.n{text-align:center}
 table.datos th.n{text-align:center}
-.icoMejor{font-size:14px;margin-left:6px;vertical-align:-3px}
+.icoMejor{font-size:18px;margin-left:6px;vertical-align:-4px}
+/* Marcas personales batidas en la sesión. */
+.records{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.recG{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:rgba(240,225,153,.10);
+  border:1px solid rgba(240,225,153,.34);border-radius:9px;padding:6px 13px;font-size:12px}
+.recG i{font-style:normal;font-size:19px;line-height:1}
+.recG b{font-weight:600;color:var(--sand,#F0E199)}
+.recG span{display:flex;align-items:baseline;gap:5px}
+.recG span + span{padding-left:9px;border-left:1px solid rgba(240,225,153,.24)}
+.recG em{font-style:normal;color:var(--text)}
+.recG u{text-decoration:none;font-family:'Chivo Mono';font-weight:600;color:var(--text)}
+.recG s{text-decoration:none;font-size:10.5px;color:var(--text-3)}
 .alertaG{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
   background:var(--sand);color:#3A2F0B;font-size:10px;font-weight:700;margin-left:5px;
   cursor:help;vertical-align:-3px;line-height:1}
@@ -442,7 +453,12 @@ svg.cols text{font-family:Sora,system-ui,sans-serif}
   .leyTabla i.sw.verde{background:#D8E8E4}
   .leyTabla b{color:#14161C}
   table.datos td.n.verde{background:#D8E8E4;color:#2F5F60;font-weight:600}
-  .icoMejor{font-size:11px;vertical-align:-2px}
+  .icoMejor{font-size:14px;vertical-align:-3px}
+  .records{gap:5px;margin-bottom:7px;break-inside:avoid}
+  .recG{background:#FDF8E6 !important;border:1px solid #E6DBA8;padding:3px 9px;font-size:9px;gap:6px}
+  .recG i{font-size:12px}
+  .recG b{color:#8A6D1F}.recG em,.recG u{color:#14161C}.recG s{color:#6B7384;font-size:8px}
+  .recG span + span{padding-left:6px;border-left:1px solid #E6DBA8}
   .alertaG{width:12px;height:12px;font-size:8px;background:#E8CF6E;color:#4A3B06}
   .kpi{border:1px solid #ccc;background:#f7f7f7}
   .kpi b{color:#111;font-size:18px}
