@@ -153,7 +153,13 @@ const CORTOS = {
   "Player Load": "Player load", "Power Plays": "Power plays",
   "Distance Per Min (m/min)": "Dist. / min", "Energy (kcal)": "Energía", "Hr Load": "Carga HR"
 };
-const nombreCorto = c => CORTOS[c] || (CALCULADAS.includes(c) ? c : c)
+const nombreCorto = c => {
+  // El umbral de la columna de impactos va pegado al nombre: "Impactos" a
+  // secas no dice a partir de cuántas G cuenta Catapult un golpe.
+  if (c === "Impacts") { const g = impactoDe(); return g ? `Impactos (${g}G)` : "Impactos"; }
+  return cortoBase(c);
+};
+const cortoBase = c => CORTOS[c] || (CALCULADAS.includes(c) ? c : c)
   .replace(/Accelerations Zone Count: (.*) m\/s\/s/, "ACC $1 m/s²")
   .replace(/Deceleration Zone Count: (.*) m\/s\/s/, "DECC $1 m/s²")
   .replace(/Max Acceleration.*/, "ACC máx m/s²")
@@ -625,12 +631,13 @@ function medallas(filas) {
       .sort((a, b) => b.v - a.v).slice(0, 5);
     const dec = decimales(filas.map(r => Math.abs(r.crudo[t.col] || 0)));
     const tope = orden[0] ? orden[0].v : 0;
-    const titulo = t.titulo || nombreMetrica(t.col);
+    const g = impactoDe();
+    const titulo = (t.col === "Impacts" && g) ? `Contactos  ·  > ${g} G` : (t.titulo || nombreMetrica(t.col));
     const puestos = [...new Set(filas.map(r => r.posicion))].sort();
     return `<div class="medalla">
       <div class="top"><span class="ico">${t.ico}</span>
         <span class="tit" title="${esc(titulo)}">
-          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(t.corto)}</span></b></span>
+          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(t.col === "Impacts" && g ? `Contactos ${g}G` : t.corto)}</span></b></span>
         <span class="uniR">${esc(unidad(t.col) || "")}</span></div>
       <ol>${orden.map((d, i) => `<li>
         <span class="pos">${i < 3 ? MEDALLA[i] : `<em>${i + 1}</em>`}</span>
@@ -902,12 +909,10 @@ function bloqueMatriz(filas, cols, ordenPor) {
         const h = v / tope * ih, an = paso * 0.86;
         g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${(y0 + ih - h).toFixed(1)}" width="${an.toFixed(1)}"
                 height="${Math.max(1, h).toFixed(1)}" rx="2" fill="${c}" opacity=".85"/>`;
-        // Si la barra da de sí, el número va girado dentro; si no, encima.
-        g += h > 28
-          ? `<text x="${cx.toFixed(1)}" y="${(y0 + ih - 5).toFixed(1)}" fill="#101828" font-size="8.6"
-               transform="rotate(-90 ${cx.toFixed(1)} ${(y0 + ih - 5).toFixed(1)})">${fmt(col, v, dec)}</text>`
-          : `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 4).toFixed(1)}" fill="#9EABC2" font-size="8.4"
-               text-anchor="middle">${fmt(col, v, dec)}</text>`;
+        // Siempre horizontal y encima de la barra: girado dentro quedaba
+        // enterrado en la base, lejos de lo que mide.
+        g += `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 5).toFixed(1)}" fill="#C9D3E4"
+                font-size="9.5" text-anchor="middle">${fmt(col, v, dec)}</text>`;
       });
     }
   });
