@@ -765,6 +765,26 @@ function catalogoDisponible(filas) {
                  .filter(([, c]) => c.length);
 }
 
+/**
+ * Anillo de exposición: el relleno es el % de su propia marca y la muesca
+ * blanca marca el umbral, que es lo que de verdad decide si hubo estímulo.
+ */
+function rosco(p, umbral) {
+  const r = 13, c = 2 * Math.PI * r, off = c * (1 - Math.min(p, 100) / 100);
+  const tono = p >= umbral ? "#6E9A9B" : (p >= umbral - 15 ? "#F0E199" : "#4A5A78");
+  const a = -Math.PI / 2 + 2 * Math.PI * umbral / 100;
+  const x1 = 18 + (r - 3.5) * Math.cos(a), y1 = 18 + (r - 3.5) * Math.sin(a);
+  const x2 = 18 + (r + 3.5) * Math.cos(a), y2 = 18 + (r + 3.5) * Math.sin(a);
+  return `<svg class="rosco" viewBox="0 0 36 36" role="img" aria-label="${nf(p)}% de su marca">
+    <circle cx="18" cy="18" r="${r}" fill="none" stroke="#1F2B42" stroke-width="5"/>
+    <circle cx="18" cy="18" r="${r}" fill="none" stroke="${tono}" stroke-width="5" stroke-linecap="round"
+      stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 18 18)"/>
+    <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+      stroke="#E9EEF7" stroke-width="1.5" opacity=".8"/>
+    <text x="18" y="21.5" text-anchor="middle" font-size="11" font-weight="600" fill="#E9EEF7">${nf(p)}</text>
+  </svg>`;
+}
+
 /** Parte el rótulo del puesto por la mitad de sus palabras. */
 function partePuesto(t) {
   const p = t.split(" ");
@@ -2350,9 +2370,17 @@ function recordsSesion(filas) {
     }
     if (!suyos.length) return "";
     suyos.sort((a, b) => b.v - a.v);
-    return `<div class="recG"><i>${m.ico}</i><b>${m.tit}</b>${suyos.map(h =>
-      `<span><em>${esc(h.jugador)}</em> <u>${nf(h.v, m.dec)} ${m.uni}</u> <s>antes ${nf(h.mejor, m.dec)}</s></span>`
-    ).join("")}</div>`;
+    return suyos.map(h => `<div class="med">
+      <span class="ico">${m.ico}</span>
+      ${rosco(100, 100)}
+      <div class="txt">
+        <s>${m.tit}</s>
+        <b>${esc(h.jugador)}</b>
+        <u>${nf(h.v, m.dec)} <i>${m.uni}</i></u>
+        <em>último registro ${nf(h.mejor, m.dec)}
+          <span class="sube">▲ ${nf((h.v / h.mejor - 1) * 100, 1)}%</span></em>
+      </div>
+    </div>`).join("");
   }).join("");
   return bloques ? `<div class="records">${bloques}</div>` : "";
 }
@@ -2381,7 +2409,10 @@ function recordsSesion(filas) {
         // Exposición: verde a partir de su umbral, porque ahí sí hubo estímulo.
         const esPct = c === PCTVEL || c === PCTACC;
         const expuesto = esPct && v >= umbralDe(c);
-        if (esPct) fondo = expuesto ? "background:rgba(110,154,155,.28)" : "";
+        // El % va dibujado: el número suelto no decía si llegaba al umbral.
+        if (esPct) {
+          return `<td class="n anillo">${rosco(v, umbralDe(c))}</td>`;
+        }
         const lider = v === tope[c] && v > 0;
         // La alerta va en la banda de G que la provoca, no en el total.
         const avisa = BANDAS_ALTAS.includes(c) && v > 0;
@@ -2401,7 +2432,8 @@ function recordsSesion(filas) {
     <span><i style="background:rgba(${semaforo(1)},.24)"></i>menos acciones por minuto</span>
     <span><i style="background:rgba(224,88,96,.34)"></i>los tres que más impactos recibieron</span>
     <span><b>negrita</b> el mejor de su columna</span>
-    <span><i class="sw verde"></i>llega al ${umbralDe(PCTVEL)}% de su top speed o al ${umbralDe(PCTACC)}% de su ACC máx</span>
+    <span class="leyAro">${rosco(72, 90)}el aro es cuánto llegó de su propia marca; la muesca blanca es el umbral
+      (${umbralDe(PCTVEL)}% en velocidad, ${umbralDe(PCTACC)}% en aceleración)</span>
     <span><span class="alertaG">!</span> precaución · impactos de alta intensidad</span>
   </div>`;
 
