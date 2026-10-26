@@ -2305,6 +2305,41 @@ function tabla(filas) {
     .slice(0, 3).map(r => r.jugador);
   const BANDAS_ALTAS = ["Impact Zones: 10 - 15 G (Impacts)", "Impact Zones: 15 - 20 G (Impacts)",
                         "Impact Zones: > 20 G (Impacts)"];
+/**
+ * Marcas personales batidas en esta sesión: se compara con TODAS las sesiones
+ * anteriores de esa jugadora, no con el techo que usa el % de exposición, que
+ * ya descarta picos. Aquí se enseñan los dos números para que se vea el salto
+ * y se pueda descartar a ojo una lectura rara del chaleco.
+ */
+function recordsSesion(filas) {
+  const hoy = filas[0].fechaMs;
+  const MIRA = [
+    { col:"Top Speed (m/s)",          ico:"⚡",  tit:"Nueva velocidad máxima",   uni:"m/s",  dec:2 },
+    { col:"Max Acceleration (m/s/s)", ico:"🏎️", tit:"Nueva aceleración máxima", uni:"m/s²", dec:2 }
+  ];
+  const bloques = MIRA.map(m => {
+    const suyos = [];
+    for (const r of filas) {
+      const v = Math.abs(r.crudo[m.col] || 0);
+      if (!v) continue;
+      const antes = DATOS.filter(x => x.jugador === r.jugador && x.fechaMs < hoy)
+        .map(x => Math.abs(x.crudo[m.col] || 0)).filter(n => n > 0);
+      // Sin un mínimo de historia cualquiera "bate su récord" el primer día.
+      if (antes.length < Math.max(2, C.minSesionesTecho ?? 1)) continue;
+      const mejor = Math.max(...antes);
+      // Medio punto porcentual de margen: mejorar 8,96 a 8,97 es ruido del
+      // chaleco, no una marca nueva.
+      if (v > mejor * 1.005) suyos.push({ jugador:r.jugador, v, mejor });
+    }
+    if (!suyos.length) return "";
+    suyos.sort((a, b) => b.v - a.v);
+    return `<div class="recG"><i>${m.ico}</i><b>${m.tit}</b>${suyos.map(h =>
+      `<span><em>${esc(h.jugador)}</em> <u>${nf(h.v, m.dec)} ${m.uni}</u> <s>antes ${nf(h.mejor, m.dec)}</s></span>`
+    ).join("")}</div>`;
+  }).join("");
+  return bloques ? `<div class="records">${bloques}</div>` : "";
+}
+
   // El icono del mejor de la sesión, el mismo que en su tarjeta de podio.
   const ICONO = { "Top Speed (m/s)":"⚡", "Max Acceleration (m/s/s)":"🏎️" };
 
@@ -2355,6 +2390,7 @@ function tabla(filas) {
 
   return `<section class="panel tablon">
     <h3>Velocidad, aceleraciones e impactos</h3>
+    ${recordsSesion(filas)}
     <div class="scroll"><table class="datos">
       <thead>
         <tr><th></th><th></th>${grupos}</tr>
