@@ -894,13 +894,17 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // repartirse el ancho entero: así no quedan bandas medio vacías cuando una
   // línea tiene dos jugadores y otra tiene diez.
   const PAD = 12;
-  const anchoDe = rs => paso0 * rs.length + PAD * 2;
-  const total = grupos.reduce((t, [, rs]) => t + anchoDe(rs), 0) + GAP * (grupos.length - 1);
+  // La banda nunca es más estrecha que su rótulo: con una sola jugadora,
+  // "Segundas líneas" se partía en dos renglones.
+  const FZ_ROTULO = 9.5;
+  const anchoRotulo = p => (PUESTO_PLURAL[p] || p).length * 0.54 * FZ_ROTULO + 14;
+  const anchoDe = (p, rs) => Math.max(paso0 * rs.length + PAD * 2, anchoRotulo(p));
+  const total = grupos.reduce((t, [p, rs]) => t + anchoDe(p, rs), 0) + GAP * (grupos.length - 1);
   // Pegado al margen de las etiquetas: centrarlo dejaba un hueco enorme entre
   // el nombre de la métrica y la primera barra cuando hay pocos jugadores.
   let g = "", x = LG;
   const bloques = grupos.map(([p, rs]) => {
-    const w = anchoDe(rs), b = { p, rs, x, w };
+    const w = anchoDe(p, rs), b = { p, rs, x, w };
     x += w + GAP;
     return b;
   });
@@ -909,7 +913,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
     // Con bandas estrechas el rótulo se pisaba con el de al lado: si no cabe
     // entero se parte en dos líneas antes que encogerlo hasta no leerse.
     const etq = PUESTO_PLURAL[p] || p;
-    const lineas = letraNombre(etq, w) >= 9 ? [etq] : partePuesto(etq);
+    const lineas = letraNombre(etq, w) >= 8.4 ? [etq] : partePuesto(etq);
     const fz = Math.max(8, Math.min(10.5, Math.min(...lineas.map(l => letraNombre(l, w)))));
     g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}" fill="${c}" opacity=".06" rx="5"/>`;
     lineas.forEach((l, i) => {
@@ -2409,10 +2413,7 @@ function recordsSesion(filas) {
         // Exposición: verde a partir de su umbral, porque ahí sí hubo estímulo.
         const esPct = c === PCTVEL || c === PCTACC;
         const expuesto = esPct && v >= umbralDe(c);
-        // El % va dibujado: el número suelto no decía si llegaba al umbral.
-        if (esPct) {
-          return `<td class="n anillo">${rosco(v, umbralDe(c))}</td>`;
-        }
+        if (esPct) fondo = expuesto ? "background:rgba(110,154,155,.28)" : "";
         const lider = v === tope[c] && v > 0;
         // La alerta va en la banda de G que la provoca, no en el total.
         const avisa = BANDAS_ALTAS.includes(c) && v > 0;
@@ -2432,8 +2433,7 @@ function recordsSesion(filas) {
     <span><i style="background:rgba(${semaforo(1)},.24)"></i>menos acciones por minuto</span>
     <span><i style="background:rgba(224,88,96,.34)"></i>los tres que más impactos recibieron</span>
     <span><b>negrita</b> el mejor de su columna</span>
-    <span class="leyAro">${rosco(72, 90)}el aro es cuánto llegó de su propia marca; la muesca blanca es el umbral
-      (${umbralDe(PCTVEL)}% en velocidad, ${umbralDe(PCTACC)}% en aceleración)</span>
+    <span><i class="sw verde"></i>llega al ${umbralDe(PCTVEL)}% de su top speed o al ${umbralDe(PCTACC)}% de su ACC máx</span>
     <span><span class="alertaG">!</span> precaución · impactos de alta intensidad</span>
   </div>`;
 
