@@ -785,6 +785,43 @@ function rosco(p, umbral) {
   </svg>`;
 }
 
+/* Cómo se agrupan los puestos en los gráficos. Una primera línea no se parece
+   a una segunda (1,55 contra 3,88 m de HMLD por minuto en los 14 partidos),
+   pero una segunda y una tercera sí, así que esas dos van juntas. Se puede
+   cambiar desde config.js con "grupos". */
+const GRUPO_PUESTO = {
+  "Primera línea":"Primeras líneas",
+  "Segunda línea":"Segundas y terceras líneas",
+  "Tercera línea":"Segundas y terceras líneas",
+  "Tres cuartos":"Tres cuartos"
+};
+const ORDEN_GRUPO = ["Primeras líneas", "Segundas y terceras líneas", "Tres cuartos"];
+const grupoDe = p => (C.grupos && C.grupos[p]) || GRUPO_PUESTO[p] || p;
+/** Los grupos presentes en estas filas, en el orden de la delantera a la línea. */
+function gruposDe(filas) {
+  const vistos = [...new Set(filas.map(r => grupoDe(r.posicion)))];
+  return vistos.sort((a, b) => {
+    const ia = ORDEN_GRUPO.indexOf(a), ib = ORDEN_GRUPO.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+  });
+}
+/* Color de cada grupo y el tinte de su panel: base, oscuro (papel), fondo. */
+const COLOR_GRUPO = {
+  "Primeras líneas":          { base:"#E2838C", papel:"#9C4B52", fondoOsc:"#2A1A20", fondoCla:"#FBEEF0" },
+  "Segundas y terceras líneas":{ base:"#6E9A9B", papel:"#2F615C", fondoOsc:"#152523", fondoCla:"#EAF4F2" },
+  "Tres cuartos":             { base:"#9AA2E0", papel:"#454C92", fondoOsc:"#1A1C2E", fondoCla:"#EFF0FA" }
+};
+const RESERVA_GRUPO = [
+  { base:"#F0E199", papel:"#8A7A2E", fondoOsc:"#262318", fondoCla:"#FBF7E6" },
+  { base:"#C7B8E7", papel:"#5B4A86", fondoOsc:"#1F1A2B", fondoCla:"#F3EFFB" },
+  { base:"#F5C4AF", papel:"#8E5338", fondoOsc:"#2A1E18", fondoCla:"#FCF0EA" }
+];
+function tonoGrupo(g, todos) {
+  if (COLOR_GRUPO[g]) return COLOR_GRUPO[g];
+  const sueltos = todos.filter(x => !COLOR_GRUPO[x]);
+  return RESERVA_GRUPO[sueltos.indexOf(g) % RESERVA_GRUPO.length];
+}
+
 /** Parte el rótulo del puesto por la mitad de sus palabras. */
 function partePuesto(t) {
   const p = t.split(" ");
@@ -854,11 +891,11 @@ function matriz(filas) {
 }
 
 function bloqueMatriz(filas, cols, ordenPor) {
-  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const puestos = gruposDe(filas);
   // Se ordena siempre por la misma métrica, la primera de las marcadas: si cada
   // bloque se ordenase por la suya, el jugador cambiaría de sitio entre páginas.
   const orden = ordenPor || cols[0];
-  const grupos = puestos.map(p => [p, filas.filter(r => r.posicion === p)
+  const grupos = puestos.map(p => [p, filas.filter(r => grupoDe(r.posicion) === p)
     .sort((a, b) => Math.abs(b.crudo[orden] || 0) - Math.abs(a.crudo[orden] || 0))]);
 
   // Cada métrica lleva su propia línea de apellidos pegada al eje: con varias
@@ -877,13 +914,13 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // así las barras quedan juntas y estrechas haya 6 jugadores o haya 25.
   // Se separa un poco más de lo que mide la barra para que el nombre de la
   // jugadora pueda leerse: la barra sigue igual de estrecha, solo crece el aire.
-  const PASO_MAX = 42;
+  const PASO_MAX = 46;
   const paso0 = Math.min(iw / n, PASO_MAX);
   const mini = Math.min(...filas.map(r => letraNombre(r.jugador, paso0)));
   // Un único cuerpo de letra para todos los nombres, el que necesita el más
   // largo: con uno por jugador la fila quedaba desigual.
   const soloApellido = r => { const t = r.jugador.trim().split(/\s+/); return t.length > 1 ? t.slice(1).join(" ") : t[0]; };
-  const fzNom = Math.max(7.6, Math.min(10, Math.min(...filas.map(r => letraNombre(soloApellido(r), paso0)))));
+  const fzNom = Math.max(8.4, Math.min(11, Math.min(...filas.map(r => letraNombre(soloApellido(r), paso0)))));
   // Si el nombre entero no cabe legible en una línea, se parte en dos: la
   // inicial arriba y el apellido debajo, que así cada uno tiene la columna entera.
   const dosLineas = mini < 7;
@@ -897,7 +934,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
   // La banda nunca es más estrecha que su rótulo: con una sola jugadora,
   // "Segundas líneas" se partía en dos renglones.
   const FZ_ROTULO = 9.5;
-  const anchoRotulo = p => (PUESTO_PLURAL[p] || p).length * 0.54 * FZ_ROTULO + 14;
+  const anchoRotulo = p => p.length * 0.54 * FZ_ROTULO + 18;
   const anchoDe = (p, rs) => Math.max(paso0 * rs.length + PAD * 2, anchoRotulo(p));
   const total = grupos.reduce((t, [p, rs]) => t + anchoDe(p, rs), 0) + GAP * (grupos.length - 1);
   // Pegado al margen de las etiquetas: centrarlo dejaba un hueco enorme entre
@@ -909,16 +946,16 @@ function bloqueMatriz(filas, cols, ordenPor) {
     return b;
   });
   for (const { p, rs, x, w } of bloques) {
-    const c = colorPuesto(p, puestos);
+    const t = tonoGrupo(p, puestos);
     // Con bandas estrechas el rótulo se pisaba con el de al lado: si no cabe
     // entero se parte en dos líneas antes que encogerlo hasta no leerse.
-    const etq = PUESTO_PLURAL[p] || p;
-    const lineas = letraNombre(etq, w) >= 8.4 ? [etq] : partePuesto(etq);
-    const fz = Math.max(8, Math.min(10.5, Math.min(...lineas.map(l => letraNombre(l, w)))));
-    g += `<rect x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}" fill="${c}" opacity=".06" rx="5"/>`;
+    const lineas = letraNombre(p, w) >= 8.4 ? [p] : partePuesto(p);
+    const fz = Math.max(8, Math.min(11, Math.min(...lineas.map(l => letraNombre(l, w)))));
+    g += `<rect class="fondoGrupo" x="${x.toFixed(1)}" y="2" width="${w.toFixed(1)}" height="${H - 4}"
+            rx="12" fill="${t.fondoOsc}"/>`;
     lineas.forEach((l, i) => {
-      g += `<text x="${(x + w / 2).toFixed(1)}" y="${13 + i * 11}" fill="${c}" font-size="${fz.toFixed(1)}"
-              text-anchor="middle">${esc(l)}<title>${esc(p)}</title></text>`;
+      g += `<text x="${(x + w / 2).toFixed(1)}" y="${15 + i * 12}" fill="${t.base}" font-size="${fz.toFixed(1)}"
+              font-weight="600" text-anchor="middle">${esc(l)}</text>`;
     });
   }
   cols.forEach((col, mi) => {
@@ -934,7 +971,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
           <line x1="${(bloques[0].x - 6).toFixed(1)}" x2="${(bloques[bloques.length - 1].x + bloques[bloques.length - 1].w + 6).toFixed(1)}"
             y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
     for (const { p, rs, x, w } of bloques) {
-      const c = colorPuesto(p, puestos), paso = paso0;
+      const c = tonoGrupo(p, puestos).base, paso = paso0;
       const dentro = x + (w - paso * rs.length) / 2;
       const m = mediaDe(rs, col), ym = y0 + ih - m / tope * ih;
       g += `<line x1="${(dentro - 4).toFixed(1)}" x2="${(dentro + paso * rs.length + 4).toFixed(1)}"
@@ -943,8 +980,9 @@ function bloqueMatriz(filas, cols, ordenPor) {
       rs.forEach((r, i) => {
         const v = Math.abs(r.crudo[col] || 0), cx = dentro + paso * (i + 0.5);
         const h = v / tope * ih, an = Math.min(paso * 0.72, 30);
+        // En color pleno quien llega al promedio de su grupo; apagada quien no.
         g += `<rect x="${(cx - an / 2).toFixed(1)}" y="${(y0 + ih - h).toFixed(1)}" width="${an.toFixed(1)}"
-                height="${Math.max(1, h).toFixed(1)}" rx="2" fill="${c}" opacity=".85"/>`;
+                height="${Math.max(1, h).toFixed(1)}" rx="4" fill="${c}" opacity="${v >= m ? 1 : .42}"/>`;
         // Siempre horizontal y encima de la barra: girado dentro quedaba
         // enterrado en la base, lejos de lo que mide.
         g += `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 5).toFixed(1)}" fill="#C9D3E4"
@@ -982,15 +1020,15 @@ function bloqueMatriz(filas, cols, ordenPor) {
  * primera línea no se queda siempre abajo a la izquierda solo por ser primera.
  */
 function scatter(filas) {
-  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const puestos = gruposDe(filas);
   const hayX = filas.some(r => F.sc.x in r.crudo), hayY = filas.some(r => F.sc.y in r.crudo);
   if (!hayX || !hayY) return `<p class="empty">Esa pareja de métricas no está en estos datos.</p>`;
   const pts = [];
   for (const p of puestos) {
-    const rs = filas.filter(r => r.posicion === p);
+    const rs = filas.filter(r => grupoDe(r.posicion) === p);
     const mx = mediaDe(rs, F.sc.x) || 1, my = mediaDe(rs, F.sc.y) || 1;
     for (const r of rs) {
-      pts.push({ nom:r.jugador, pos:p, c:colorPuesto(p, puestos),
+      pts.push({ nom:r.jugador, pos:p, c:tonoGrupo(p, puestos).base,
                  a:Math.abs(r.crudo[F.sc.x] || 0) / mx * 100,
                  b:Math.abs(r.crudo[F.sc.y] || 0) / my * 100 });
     }
@@ -1136,15 +1174,15 @@ function envuelve(txt, max = 28) {
  * en porcentaje y sin esto no hay forma de saber de cuánto se habla.
  */
 function cajas100(filas) {
-  const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+  const puestos = gruposDe(filas);
   const x = F.sc.x, y = F.sc.y;
   const dx = decMedia(decimales(filas.map(r => Math.abs(r.crudo[x] || 0))));
   const dy = decMedia(decimales(filas.map(r => Math.abs(r.crudo[y] || 0))));
   return `<div class="cajas100">
     <span class="t100">El 100% de cada línea en esta sesión</span>
     ${puestos.map(p => {
-      const rs = filas.filter(r => r.posicion === p);
-      return `<div class="c100" style="border-left-color:${colorPuesto(p, puestos)}">
+      const rs = filas.filter(r => grupoDe(r.posicion) === p);
+      return `<div class="c100" style="border-left-color:${tonoGrupo(p, puestos).base}">
         <span>${esc(p)}</span>
         <div class="par"><b>${fmt(x, mediaDe(rs, x), dx)}${unidad(x) ? " " + esc(unidad(x)) : ""}</b><i>${esc(etiquetaChip(x))}</i></div>
         <div class="par"><b>${fmt(y, mediaDe(rs, y), dy)}${unidad(y) ? " " + esc(unidad(y)) : ""}</b><i>${esc(etiquetaChip(y))}</i></div>
