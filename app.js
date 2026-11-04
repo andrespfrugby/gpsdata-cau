@@ -473,6 +473,7 @@ async function cargar() {
       const j = await cargarPorScript(fuente);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      AVISO_BIP = j.bipAviso || "";
       if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
         j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
       const brutas = (j.cabeceras && j.filas)
@@ -501,6 +502,7 @@ async function cargar() {
       const j = JSON.parse(txt);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      AVISO_BIP = j.bipAviso || "";
       if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
         j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
       if (j.cabeceras && j.filas) {
@@ -2562,6 +2564,7 @@ function vistaDrill() {
 
 /* ---------- balón en juego ---------- */
 let BIP = [];                 // fases guardadas, una por secuencia
+let AVISO_BIP = "";           // lo que el Apps Script cuenta si el enlace falla
 const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloques
              ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
@@ -3245,7 +3248,10 @@ function vistaBip() {
 
   const contenido = !BIP.length
     ? `<div class="empty"><p style="font-size:15px;color:var(--text-2)">Todavía no hay partidos de balón en juego.</p>
-       <p>Pulsa <b>Cargar CSV de BiP</b> y arrastra el export de tu herramienta.</p></div>`
+       ${AVISO_BIP
+         ? `<div class="aviso espera" style="max-width:560px;margin:14px auto 0;text-align:left">
+              <b>El enlace con tu hoja de BiP no está trayendo nada.</b><br>${esc(AVISO_BIP)}</div>`
+         : `<p>Pulsa <b>Cargar CSV de BiP</b> y arrastra el export de tu herramienta.</p>`}</div>`
     : FB.vista === "panel" ? panelBip()
     : FB.vista === "historico" ? historicoBip()
     : FB.vista === "evolucion" ? evolucionBip()
