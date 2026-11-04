@@ -1,666 +1,806 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CAU · Reporte de sesión</title>
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>MOCKUP · CAU GPS en claro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Chivo+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink-900:#0E1524; --ink-850:#151F33; --ink-800:#1B263B; --ink-700:#26344F; --ink-600:#33445F;
-  --teal:#6E9A9B; --pink:#EFB5B9; --lav:#A0A7D8; --purple:#C7B8E7; --peach:#F5C4AF; --sand:#F0E199; --red:#E63946;
-  --text:#E9EEF7; --text-2:#9EABC2; --text-3:#6B7A94;
-  --r:10px;
+  --papel:#FFFFFF;
+  --mesa:#ECEFEE;
+  --tinta:#131715;
+  --tinta2:#5C6462;
+  --tinta3:#8A9290;
+  --linea:#DCE1DF;
+  --linea2:#EDF0EF;
+  --g1:#A8323F;  /* primeras lineas */
+  --g2:#1F5E5C;  /* segundas y terceras */
+  --g3:#343C8A;  /* tres cuartos */
+  --g1s:#FBEEF0; --g2s:#E8F2F0; --g3s:#EDEEF9;
+  --ok:#1F5E5C; --avi:#9A6B12; --mal:#A8323F;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{background:var(--ink-900);color:var(--text);font-family:Sora,system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-h1,h2,h3{font-family:Sora,sans-serif;font-weight:600;margin:0;letter-spacing:-.01em}
-.app{display:grid;grid-template-columns:170px 1fr;min-height:100vh}
-aside{background:var(--ink-850);border-right:1px solid var(--ink-700);padding:16px 11px;
-  display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh}
-aside .brand{display:flex;align-items:center;gap:9px;padding:0 5px;margin-bottom:16px}
-aside .brand b{font-family:Sora;font-weight:600;font-size:15px}
-aside nav{display:flex;flex-direction:column;gap:3px;border:none;padding:0;margin:0;overflow:visible}
-main{min-width:0}
-.wrap{max-width:none;margin:0;padding:18px 22px 64px;display:flex;flex-direction:column}
-/* El orden de lectura: resumen, ranking, cuadrante, tabla y gráficas. */
-#resumen{order:1}#selectores{order:2}#cuadrante{order:3}#tabla{order:4}#paneles{order:5}#notas{order:6}
+body{margin:0;background:var(--mesa);color:var(--tinta);
+  font:400 14px/1.45 Sora,Inter,-apple-system,Segoe UI,Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 
-header{border-bottom:1px solid var(--ink-700);background:var(--ink-850);position:sticky;top:0;z-index:20}
-.ctx{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding:15px 22px;flex-wrap:wrap}
-.ctrl{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-.hd{max-width:1760px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
-.mark{width:32px;height:32px;border-radius:8px;background:var(--teal);color:var(--ink-900);display:grid;place-items:center;font-family:Sora;font-weight:700;font-size:13px}
-.brand b{font-family:Chivo;font-weight:500;font-size:16px;display:block;line-height:1.2}
-.brand span{font-size:12px;color:var(--text-3)}
-select,button{font-family:inherit;font-size:13px;color:var(--text);background:var(--ink-800);border:1px solid var(--ink-700);border-radius:var(--r);padding:7px 10px;height:34px}
-select:hover,button:hover{border-color:var(--ink-600);cursor:pointer}
-select:focus-visible,button:focus-visible,.tab:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
-.field{display:flex;align-items:center;gap:7px}
-.field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--sand);flex:none}
-.dot.live{background:var(--teal)}
-#estado{font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;
-  padding:11px 5px 0;margin-top:10px;border-top:1px solid var(--ink-700);line-height:1.35}
+/* ---------- armazon ---------- */
+.pant{display:flex;width:1440px;background:var(--mesa)}
+.rail{width:188px;flex:none;background:var(--papel);border-right:1px solid var(--linea);
+  padding:22px 0 30px;min-height:100%}
+.marca{display:flex;align-items:baseline;gap:7px;padding:0 20px 20px;border-bottom:1px solid var(--linea2);margin-bottom:14px}
+.marca b{font-size:21px;font-weight:700;letter-spacing:-.04em;line-height:1}
+.marca s{text-decoration:none;font-size:10px;color:var(--tinta3);line-height:1}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--tinta2);
+  text-decoration:none;font-size:13.5px;border-left:3px solid transparent}
+.nav a.on{color:var(--tinta);font-weight:600;border-left-color:var(--g2);background:var(--g2s)}
+.nav .sep{font-size:9.5px;color:var(--tinta3);padding:16px 20px 6px;letter-spacing:.09em}
+.nav i{width:15px;text-align:center;font-style:normal;font-size:13px;opacity:.75}
 
-nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700);margin-bottom:22px}
-.tab{background:none;border:none;border-radius:8px;height:auto;padding:9px 12px;color:var(--text-3);
-  font-size:13.5px;text-align:left;width:100%}
-.tab:hover{background:var(--ink-800);border-color:transparent}
-.tab[aria-selected=true]{background:var(--ink-700);color:var(--text);font-weight:500}
-.tab.abajo{margin-top:auto}
+.hoja{flex:1;min-width:0;background:var(--papel);margin:0;padding:0 0 46px}
+.cab{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  padding:24px 30px 16px;border-bottom:1px solid var(--linea)}
+.cab h1{font-size:23px;font-weight:600;letter-spacing:-.025em;margin:0 0 5px}
+.cab .sub{font-size:12.5px;color:var(--tinta2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--linea);border-radius:20px;padding:4px 11px;font-size:11.5px;color:var(--tinta2);background:var(--papel)}
+.chip.ac{border-color:var(--g2);color:var(--g2);background:var(--g2s);font-weight:600}
+.bot{border:1px solid var(--linea);background:var(--papel);border-radius:9px;padding:8px 14px;
+  font:inherit;font-size:13px;color:var(--tinta);cursor:pointer}
+.bot.pri{background:var(--tinta);color:#fff;border-color:var(--tinta);font-weight:500}
 
-.cab{display:block;margin:0}
-.cab h2{font-size:22px;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
-.cab .meta{display:block;font-size:12.5px;color:var(--text-3);margin-top:3px}
-.md{font-family:Chivo;font-size:12px;letter-spacing:.06em;background:var(--ink-700);color:var(--lav);padding:3px 10px;border-radius:99px}
-.md.partido{background:rgba(239,181,185,.16);color:var(--pink)}
+.sec{padding:22px 30px 0}
+.sec>h2{font-size:14px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
+.sec>p.ay{font-size:12px;color:var(--tinta2);margin:0 0 14px;max-width:72ch}
+.hr{height:1px;background:var(--linea);margin:26px 30px 0}
 
-.resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
-@media(max-width:1000px){.resumen{grid-template-columns:1fr 1fr}}
-@media(max-width:820px){
-  .app{grid-template-columns:1fr}
-  aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;
-    border-right:none;border-bottom:1px solid var(--ink-700)}
-  aside nav{flex-direction:row;flex-wrap:wrap}
-  .tab{width:auto}
-  .tab.abajo{margin-top:0}
-  #estado{border-top:none;padding:0;margin:0}
-}
-.kpi{border-radius:12px;padding:12px 15px;background:var(--ink-850);border:1px solid var(--ink-700);
-  border-left:3px solid var(--teal)}
-.kpi.int{border-left-color:var(--lav)}
-.kpi .k{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-2)}
-.kpi b{display:block;font-family:'Chivo Mono';font-weight:600;font-size:36px;line-height:1.15;margin:2px 0}
-.kpi b i{font-style:normal;font-size:14px;color:var(--text-2)}
-.kpi .s{font-size:12px;color:var(--text-3)}
-.soloPdf{display:none}
-.panel .selMet{width:100%;height:40px;font-size:14px;margin-bottom:11px}
-.avgline{font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:13px}
-.avgline b{font-family:'Chivo Mono';font-weight:600;font-size:30px;color:var(--pink);font-weight:500;letter-spacing:-.01em;vertical-align:-2px;margin-right:4px}
-.pie{margin-top:13px;padding-top:11px;border-top:1px solid var(--ink-700)}
+/* ---------- fila kpi ---------- */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--linea);
+  border-bottom:1px solid var(--linea)}
+.kpi{padding:16px 22px 15px;border-right:1px solid var(--linea2)}
+.kpi:last-child{border-right:0}
+.kpi .et{font-size:11px;color:var(--tinta2);margin-bottom:7px}
+.kpi .vl{display:flex;align-items:baseline;gap:7px}
+.kpi .vl b{font-size:30px;font-weight:600;letter-spacing:-.035em;line-height:1}
+.kpi .vl s{text-decoration:none;font-size:12px;color:var(--tinta3)}
+.kpi .dl{font-size:11.5px;margin-top:6px;color:var(--tinta2)}
+.kpi .dl em{font-style:normal;font-weight:600}
+.kpi .dl em.up{color:var(--ok)} .kpi .dl em.dn{color:var(--mal)}
+.disp{margin-top:11px}
 
+/* ---------- pills de record ---------- */
+.rec{display:flex;gap:10px;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:11px;border:1px solid var(--linea);border-radius:12px;
+  padding:9px 15px 9px 12px;background:var(--papel)}
+.pill .ic{font-size:17px;line-height:1}
+.pill .tx b{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.pill .tx s{text-decoration:none;display:block;font-size:11px;color:var(--tinta2);margin-top:1px}
+.pill .vl{font-size:19px;font-weight:600;letter-spacing:-.03em;margin-left:4px}
+.pill .mj{font-size:11px;color:var(--ok);font-weight:600}
 
+/* ---------- tabla ---------- */
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:7px 10px;text-align:right;white-space:nowrap}
+th{font-size:10.5px;font-weight:500;color:var(--tinta2);border-bottom:1px solid var(--linea);padding-bottom:9px}
+td{border-bottom:1px solid var(--linea2)}
+th:first-child,td:first-child{text-align:left;padding-left:14px}
+tr.grp td{background:var(--papel);padding:16px 0 5px 10px;border-bottom:2px solid currentColor;
+  font-size:11px;font-weight:600;letter-spacing:.03em}
+td.nm{font-weight:500}
+.sello{display:inline-block;font-size:9.5px;padding:2px 6px;border-radius:5px;margin-left:7px;font-weight:600;vertical-align:1px}
+.s-j{background:var(--g2s);color:var(--g2)}
+.s-p{background:#FBF3E0;color:var(--avi)}
+.s-e{background:var(--g1s);color:var(--g1)}
+.bar{display:inline-block;height:7px;border-radius:4px;vertical-align:middle}
+.cel{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+td.ok{color:var(--ok);font-weight:600}
+td.no{color:var(--tinta3)}
 
-.paneles{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:900px){.paneles{grid-template-columns:1fr}}
-.panel{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
-.panel h3{font-size:16px}
-.panel .uni{color:var(--text-3);font-size:12px;font-weight:400}
-.tit{margin-bottom:14px}
-.cajas{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-.caja{display:inline-flex;align-items:baseline;gap:6px;background:var(--ink-800);border:1px solid var(--ink-700);
-  border-radius:99px;padding:4px 11px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
-.caja b{font-family:'Chivo Mono';font-weight:500;font-size:14px;color:var(--text-2);letter-spacing:-.01em}
-.caja.destacada b{font-size:17px;color:var(--pink)}
-.caja.destacada{background:rgba(239,181,185,.14);border-color:rgba(239,181,185,.3)}
-.caja.destacada b{color:var(--pink)}
-.fila{display:grid;grid-template-columns:118px 1fr 80px;align-items:center;gap:11px;padding:5px 0}
-.fila .nom{font-size:15.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pista{position:relative;height:24px;background:var(--ink-800);border-radius:5px}
-.pista i{position:absolute;left:0;top:0;bottom:0;background:var(--teal);border-radius:4px}
-.pista i{background:var(--lav)}
-.pista i.cumple{background:var(--teal)}
-.pista u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--pink);text-decoration:none}
-.fila .val{font-family:'Chivo Mono';font-size:15px;text-align:right;color:var(--text)}
-.fila:hover .nom{color:var(--text)}
-.leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin-top:12px;padding-top:10px;border-top:1px solid var(--ink-800)}
+.leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--tinta2);margin:12px 0 0}
 .leyenda span{display:flex;align-items:center;gap:6px}
-.sw{width:9px;height:9px;border-radius:2px;display:inline-block}
-.tablon{margin-bottom:20px}
-.row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-.conmuta{display:flex;gap:4px;background:var(--ink-800);border-radius:99px;padding:3px}
-.mini{background:none;border:none;border-radius:99px;height:28px;padding:0 14px;font-size:12px;color:var(--text-3)}
-.mini.on{background:var(--ink-700);color:var(--text)}
-.medallas{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-@media(max-width:1200px){.medallas{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.medallas{grid-template-columns:1fr}}
-.medalla{background:var(--ink-800);border-radius:12px;padding:12px 14px}
-.medalla .cab{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.medalla .ico{font-size:22px;line-height:1}
-.medalla .cab b{display:block;font-family:Chivo;font-weight:500;font-size:13px}
-.medalla .cab span{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em}
-.medalla ol{list-style:none;margin:0;padding:0}
+.pt{width:9px;height:9px;border-radius:3px;display:inline-block}
 
-.medalla li.porpos{grid-template-columns:52px 1fr auto}
-.medalla li.porpos .qui{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)}
-.medalla li .nom2{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.medalla li.vacio{color:var(--text-3);grid-template-columns:1fr}
-.panel .sub{font-size:13px;line-height:1.6;color:var(--text-2);margin:2px 0 14px}
-.panel .sub b{color:var(--text);font-weight:600}
-/* Pie de los KPI: contra cuántas sesiones se compara, o que no hay histórico. */
-.kpi .vs{display:block;font-size:9px;color:var(--text-3);margin:2px 0 1px}
-.kpi .vs.sola{color:var(--text-3);font-style:italic;margin-top:6px}
-/* Chips para marcar las métricas de la matriz. */
-.chipsMet{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 14px;max-height:66px;overflow-y:auto}
-.chM{font-size:10.5px;padding:4px 9px;border-radius:6px;background:var(--ink-800);
-  border:1px solid var(--ink-600);color:var(--text-3);cursor:pointer;font-family:inherit;white-space:nowrap}
-.chM:hover{color:var(--text-2)}
-.chM.on{background:rgba(110,154,155,.18);border-color:var(--teal,#6E9A9B);color:var(--text);font-weight:600}
-/* Los dos desplegables del scatter. */
-.ejes{display:flex;gap:12px;margin:0 0 14px;flex-wrap:wrap}
-.ejeSel span{display:block;font-size:9px;letter-spacing:.12em;color:var(--text-3);margin-bottom:4px}
-.ejeSel select{background:var(--ink-800);color:var(--text);border:1px solid var(--ink-600);
-  border-radius:9px;padding:8px 12px;font-size:13px;min-width:200px;font-family:inherit}
-/* Qué vale el 100% de cada línea, en metros y en número. */
-.cajas100{display:flex;flex-wrap:wrap;gap:7px;align-items:stretch;margin:0 0 14px}
-.t100{width:100%;font-size:8.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--text-3);margin-bottom:1px}
-.c100{background:var(--ink-800);border-left:3px solid var(--ink-600);border-radius:8px;padding:6px 12px;min-width:126px}
-.c100>span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);margin-bottom:2px}
-.c100 .par{display:flex;align-items:baseline;gap:5px}
-.c100 .par b{font-size:14px;font-weight:600;letter-spacing:-.01em}
-.c100 .par i{font-style:normal;font-size:9.5px;color:var(--text-3)}
-/* El aviso de qué no mide el gráfico. */
-.avisoDisp{font-size:11.5px;line-height:1.5;color:var(--text-3);margin:12px 0 0;max-width:900px}
-.leyDisp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 20px;margin-top:12px;font-size:12.5px;color:var(--text-2)}
-.leyDisp span{display:flex;align-items:flex-start;gap:7px;line-height:1.35}
-.leyDisp b{color:var(--text);font-weight:600}
-.leyDisp i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none;margin-top:2px}
-.scroll{overflow-x:auto}
-table.datos{width:100%;border-collapse:collapse;font-size:13.5px;white-space:nowrap}
-table.datos th{font-weight:400;font-size:12px;color:var(--text-3);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-700)}
-table.datos th.grupo{text-align:center;color:var(--lav);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--ink-600)}
-table.datos th.n{text-align:right}
-table.datos td{padding:6px 8px;border-bottom:1px solid var(--ink-800)}
-table.datos td.n{text-align:right;font-family:'Chivo Mono'}
-table.datos td.pos{color:var(--text-3)}
-table.datos tbody tr:hover{background:var(--ink-800)}
-table.datos tbody tr.corte td{border-top:1px solid var(--ink-700)}
-table.datos.carga td.n i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:2px}
-table.datos.carga tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.06);color:var(--lav)}
-table.datos.acwrtabla th.col{cursor:pointer}
-table.datos.acwrtabla th.col:hover{color:var(--text)}
-table.datos td.acwr{font-weight:600}
-table.datos td.acwr.alta{color:#F08A90}
-table.datos td.acwr.ok{color:var(--teal)}
-table.datos td.acwr.baja{color:var(--lav)}
-.tag{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px}
-.tag.alta{background:rgba(230,57,70,.16);color:#F08A90}
-.tag.ok{background:rgba(110,154,155,.18);color:var(--teal)}
-.tag.baja{background:rgba(160,167,216,.16);color:var(--lav)}
-.tag.na{background:var(--ink-800);color:var(--text-3)}
-td.chispa{display:flex;align-items:flex-end;gap:2px;height:34px;padding-top:12px}
-td.chispa i{width:9px;background:var(--ink-600);border-radius:2px;display:block}
-td.chispa i.ult{background:var(--teal)}
-table.datos th.orden{cursor:pointer;user-select:none}
-table.datos th.orden:hover{color:var(--text)}
-table.datos.drills td{padding:9px 10px}
-table.datos.drills tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.10);color:var(--lav)}
-table.datos.drills tfoot .nomb{color:var(--text)}
-table.datos.drills tfoot tr.tipico td{background:rgba(110,154,155,.10);color:var(--teal);border-top:none}
-table.datos.drills tfoot tr.dif td{background:var(--ink-800);color:var(--text-2);border-top:none}
-table.datos.drills .nomb{font-size:14px}
-table.datos.drills .dur{display:flex;align-items:center;gap:7px;margin-top:4px}
-table.datos.drills .dur i{height:4px;background:var(--ink-600);border-radius:2px;display:block}
-table.datos.drills .dur span{font-size:10.5px;color:var(--text-3)}
-table.datos td.n.verde{color:var(--teal);font-weight:500}
-table.datos td.n.lider{font-weight:700;color:var(--text)}
-table.datos tfoot tr.media td{border-top:1px solid var(--ink-600);border-bottom:none;color:var(--lav);background:rgba(160,167,216,.06)}
-table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,216,.14);font-weight:500}
-.empty{padding:36px 20px;text-align:center;color:var(--text-3);font-size:13px;grid-column:1/-1}
+/* ---------- barra de control ---------- */
+.ctrl{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;background:#F7F9F8;
+  border:1px solid var(--linea);border-radius:13px;padding:13px 15px}
+.campo label{display:block;font-size:10.5px;color:var(--tinta2);margin-bottom:5px}
+.seg{display:flex;background:var(--papel);border:1px solid var(--linea);border-radius:9px;padding:3px;gap:2px}
+.seg button{background:none;border:0;border-radius:7px;padding:7px 12px;font:inherit;font-size:12.5px;
+  color:var(--tinta2);cursor:pointer}
+.seg button.on{background:var(--tinta);color:#fff;font-weight:600}
+.obj{display:flex;align-items:center;gap:6px;background:var(--papel);border:1px solid var(--linea);
+  border-radius:9px;padding:6px 12px}
+.obj input{width:46px;background:none;border:0;color:var(--tinta);font:inherit;font-size:16px;
+  font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.obj span{color:var(--tinta2);font-size:13px}
+.rueda{margin-left:auto;background:var(--papel);border:1px solid var(--linea);border-radius:9px;
+  width:40px;height:40px;font-size:16px;color:var(--tinta2);cursor:pointer}
+.rueda.on{border-color:var(--g2);color:var(--g2);background:var(--g2s)}
+.ajustes{margin-top:14px;border-top:1px solid var(--linea);padding-top:15px;display:none}
+.ajustes.ver{display:block}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.blq h4{font-size:11.5px;margin:0 0 9px;color:var(--tinta);font-weight:600}
+.fila{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;font-size:12.5px;color:var(--tinta2)}
+.fila input[type=number]{width:58px;background:var(--papel);border:1px solid var(--linea);border-radius:7px;
+  color:var(--tinta);font:inherit;font-size:13px;padding:4px 8px;text-align:right}
+.fila s{text-decoration:none;color:var(--tinta3);font-size:11.5px}
+.nota{color:var(--tinta2);font-size:11.5px;line-height:1.5;margin:9px 0 0}
 
-.solo{grid-column:1/-1;max-width:720px}
-.zona{border:2px dashed var(--ink-700);border-radius:14px;padding:38px 24px;text-align:center;background:var(--ink-850);transition:border-color .15s,background .15s}
-.zona.encima{border-color:var(--teal);background:var(--ink-800)}
-.zona h3{font-size:16px;margin-bottom:6px}
-.zona p{font-size:13px;color:var(--text-3);margin:0 0 18px}
-.zona button{background:var(--teal);border-color:var(--teal);color:var(--ink-900);height:38px;padding:0 18px;font-weight:500}
-.resumen{margin-top:18px;background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;padding:16px 18px}
-.resumen dl{display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin:0;font-size:13px}
-.resumen dt{color:var(--text-2)}
-.resumen dd{margin:0;font-family:'Chivo Mono';text-align:right}
-.aviso{margin-top:14px;padding:10px 14px;border-radius:10px;font-size:13px}
-.aviso.ok{background:rgba(110,154,155,.14);color:var(--teal)}
-.aviso.error{background:rgba(230,57,70,.14);color:#F08A90}
-.aviso.espera{background:var(--ink-800);color:var(--text-2)}
-.pasos{font-size:13px;color:var(--text-3);margin-top:16px;line-height:1.7}
-/* ---- BiP ---- */
-.bip .secc{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--teal);margin:22px 0 9px;font-weight:600}
-.bip .secc:first-of-type{margin-top:0}
-.celdas{display:grid;gap:8px;margin-bottom:16px}
-.celdas.seis{grid-template-columns:repeat(6,1fr)}
-.celdas.cinco{grid-template-columns:repeat(5,1fr)}
-.celdas.cuatro{grid-template-columns:repeat(4,1fr)}
-@media(max-width:900px){.celdas.seis,.celdas.cinco,.celdas.cuatro{grid-template-columns:repeat(3,1fr)}}
-.c{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:10px;padding:10px 12px}
-.c.dest{background:linear-gradient(180deg,rgba(110,154,155,.18),rgba(110,154,155,.04));border-color:rgba(110,154,155,.4)}
-.c span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text-3);margin-bottom:3px}
-.c b{font-family:'Chivo Mono';font-weight:600;font-size:23px;line-height:1.1}
-.c b i{font-style:normal;font-size:13px;color:var(--text-2)}
-.paneles.dos{grid-template-columns:1fr 1fr}
-@media(max-width:900px){.paneles.dos{grid-template-columns:1fr}}
-table.datos.bip td:first-child{color:var(--text-2)}
-table.datos td i{font-style:normal;color:var(--text-3);font-size:11px}
-.secuencias{display:grid;gap:3px;margin-top:6px}
-.sec{display:grid;grid-template-columns:64px 1fr 56px;align-items:center;gap:10px}
-.sec .id{font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em}
-.sec .barra{position:relative;height:15px;background:var(--ink-800);border-radius:4px}
-.sec .barra i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--lav)}
-.sec .barra i.corta{background:var(--ink-600)}
-.sec .barra i.larga{background:var(--teal)}
-.sec .barra i.wcs{background:var(--pink)}
-.sec .seg{font-family:'Chivo Mono';font-size:12px;text-align:right;color:var(--text-2)}
-.franjas{display:grid;gap:5px;margin-top:6px}
-.franja{display:grid;grid-template-columns:82px 1fr 62px;align-items:center;gap:11px;font-size:13px}
-.franja.ancha{grid-template-columns:190px 1fr 96px}
-.franja .n{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.franja .b{position:relative;height:19px;background:var(--ink-800);border-radius:4px}
-.franja .b i{position:absolute;left:0;top:0;bottom:0;background:var(--lav);border-radius:4px}
-.franja .v{font-family:'Chivo Mono';text-align:right}
-.franja .v em{font-style:normal;color:var(--text-3);font-size:11px;margin-left:5px}
-/* gráfica de evolución: barras de % BiP con la métrica encima */
-.evo{display:flex;align-items:flex-end;gap:10px;height:300px;margin-top:14px;padding:0 4px}
-.evo .col{position:relative;flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
-.evo .barra{width:100%;max-width:64px;background:var(--ink-700);border-radius:5px 5px 0 0}
-.evo .punto{position:absolute;left:50%;transform:translateX(-50%);width:11px;height:11px;border-radius:50%;
-  background:var(--teal);box-shadow:0 0 0 3px rgba(110,154,155,.22)}
-.evo .dato{position:absolute;left:50%;transform:translateX(-50%);bottom:auto;top:2px;
-  font-family:'Chivo Mono';font-size:13px;color:var(--teal)}
-.evo .pct{font-family:'Chivo Mono';font-size:12px;color:var(--text-2);margin-top:5px}
-.evo .nom{font-size:11px;color:var(--text-3);margin-top:2px;text-align:center;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.pasos code{background:var(--ink-800);padding:1px 6px;border-radius:4px;font-family:'Chivo Mono';font-size:12px}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* cascada */
+.casc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0 0}
+.paso{border:1px solid var(--linea);border-radius:10px;padding:8px 13px;font-size:12px;background:var(--papel)}
+.paso b{display:block;font-size:12.5px}.paso s{text-decoration:none;color:var(--tinta3);font-size:10.5px}
+.paso.act{border-color:var(--g2);background:var(--g2s)}
+.fle{color:var(--tinta3);font-size:15px}
 
-/* ---- Jugador: evolución individual ---- */
-body.sinSesion #paneles{display:block}
-body.sinSesion .panel{margin-bottom:16px}
-body.sinSesion #campoFecha{display:none}
-#campoJugador{display:none}
-body.sinSesion #campoJugador{display:flex}
-#fJugador{min-width:160px}
-.barraJug{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-.segm{display:flex;gap:3px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:99px;padding:3px}
-.segm button{background:none;border:none;height:28px;padding:0 15px;border-radius:99px;font-size:12.5px;color:var(--text-3)}
-.segm button.on{background:var(--ink-700);color:var(--text);font-weight:500}
-.resumen.cinco{grid-template-columns:repeat(5,1fr)}
-@media(max-width:1100px){.resumen.cinco{grid-template-columns:repeat(2,1fr)}}
-.kpi.pico{border-left-color:var(--pink)}
-.svgJug{width:100%;height:auto;display:block}
-.svgJug text{font-family:'Chivo Mono',monospace}
-.ptJug{cursor:pointer}
-.sw.ln{width:16px;height:2px;border-radius:0}
-table.datos.jug td.ses{color:var(--text-2);max-width:260px;overflow:hidden;text-overflow:ellipsis}
-table.datos.jug th.minc,table.datos.jug td.minc{background:rgba(160,167,216,.08)}
-table.datos.jug td.minc{font-weight:600;color:var(--text)}
-table.datos.jug tr.fuera{opacity:.42}
-table.datos.jug input{accent-color:#6E9A9B;width:15px;height:15px;cursor:pointer}
-.tipoEv{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:99px;
-  background:rgba(160,167,216,.15);color:var(--lav)}
-.tipoEv.p{background:rgba(239,181,185,.16);color:var(--pink)}
-.tip{position:fixed;pointer-events:none;background:var(--ink-800);border:1px solid var(--ink-600);border-radius:8px;
-  padding:8px 11px;font-size:12px;opacity:0;transition:opacity .1s;z-index:50;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.tip b{font-family:'Chivo Mono';font-size:13px;display:block}
-.tip em{font-style:normal;color:var(--text-3)}
+/* tooltip */
+.tip{position:absolute;background:var(--tinta);color:#fff;border-radius:11px;padding:11px 13px;
+  font-size:12px;line-height:1.5;box-shadow:0 10px 28px rgba(0,0,0,.22);width:258px}
+.tip h5{margin:0 0 7px;font-size:12.5px;font-weight:600}
+.tip .tr{display:flex;justify-content:space-between;gap:12px;padding:2.5px 0;color:#C9D2D0}
+.tip .tr b{color:#fff;font-variant-numeric:tabular-nums}
+.tip .pie{margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.17);
+  color:#A9B3B1;font-size:11px}
 
-/* ---- Podio de la sesión y promedios en cinco ---- */
-.medallas{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:10px}
-@media(max-width:620px){.medallas{grid-template-columns:repeat(2,1fr)}}
-.medalla{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:10px;padding:8px 9px;
-  display:flex;flex-direction:column;min-width:0;overflow:hidden}
-.medalla .top{display:flex;align-items:center;gap:8px;margin-bottom:5px;min-height:30px}
-.medalla .ico{font-size:22px;line-height:1;width:25px;text-align:center;flex:none}
-.medalla .tit{min-width:0}
-.medalla .tit b{display:block;font-size:10.5px;font-weight:600;line-height:1.22;letter-spacing:-.01em}
-.medalla ol{list-style:none;margin:auto 0 0;padding:0}
-/* Cada puesto es una fila: medalla, nombre, barra recta con el color de su
-   línea y el dato. La barra es la que deja comparar de un vistazo. */
-.medalla li{display:grid;grid-template-columns:19px minmax(56px,78px) minmax(26px,1fr) auto;
-  align-items:center;gap:6px;padding:3px 0;font-size:12.5px}
-.medalla li+li{border-top:1px solid var(--ink-800)}
-.medalla li .pos{font-size:13.5px;line-height:1;text-align:center}
-.medalla li .pos em{font-style:normal;font-family:'Chivo Mono';font-size:9.5px;color:var(--text-3)}
-.medalla li .qui{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.medalla li .bar{height:15px;background:var(--ink-700);border-radius:2px;overflow:hidden;min-width:20px}
-.medalla li .bar i{display:block;height:100%;border-radius:2px}
-.medalla li .val{font-family:'Chivo Mono';color:var(--text);font-size:11.5px;letter-spacing:-.02em;
-  text-align:right;white-space:nowrap}
-.medalla .uniR{margin-left:auto;font-size:9px;color:var(--text-3);flex:none}
-.larga{display:inline}.corta{display:none}
-@media(max-width:1280px){.larga{display:none}.corta{display:inline}}
+.marco{position:relative}
+.avi{background:#FBF6EA;border:1px solid #E8D9B4;border-radius:11px;padding:11px 14px;
+  font-size:12px;color:#6F5415;margin:14px 0 0;line-height:1.5}
+.ej{display:inline-block;font-size:10px;border:1px dashed var(--tinta3);color:var(--tinta3);
+  border-radius:6px;padding:2px 7px;margin-left:9px;vertical-align:2px;font-weight:500}
+svg{display:block;max-width:100%}
+.dosc{display:grid;grid-template-columns:1.25fr 1fr;gap:30px}
+</style></head><body>
 
-.resumen.cinco{grid-template-columns:repeat(5,1fr);gap:8px;padding:11px 12px}
-@media(max-width:620px){.resumen.cinco{grid-template-columns:repeat(2,1fr)}}
-.resumen.cinco .kpi{padding:8px 10px;min-width:0;overflow:hidden;border-radius:9px}
-.resumen.cinco .kpi .k{font-size:9px;letter-spacing:.1em;color:var(--text-2);font-weight:500;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.resumen.cinco .kpi b{font-size:21px;letter-spacing:-.025em;white-space:nowrap;margin:1px 0}
-.resumen.cinco .kpi b i{font-size:11px}
-.resumen.cinco .kpi .s{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.resumen.cinco .kpi .s em{font-style:normal;color:var(--teal)}
-.resumen.cinco .kpi.int .s em{color:var(--lav)}
-
-/* ---- Semáforo, alertas e iconos de la tabla ---- */
-table.datos td.n{text-align:center}
-table.datos th.n{text-align:center}
-.icoMejor{font-size:18px;margin-left:6px;vertical-align:-4px}
-/* Marcas personales batidas en la sesión. */
-.records{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 12px}
-/* Marca personal batida: rayo, aro lleno y el salto respecto a su registro. */
-.med{display:flex;align-items:center;gap:11px;background:rgba(240,225,153,.09);
-  border:1px solid rgba(240,225,153,.32);border-radius:11px;padding:8px 15px 8px 12px}
-.med .ico{font-size:21px;line-height:1}
-.med .rosco{width:40px;height:40px;flex:none}
-.med .txt s{display:block;text-decoration:none;font-size:9px;letter-spacing:.09em;
-  text-transform:uppercase;color:var(--sand,#F0E199);font-weight:600}
-.med .txt b{display:block;font-size:13px;line-height:1.3}
-.med .txt u{text-decoration:none;font-family:'Chivo Mono';font-weight:600;font-size:15px;letter-spacing:-.02em}
-.med .txt u i{font-style:normal;font-size:10px;color:var(--text-3);margin-left:2px;font-family:Sora}
-.med .txt em{font-style:normal;display:block;font-size:10px;color:var(--text-3);margin-top:1px}
-.med .sube{color:#6E9A9B;font-weight:600}
-/* El % de exposición, dibujado en la celda. */
-.rosco{width:30px;height:30px;display:block;margin:0 auto}
-.leyAro{align-items:center}
-.leyAro .rosco{width:22px;height:22px;margin:0 6px 0 0}
-td.anillo{padding-top:2px;padding-bottom:2px}
-.alertaG{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
-  background:var(--sand);color:#3A2F0B;font-size:10px;font-weight:700;margin-left:5px;
-  cursor:help;vertical-align:-3px;line-height:1}
-.leyTabla{display:flex;gap:15px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-3);
-  margin-top:12px;padding-top:10px;border-top:1px solid var(--ink-800)}
-.leyTabla i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-.leyTabla i.sw.verde{background:rgba(110,154,155,.45)}
-.leyTabla b{color:var(--text-2)}
-.leyPaneles{grid-column:1/-1;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:11px;
-  color:var(--text-3);margin-top:2px}
-.leyPaneles i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-.leyPaneles i.raya{width:2px;height:11px;border-radius:0;background:var(--pink)}
-
-/* ---- Paneles de columnas agrupadas por línea ---- */
-.paneles{grid-template-columns:1fr}
-.panel .cajasMedia{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px}
-.cm{background:var(--ink-800);border-left:3px solid var(--ink-600);border-radius:8px;padding:6px 12px;min-width:102px}
-.cm span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3)}
-.cm b{font-family:'Chivo Mono';font-size:16px;letter-spacing:-.02em;font-weight:600;display:block;line-height:1.25}
-.cm.eq{background:rgba(239,181,185,.14);border:1px solid rgba(239,181,185,.3);border-left:1px solid rgba(239,181,185,.3)}
-.cm.eq b{color:var(--pink);font-size:20px}
-svg.cols{width:100%;height:auto;display:block}
-svg.cols text{font-family:Sora,system-ui,sans-serif}
-.leyPaneles{grid-column:1/-1;display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--text-3);margin-top:2px}
-
-/* ---- Minigráfico en las cajas de promedio ---- */
-.resumen.cinco .kpi .chispa{display:block;width:100%;height:32px;margin-top:5px}
-.delta{font-family:'Chivo Mono';font-size:10.5px;margin-left:6px}
-.delta.sube{color:var(--teal)}
-.delta.baja{color:var(--pink)}
-.enlace{background:none;border:none;padding:0;height:auto;color:var(--teal);font-size:12px;
-  text-decoration:underline;cursor:pointer;font-family:inherit}
-.enlace:hover{color:var(--text)}
-
-/* ---- Comentarios escritos a mano ---- */
-.panel.comentarios{margin-top:16px}
-.coment{min-height:84px;background:var(--ink-800);border:1px solid var(--ink-700);border-radius:10px;
-  padding:11px 14px;font-size:14px;line-height:1.6;white-space:pre-wrap;outline:none}
-.coment:focus{border-color:var(--teal)}
-.coment:empty:before{content:attr(data-vacio);color:var(--text-3)}
-
-/* ---- Informe de varias métricas del jugador ---- */
-.chipsJug{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:-8px 0 16px}
-.chipsJug .et{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
-.chipsJug .chip{background:var(--ink-800);border:1px solid var(--ink-700);border-radius:99px;
-  height:28px;padding:0 12px;font-size:12.5px;color:var(--text-2);cursor:pointer;font-family:inherit}
-.chipsJug .chip:hover{border-color:var(--teal);color:var(--text)}
-.chipsJug .chip i{font-style:normal;color:var(--text-3);margin-left:4px}
-#jMas{max-width:210px}
-@media print{
-  @page{margin:9mm;size:landscape}
-  *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  body{background:#fff;color:#111;font-size:12px}
-  header,nav,aside,.selectores,.leyenda{display:none}
-  .app{display:block}
-  .soloPdf{display:block;font-size:13px;margin-bottom:6px;color:#111}
-  /* las cajas de arriba pierden el degradado, que en papel sale casi negro */
-  .kpi{background:#f7f7f7 !important;border:1px solid #bbb;border-left:3px solid #5a8b8c}
-  .kpi.int{border-left-color:#7f8bbf}
-  .c,.c.dest{background:#f4f4f4 !important;border:1px solid #bbb}
-  .panel .selMet{display:none}
-  .resumen{grid-template-columns:repeat(4,1fr);gap:6px}
-  /* El reporte en papel: podio y promedios arriba, tabla, y los paneles después. */
-  .medallas{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:7px;break-inside:avoid}
-  .medalla{background:#FBFCFD !important;border:1px solid #D4D8E0;border-radius:7px;padding:6px 8px}
-  .medalla .ico{font-size:16px;width:19px}
-  .medalla .top{min-height:0;margin-bottom:4px}
-  .medalla .tit b{font-size:9px;color:#14161C}
-  .larga{display:inline}.corta{display:none}
-  .medalla li{font-size:9px;padding:1px 0;gap:4px;
-    grid-template-columns:14px minmax(44px,58px) minmax(18px,1fr) auto}
-  .medalla li+li{border-top:1px solid #EDEFF3}
-  .medalla li .pos{font-size:10px}
-  .medalla li .pos em{font-size:8px;color:#6B7384}
-  .medalla li .qui{color:#3B414E}
-  .medalla li .bar{height:10px;background:#E8EAF0}
-  .medalla li .val{color:#14161C;font-size:9px}
-  .medalla .uniR{font-size:7.5px;color:#6B7384}
-  .resumen.cinco{grid-template-columns:repeat(5,1fr);gap:6px;background:#fff !important;
-    border:none;padding:0;margin-bottom:7px;break-inside:avoid}
-  .resumen.cinco .kpi{background:#FBFCFD !important;border:1px solid #D4D8E0;border-left:3px solid #5A8B8C;padding:5px 9px}
-  .resumen.cinco .kpi.int{border-left-color:#7F8BBF}
-  .resumen.cinco .kpi .k{color:#5A6171;font-size:8px}
-  .resumen.cinco .kpi b{color:#14161C;font-size:17px}
-  .resumen.cinco .kpi b i{color:#5A6171;font-size:10px}
-  .resumen.cinco .kpi .s{color:#8A909C;font-size:8.5px}
-  .resumen.cinco .kpi .s em{color:#5A8B8C;font-weight:600}
-  .resumen.cinco .kpi.int .s em{color:#7F8BBF}
-  /* En pantalla la tabla va al final, pero en papel cierra la primera página:
-     primero el resumen de la sesión, los paneles después. */
-  .wrap{display:flex;flex-direction:column}
-  /* En papel la tabla sube a la primera hoja, con el resumen y el ranking, y
-     el cuadrante se queda solo en la segunda. */
-  #resumen{order:1}
-  #tabla{order:2}
-  #cuadrante{order:3}
-  #paneles{order:4}
-  #notas{order:5}
-  .tablon{border:none;padding:0;margin-bottom:0}
-  .leyTabla{color:#6B7384;font-size:7.5px;gap:12px;margin-top:6px;padding-top:5px;border-top:1px solid #EDEFF3}
-  .leyTabla i{width:8px;height:8px}
-  .leyTabla i.sw.verde{background:#D8E8E4}
-  .leyTabla b{color:#14161C}
-  table.datos td.n.verde{background:#D8E8E4;color:#2F5F60;font-weight:600}
-  .icoMejor{font-size:14px;vertical-align:-3px}
-  .records{gap:5px;margin-bottom:7px;break-inside:avoid}
-  .med{background:#FDF8E6 !important;border:1px solid #E6DBA8;padding:4px 10px;gap:7px}
-  .med .ico{font-size:14px}
-  .med .rosco{width:28px;height:28px}
-  .med .txt s{color:#8A6D1F;font-size:7px}
-  .med .txt b{font-size:9.5px;color:#14161C}
-  .med .txt u{font-size:11px;color:#14161C}
-  .med .txt u i{font-size:7.5px;color:#6B7384}
-  .med .txt em{font-size:7.5px;color:#6B7384}
-  .med .sube{color:#2F5F60}
-  .rosco{width:21px;height:21px}
-  .leyAro .rosco{width:15px;height:15px}
-  .rosco circle[stroke="#1F2B42"]{stroke:#E4E7EE}
-  .rosco text{fill:#14161C !important;font-size:12px}
-  .rosco line{stroke:#5C6678 !important;opacity:1}
-  .alertaG{width:12px;height:12px;font-size:8px;background:#E8CF6E;color:#4A3B06}
-  .kpi{border:1px solid #ccc;background:#f7f7f7}
-  .kpi b{color:#111;font-size:18px}
-  .kpi .k,.kpi .s{color:#555}
-  .avgline{color:#555}
-  .avgline b{color:#a3444d;font-size:15px}
-  .wrap{max-width:none;padding:0}
-  .cab h2{color:#111;font-size:16px}
-  .cab .meta{color:#333}
-  .paneles{grid-template-columns:repeat(3,1fr);gap:8px}
-  .panel{background:#fff;border:1px solid #bbb;padding:10px 12px;break-inside:avoid;page-break-inside:avoid}
-  .panel h3{color:#111;font-size:12px}
-  .panel .uni,.caja{color:#555}
-  .caja{background:#f2f2f2;padding:4px 6px}
-  .caja b{color:#111;font-size:12px}
-  .caja.destacada{background:#f7e6e8}
-  .caja.destacada b{color:#a3444d}
-  .fila{grid-template-columns:88px 1fr 60px;padding:2px 0}
-  .fila .nom{color:#222;font-size:11.5px}
-  .fila .val{color:#000;font-size:11.5px;font-weight:500}
-  .pista{height:13px;background:#e8e8e8}
-  .pista i{background:#7f8bbf}
-  .pista i.alta{background:#3c4a8a}
-  .pista u{background:#c0392b;width:2px}
-  table.datos{font-size:10.5px}
-  table.datos th,table.datos td{color:#111;border-color:#ddd;padding:2px 4px}
-  table.datos td.n.lider{color:#111;font-weight:700}
-  table.datos td.n.verde{background:#dceceb}
-  /* con 17 columnas hay que apretar para que quepan los impactos */
-  .scroll{overflow:visible}
-  table.datos{font-size:8.5px;table-layout:auto;width:100%}
-  table.datos th{font-size:7.5px;white-space:normal;line-height:1.2}
-  table.datos th.grupo{color:#333;background:#eee}
-  table.datos.drills td{padding:5px 7px}
-  table.datos.drills .nomb{font-size:11px;color:#111}
-  table.datos.drills .dur i{background:#bbb}
-  table.datos.drills .dur span{color:#555}
-  table.datos td.acwr.alta{color:#b03a3a}
-  table.datos td.acwr.ok{color:#2f5f60}
-  table.datos td.acwr.baja{color:#4a5a8a}
-  .tag{border:1px solid #ccc;color:#333;background:#f4f4f4}
-  td.chispa i{background:#ccc}
-  td.chispa i.ult{background:#5a8b8c}
-  .conmuta{display:none}
-  /* La pestaña de jugador en papel: fondo claro y todo el texto legible. */
-  .barraJug,.chipsJug,.tip,table.datos.jug input{display:none}
-  /* Los comentarios se imprimen como texto, sin la caja de edición. */
-  .panel.comentarios{break-inside:avoid;page-break-inside:avoid;background:#fff;border:1px solid #D4D8E0;
-    padding:6px 10px;margin-top:6px}
-  .panel.comentarios h3{color:#14161C;font-size:11px;margin-bottom:4px}
-  .coment{background:#FBFCFD !important;border:1px solid #E2E6EE;color:#14161C;font-size:11px;
-    min-height:0;padding:8px 11px;white-space:pre-wrap}
-  .coment:empty{display:none}
-  .noPdf{display:none}
-  .resumen{background:#fff !important;border:none;padding:0}
-  .svgJug text{fill:#444}
-  .svgJug line[stroke="#1B263B"]{stroke:#e3e3e3}
-  .svgJug rect{fill:#9aa3bd !important}
-  .svgJug path[fill^="url"]{opacity:.35}
-  table.datos.jug tr.fuera{display:none}
-  table.datos.jug th.minc,table.datos.jug td.minc{background:#eef0f7}
-  table.datos.jug td.minc,table.datos.jug td.ses,table.datos.jug td{color:#111}
-  table.datos.jug .tipoEv{background:#ececec;color:#333;border:none}
-  table.datos.jug .tipoEv.p{background:#f7e6e8;color:#a3444d}
-  .panel .sub{color:#555}
-  .panel.ancho{break-inside:auto;page-break-inside:auto}
-  .cabPdf{font-size:15px;color:#111;margin-bottom:10px}
-  .cabPdf b{font-size:17px}
-  .c{background:#f7f7f7;border:1px solid #ccc}
-  .c b{color:#111;font-size:17px}
-  .c span{color:#555}
-  .c.dest{background:#e8f0ef}
-  .bip .secc{color:#2f5f60}
-  .medalla{background:#f7f7f7;border:1px solid #ddd}
-  .medalla .cab b,.medalla li .val,.medalla li.p1 .qui{color:#111}
-  .medalla li .qui,.medalla li .nom2{color:#333}
-  table.datos.carga td.n i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);margin-top:2px}
-table.datos.carga tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.06);color:var(--lav)}
-table.datos th.orden{cursor:pointer;user-select:none}
-table.datos th.orden:hover{color:var(--text)}
-table.datos.drills td{padding:9px 10px}
-table.datos.drills tfoot tr.media td{border-top:1px solid var(--ink-600);background:rgba(160,167,216,.10);color:var(--lav)}
-table.datos.drills tfoot .nomb{color:var(--text)}
-table.datos.drills tfoot tr.tipico td{background:rgba(110,154,155,.10);color:var(--teal);border-top:none}
-table.datos.drills tfoot tr.dif td{background:var(--ink-800);color:var(--text-2);border-top:none}
-table.datos.drills .nomb{font-size:14px}
-table.datos.drills .dur{display:flex;align-items:center;gap:7px;margin-top:4px}
-table.datos.drills .dur i{height:4px;background:var(--ink-600);border-radius:2px;display:block}
-table.datos.drills .dur span{font-size:10.5px;color:var(--text-3)}
-table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
-
-  table.datos td.pos{color:#555}
-
-  /* Los paneles van al final del bloque de impresión a propósito: así ganan a
-     las reglas de arriba. Las barras horizontales necesitan el ancho de la
-     hoja para que quepa el nombre entero, así que van de una en una. */
-  .paneles{grid-template-columns:1fr;gap:7px;align-items:start}
-  .panel{padding:7px 10px;background:#fff;border:1px solid #D4D8E0;border-radius:8px}
-  .panel h3{font-size:11px;line-height:1.2;color:#14161C}
-  .panel .cajasMedia{gap:5px;margin-bottom:7px}
-  .cm{background:#F4F6FA !important;border:1px solid #E2E6EE;border-left:3px solid #C9CED8;padding:4px 9px;min-width:88px}
-  .cm span{color:#6B7384;font-size:7px}
-  .cm b{color:#14161C;font-size:12px}
-  .cm.eq{background:#FBF0F1 !important;border:1px solid #EBD3D5}
-  .cm.eq b{color:#9C4B52;font-size:14px}
-  svg.cols text{fill:#3B414E}
-  svg.cols line[stroke="#1B263B"]{stroke:#E6E9EF}
-  /* El panel de cada grupo en papel: tinte claro en vez del oscuro. */
-  svg.cols rect.fondoGrupo[fill="#2A1A20"]{fill:#FBEEF0}
-  svg.cols rect.fondoGrupo[fill="#152523"]{fill:#EAF4F2}
-  svg.cols rect.fondoGrupo[fill="#1A1C2E"]{fill:#EFF0FA}
-  svg.cols rect.fondoGrupo[fill="#262318"]{fill:#FBF7E6}
-  svg.cols rect.fondoGrupo[fill="#1F1A2B"]{fill:#F3EFFB}
-  svg.cols rect.fondoGrupo[fill="#2A1E18"]{fill:#FCF0EA}
-  /* Los carteles del cuadrante: en papel el fondo oscuro dejaba el texto
-     ilegible, porque la letra del SVG se imprime en gris oscuro. */
-  svg.cols g.cartel rect.fondo{fill:#FFFFFF;opacity:.93;stroke:#D4D8E0}
-  svg.cols g.cartel text{fill:#14161C}
-  svg.cols rect[fill="#fff"]{fill:none}
-  /* La nota de los paneles se iba sola a una página en blanco al final. */
-  .leyPaneles{display:none}
-  .chipsMet,.ejes{display:none}
-  .medalla li .bar{background:#E8EAF0}
-  .medalla li .val,.medalla li .qui{color:#14161C}
-  .cajas100{gap:5px;margin-bottom:7px;break-inside:avoid}
-  .t100{color:#6B7384;font-size:7px}
-  .c100{background:#F4F6FA !important;border:1px solid #E2E6EE;border-left:3px solid #C9CED8;padding:4px 9px;min-width:104px}
-  .c100>span{color:#6B7384;font-size:7px}
-  .c100 .par b{color:#14161C;font-size:11px}
-  .c100 .par i{color:#6B7384;font-size:8px}
-  .avisoDisp{font-size:8.5px;color:#6B7384;margin-top:6px}
-  .leyDisp{color:#3B414E;font-size:9px;gap:3px 14px}
-  .leyDisp b{color:#14161C}
-  .panel.disp .sub{font-size:9px;color:#3B414E;margin:0 0 6px}
-  .panel.matriz,.panel.disp{page-break-inside:avoid;break-inside:avoid}
-  /* el minigráfico también se imprime */
-  .resumen.cinco .kpi .chispa{display:block;height:20px}
-  .delta.sube{color:#2F5F60}
-  .delta.baja{color:#9C4B52}
-}
-</style>
-</head>
-<body>
-<div class="app">
-  <aside>
-    <div class="brand"><span class="mark">CAU</span><b>Cargas</b></div>
-    <nav role="tablist">
-      <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
-      <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
-      <button class="tab" role="tab" id="tab-jugador" aria-selected="false">Jugador</button>
-      <button class="tab" role="tab" id="tab-carga" aria-selected="false">% Carga</button>
-      <button class="tab" role="tab" id="tab-acwr" aria-selected="false">Carga ACWR</button>
-      <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
-      <button class="tab abajo" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
+<!-- ============ 1 · REPORTE DE SESION ============ -->
+<div class="pant" id="p1">
+  <aside class="rail">
+    <div class="marca"><b>CAU</b><s>control de carga</s></div>
+    <nav class="nav">
+      <a class="on" href="#"><i>▣</i>Reporte de sesión</a>
+      <a href="#"><i>◱</i>Análisis</a>
+      <a href="#"><i>▤</i>Semana</a>
+      <a href="#"><i>◷</i>Tareas y drills</a>
+      <a href="#"><i>◯</i>Ball in Play</a>
+      <div class="sep">Datos</div>
+      <a href="#"><i>↥</i>Cargar sesión</a>
+      <a href="#"><i>⚙</i>Criterios</a>
     </nav>
-    <div id="estado"><span class="dot"></span><span id="estadoTxt">Cargando…</span></div>
   </aside>
-
-  <main>
-    <header>
-      <div class="ctx">
-        <div class="cab" id="cab"></div>
-        <div class="ctrl">
-          <div class="field"><label for="fSquad">Equipo</label><select id="fSquad"></select></div>
-          <div class="field" id="campoFecha"><label for="fFecha">Sesión</label><select id="fFecha"></select></div>
-          <div class="field" id="campoJugador"><label for="fJugador">Jugador</label><select id="fJugador"></select></div>
-          <button id="btnPdf">Exportar PDF</button>
-        </div>
+  <main class="hoja">
+    <div class="cab">
+      <div>
+        <h1>Zarautz · fuera</h1>
+        <div class="sub">Sábado 25 de octubre · 21 jugadoras con registro · sesión completa</div>
       </div>
-    </header>
-    <div class="wrap">
-      <div id="resumen"></div>
-      <div class="selectores" id="selectores"></div>
-      <div id="cuadrante"></div>
-      <div class="paneles" id="paneles"></div>
-      <div id="tabla"></div>
-      <div id="notas"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="bot">Comparar con otra sesión</button>
+        <button class="bot pri">Guardar PDF</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="sec">
+      <h2>Nuevos máximos de la temporada</h2>
+      <p class="ay">Solo sale cuando el registro supera el anterior por más de medio punto y hay al menos dos partidos previos con los que comparar.</p>
+      <div class="rec">
+        <div class="pill"><span class="ic">⚡</span><span class="tx"><b>Velocidad máxima</b><s>R. Rodenas · tres cuartos</s></span>
+          <span class="vl num">9,34</span><span class="mj">▲ 3,1%</span></div>
+        <div class="pill"><span class="ic">⚡</span><span class="tx"><b>Velocidad máxima</b><s>L. Gil · tres cuartos</s></span>
+          <span class="vl num">8,76</span><span class="mj">▲ 1,4%</span></div>
+        <div class="pill"><span class="ic">🏎️</span><span class="tx"><b>Aceleración máxima</b><s>C. Cabedo · segundas y terceras</s></span>
+          <span class="vl num">4,81</span><span class="mj">▲ 2,2%</span></div>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="sec">
+      <h2>Dónde está cada una respecto a su posición</h2>
+      <p class="ay">Cada punto es una jugadora. El cruce de las líneas es el valor habitual de su posición, así que estar a la derecha o arriba es haber hecho más de lo normal en ese puesto. Los colores no son una nota: dicen hacia dónde tirar la próxima semana.</p>
+      <div id="cuad"></div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="sec">
+      <h2>Ranking de la sesión</h2>
+      <p class="ay">Ordenado dentro de cada grupo de puesto, porque las exigencias no se parecen entre una primera línea y una tres cuartos.</p>
+      <div class="dosc">
+        <div id="rank"></div>
+        <div id="top5"></div>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="sec">
+      <h2>Las cuatro métricas, grupo por grupo</h2>
+      <p class="ay">Mismo alto de barra significa mismo valor dentro de la fila. La línea de puntos es el valor habitual del grupo en esa métrica.</p>
+      <div id="mat"></div>
     </div>
   </main>
 </div>
-<div class="tip" id="tipJug"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
-</body>
-</html>
+<!-- ============ 2 · ANALISIS ============ -->
+<div class="pant" id="p2">
+  <aside class="rail">
+    <div class="marca"><b>CAU</b><s>control de carga</s></div>
+    <nav class="nav">
+      <a href="#"><i>▣</i>Reporte de sesión</a>
+      <a class="on" href="#"><i>◱</i>Análisis</a>
+      <a href="#"><i>▤</i>Semana</a>
+      <a href="#"><i>◷</i>Tareas y drills</a>
+      <a href="#"><i>◯</i>Ball in Play</a>
+      <div class="sep">Datos</div>
+      <a href="#"><i>↥</i>Cargar sesión</a>
+      <a href="#"><i>⚙</i>Criterios</a>
+    </nav>
+  </aside>
+  <main class="hoja">
+    <div class="cab">
+      <div>
+        <h1>Análisis</h1>
+        <div class="sub">Zarautz · comparado contra la media de los 5 partidos anteriores</div>
+      </div>
+      <div class="chips"><span class="chip ac">Carrera explosiva (HMLD)</span><span class="chip">Sprint</span><span class="chip">Distancia</span><span class="chip">Acel. &gt; 3 m/s²</span></div>
+    </div>
+
+    <div class="sec">
+      <div class="ctrl">
+        <div class="campo"><label>Comparar contra</label>
+          <div class="seg"><button>Ella misma</button><button class="on">Su posición</button><button>El equipo</button></div></div>
+        <div class="campo"><label>Qué referencia</label>
+          <div class="seg"><button class="on">Media de 5 partidos</button><button>Perfil alto</button><button>Máximo</button><button>Z-score</button></div></div>
+        <div class="campo"><label>Objetivo</label>
+          <div class="obj"><input value="70"><span>%</span></div></div>
+        <button class="rueda on" id="btnR">⚙</button>
+        <div class="ajustes ver" id="aj">
+          <div class="g3">
+            <div class="blq"><h4>Minutos mínimos para entrar en la referencia</h4>
+              <div class="fila"><span>Primera línea</span><input type="number" value="50"></div>
+              <div class="fila"><span>Segunda línea</span><input type="number" value="55"></div>
+              <div class="fila"><span>Tercera línea</span><input type="number" value="55"></div>
+              <div class="fila"><span>Tres cuartos</span><input type="number" value="60"></div>
+              <p class="nota">Un partido por debajo de esos minutos sigue saliendo en el reporte, pero no cuenta para calcular lo habitual.</p>
+            </div>
+            <div class="blq"><h4>Ventana</h4>
+              <div class="fila"><span>Partidos que cuentan</span><input type="number" value="5"></div>
+              <div class="fila"><span>Tipo de sesión</span><s>Solo partidos</s></div>
+              <div class="fila"><span>Mínimo para fiarse</span><input type="number" value="5"></div>
+              <p class="nota">Con menos de 5 partidos válidos la referencia baja de nivel sola, en el orden de abajo.</p>
+            </div>
+            <div class="blq"><h4>Perfil alto</h4>
+              <div class="fila"><span>Se calcula como</span><s>Percentil 90</s></div>
+              <div class="fila"><span>Avisar si el máximo se despega</span><input type="number" value="40"></div>
+              <p class="nota">En tus demandas, el máximo de sprint de segunda línea está un 103% por encima del p90: es un partido suelto. Por eso el perfil alto es el p90 y no el máximo.</p>
+            </div>
+          </div>
+          <div class="casc">
+            <div class="paso act"><b>Ella misma</b><s>5 partidos válidos o más</s></div><span class="fle">→</span>
+            <div class="paso"><b>Su posición</b><s>si ella no llega</s></div><span class="fle">→</span>
+            <div class="paso"><b>El equipo</b><s>si la posición tampoco</s></div>
+          </div>
+          <p class="nota">Cada fila lleva una etiqueta que dice con qué se ha comparado y con cuántos partidos, para que no haya un número sin saber de dónde sale.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec marco">
+      <h2>Carrera explosiva · % de la media de su posición<span class="ej">las referencias individuales son de ejemplo</span></h2>
+      <p class="ay">Marcadas en verde las que pasan del 70% que has puesto arriba. Pasa el ratón por un porcentaje y sale contra qué se está comparando.</p>
+      <div id="tabla"></div>
+
+      <div class="tip" style="top:556px;left:878px">
+        <h5>R. Rodenas · carrera explosiva</h5>
+        <div class="tr"><span>Esta sesión</span><b>1050 m</b></div>
+        <div class="tr"><span>Su habitual (5 partidos)</span><b>786 m</b></div>
+        <div class="tr"><span>Su máximo</span><b>1112 m</b></div>
+        <div class="tr"><span>Habitual de tres cuartos</span><b>695 m</b></div>
+        <div class="tr"><span>Perfil alto de tres cuartos</span><b>944 m</b></div>
+        <div class="pie">151% de la media del puesto · 94% de su propio máximo</div>
+      </div>
+
+      <div class="avi"><b>Por qué no sale el Z-score por defecto.</b> Con 5 o 6 partidos por jugadora, la desviación típica del denominador se mueve tanto que un Z de 1,8 y uno de 0,9 pueden ser el mismo partido. El porcentaje de una media móvil no tiene ese problema: si la referencia cambia, lo ves. El Z-score queda como cuarta opción y solo se pinta cuando hay 8 partidos o más.</div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ 3 · SEMANA ============ -->
+<div class="pant" id="p3">
+  <aside class="rail">
+    <div class="marca"><b>CAU</b><s>control de carga</s></div>
+    <nav class="nav">
+      <a href="#"><i>▣</i>Reporte de sesión</a>
+      <a href="#"><i>◱</i>Análisis</a>
+      <a class="on" href="#"><i>▤</i>Semana</a>
+      <a href="#"><i>◷</i>Tareas y drills</a>
+      <a href="#"><i>◯</i>Ball in Play</a>
+      <div class="sep">Datos</div>
+      <a href="#"><i>↥</i>Cargar sesión</a>
+      <a href="#"><i>⚙</i>Criterios</a>
+    </nav>
+  </aside>
+  <main class="hoja">
+    <div class="cab">
+      <div>
+        <h1>Semana del 20 al 26 de octubre<span class="ej">datos de ejemplo</span></h1>
+        <div class="sub">Dos entrenamientos y partido · reparto de la carga por día</div>
+      </div>
+      <div class="chips"><span class="chip ac">Equipo</span><span class="chip">Por grupo</span><span class="chip">Por jugadora</span></div>
+    </div>
+
+    <div class="sec">
+      <h2>Forma de la semana</h2>
+      <p class="ay">Cada columna es un día. La altura es la distancia de carrera explosiva del equipo, que es lo que de verdad se acumula. Debajo, cuánto de esa carga es del partido.</p>
+      <div id="sem"></div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="sec">
+      <h2>Carga de 7 días frente a la de 28</h2>
+      <p class="ay">Dos líneas en vez de un ratio. El ratio agudo:crónico divide una por la otra y se queda en un número que esconde si has subido la semana o si ha bajado el mes; estas dos líneas dicen las dos cosas. La barra de abajo es el cambio de una semana a la siguiente, que es el único umbral con algo de respaldo.</p>
+      <div id="ac"></div>
+      <div class="avi"><b>Qué mirar.</b> Un salto de más del 15% de una semana a la siguiente en carrera explosiva es el aviso útil. El 0,8–1,3 del ratio agudo:crónico no está respaldado: cuando se prueba con denominadores inventados, la relación con la lesión sale parecida (Impellizzeri et al., 2020). Se queda en la app como dato descriptivo, sin semáforo.</div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ 4 · DRILLS ============ -->
+<div class="pant" id="p4">
+  <aside class="rail">
+    <div class="marca"><b>CAU</b><s>control de carga</s></div>
+    <nav class="nav">
+      <a href="#"><i>▣</i>Reporte de sesión</a>
+      <a href="#"><i>◱</i>Análisis</a>
+      <a href="#"><i>▤</i>Semana</a>
+      <a class="on" href="#"><i>◷</i>Tareas y drills</a>
+      <a href="#"><i>◯</i>Ball in Play</a>
+      <div class="sep">Datos</div>
+      <a href="#"><i>↥</i>Cargar sesión</a>
+      <a href="#"><i>⚙</i>Criterios</a>
+    </nav>
+  </aside>
+  <main class="hoja">
+    <div class="cab">
+      <div>
+        <h1>Tareas y drills<span class="ej">datos de ejemplo</span></h1>
+        <div class="sub">Entrenamiento del jueves · intensidad por minuto comparada con el partido</div>
+      </div>
+      <div class="chips"><span class="chip ac">Tres cuartos</span><span class="chip">Segundas y terceras</span><span class="chip">Primeras líneas</span></div>
+    </div>
+    <div class="sec">
+      <h2>¿Qué tarea llega a la intensidad del partido?</h2>
+      <p class="ay">Todo por minuto, que es la única forma de comparar un drill de 6 minutos con un partido de 70. La línea vertical es el partido: lo que la pasa está exponiendo a la jugadora a algo que el partido le va a pedir.</p>
+      <div id="drill"></div>
+      <div class="avi"><b>Para qué sirve.</b> Si ninguna tarea de la semana llega al ritmo de carrera explosiva del partido, el partido es el primer sitio donde las jugadoras ven esa intensidad, y ahí es donde se rompen. Los periodos de máxima intensidad del partido son el objetivo que tiene que tocar al menos una tarea por semana.</div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ 5 · BALL IN PLAY ============ -->
+<div class="pant" id="p5">
+  <aside class="rail">
+    <div class="marca"><b>CAU</b><s>control de carga</s></div>
+    <nav class="nav">
+      <a href="#"><i>▣</i>Reporte de sesión</a>
+      <a href="#"><i>◱</i>Análisis</a>
+      <a href="#"><i>▤</i>Semana</a>
+      <a href="#"><i>◷</i>Tareas y drills</a>
+      <a class="on" href="#"><i>◯</i>Ball in Play</a>
+      <div class="sep">Datos</div>
+      <a href="#"><i>↥</i>Cargar sesión</a>
+      <a href="#"><i>⚙</i>Criterios</a>
+    </nav>
+  </aside>
+  <main class="hoja">
+    <div class="cab">
+      <div>
+        <h1>Balón en juego · Zarautz<span class="ej">datos de ejemplo</span></h1>
+        <div class="sub">CSV de Ball in Play emparejado con la sesión de GPS</div>
+      </div>
+      <button class="bot">Cambiar CSV</button>
+    </div>
+    <div class="sec">
+      <div class="kpis" id="kbip" style="border-radius:0"></div>
+    </div>
+    <div class="sec">
+      <h2>Cómo se repartió el juego</h2>
+      <p class="ay">Cada bloque es una secuencia de balón en juego, colocada en el minuto en que ocurrió y de ancho su duración. Lo que se ve de un golpe es si el partido fue a trompicones o a tirones largos.</p>
+      <div id="bip"></div>
+      <div class="avi"><b>Esto es lo que va al reporte de las jugadoras.</b> Una frase: «jugamos 32 minutos de balón en juego en secuencias de 38 segundos de media; la más larga, 2 minutos y 11 segundos en el minuto 54». Con eso entienden por qué el acondicionamiento se trabaja en bloques cortos y repetidos, y no corriendo veinte minutos seguidos.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============ datos reales · INSPO_W17_MD_Zarautz ============ */
+const G1="Primeras líneas", G2="Segundas y terceras líneas", G3="Tres cuartos";
+const COL={[G1]:"#A8323F",[G2]:"#1F5E5C",[G3]:"#343C8A"};
+const SUA={[G1]:"#FBEEF0",[G2]:"#E8F2F0",[G3]:"#EDEEF9"};
+const D=[
+ {n:"M. Banegas",g:G1,d:3549,h:92,s:0,a:16},
+ {n:"E. Morcillo",g:G1,d:1323,h:30,s:0,a:18},
+ {n:"D. Ribas",g:G2,d:6113,h:439,s:208,a:49},
+ {n:"D. Belver",g:G2,d:5956,h:494,s:230,a:63},
+ {n:"C. Cabedo",g:G2,d:5766,h:629,s:376,a:65},
+ {n:"T. Anastasi",g:G2,d:5110,h:138,s:33,a:26},
+ {n:"F. Mesones",g:G2,d:4495,h:539,s:297,a:50},
+ {n:"J. Chirivella",g:G2,d:3773,h:308,s:141,a:39},
+ {n:"G. Mercado",g:G2,d:1372,h:41,s:1,a:8},
+ {n:"A. Maino",g:G2,d:1326,h:46,s:20,a:6},
+ {n:"T. Luna",g:G2,d:559,h:44,s:31,a:4},
+ {n:"J. Terol",g:G3,d:7108,h:478,s:138,a:55},
+ {n:"M. German",g:G3,d:7101,h:858,s:452,a:61},
+ {n:"R. Rodenas",g:G3,d:7098,h:1050,s:668,a:65},
+ {n:"B. Sellau",g:G3,d:5832,h:598,s:304,a:42},
+ {n:"P. Gimeno",g:G3,d:4477,h:391,s:181,a:27},
+ {n:"M. Ponce",g:G3,d:3369,h:283,s:116,a:24},
+ {n:"L. Gil",g:G3,d:3265,h:481,s:347,a:24},
+ {n:"A. Terol",g:G3,d:3235,h:347,s:179,a:23},
+ {n:"E. Sorribes",g:G3,d:2085,h:156,s:83,a:15},
+ {n:"F. Morente",g:G3,d:1969,h:205,s:104,a:18}
+];
+/* demandas 25/26 · media y p90 por grupo (2a y 3a agrupadas) */
+const REF={
+ [G1]:{d:[3814.71,4606.92],h:[85.13,120.97],s:[13.84,34.30]},
+ [G2]:{d:[5594.86,6349.09],h:[404.28,580.31],s:[204.42,327.77]},
+ [G3]:{d:[6674.46,7441.23],h:[694.62,944.47],s:[418.24,627.18]}
+};
+const GRUPOS=[G1,G2,G3];
+const mil=v=>v.toLocaleString("es-ES");
+const dec=(v,n=1)=>v.toLocaleString("es-ES",{minimumFractionDigits:n,maximumFractionDigits:n});
+const ap=o=>o.n.split(" ").slice(1).join(" ");
+
+/* ---------- fila de KPI con dispersion real ---------- */
+function tiras(vals,med){
+  const mx=Math.max(...vals), W=250,H=26;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  s+=`<line x1="0" y1="19" x2="${W}" y2="19" stroke="#DCE1DF" stroke-width="1"/>`;
+  vals.forEach(v=>{const x=(v/mx)*(W-2)+1;
+    s+=`<line x1="${x.toFixed(1)}" y1="7" x2="${x.toFixed(1)}" y2="19" stroke="#1F5E5C" stroke-width="1.4" opacity=".4"/>`;});
+  const xm=(med/mx)*(W-2)+1;
+  s+=`<line x1="${xm.toFixed(1)}" y1="3" x2="${xm.toFixed(1)}" y2="23" stroke="#131715" stroke-width="2"/>`;
+  return s+`</svg>`;
+}
+const KP=[
+ {et:"Distancia media por jugadora",k:"d",u:"m",dl:'<em class="up">▲ 0,2%</em> frente a los 5 partidos anteriores'},
+ {et:"Carrera explosiva media (HMLD)",k:"h",u:"m",dl:'la mediana del equipo está en 308 m'},
+ {et:"Distancia de sprint media",k:"s",u:"m",dl:'7 jugadoras no registraron ni un metro de sprint'},
+ {et:"Aceleraciones &gt; 3 m/s²",k:"a",u:"por jugadora",dl:'máximo de la sesión: 65, en Cabedo y Rodenas'}
+];
+document.getElementById("kpis").innerHTML=KP.map(k=>{
+  const vals=D.map(o=>o[k.k]).sort((a,b)=>a-b);
+  const media=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const med=vals[Math.floor(vals.length/2)];
+  return `<div class="kpi"><div class="et">${k.et}</div>
+    <div class="vl"><b class="num">${k.k==="a"?dec(media,1):mil(Math.round(media*100)/100)}</b><s>${k.u}</s></div>
+    <div class="dl">${k.dl}</div>
+    <div class="disp">${tiras(vals,med)}</div></div>`;
+}).join("");
+
+/* ---------- cuadrante ---------- */
+(function(){
+  const W=1180,H=470,L=58,T=18,R=22,B=46, iw=W-L-R, ih=H-T-B;
+  const pts=D.map(o=>({...o,x:o.s/REF[o.g].s[0]*100,y:o.h/REF[o.g].h[0]*100}));
+  const lejos=Math.max(...pts.flatMap(p=>[Math.abs(p.x-100),Math.abs(p.y-100)]),40)*1.16;
+  const lo=100-lejos, hi=100+lejos;
+  const px=v=>L+(v-lo)/(hi-lo)*iw, py=v=>T+ih-(v-lo)/(hi-lo)*ih;
+  const cx=px(100), cy=py(100);
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Sora, Inter, sans-serif">`;
+  /* fondos de cuadrante */
+  const q=[[cx,T,L+iw-cx,cy-T,"#E8F2F0"],[L,T,cx-L,cy-T,"#FBF6EA"],
+           [cx,cy,L+iw-cx,T+ih-cy,"#FDF1EC"],[L,cy,cx-L,T+ih-cy,"#FBEEF0"]];
+  q.forEach(([x,y,w,h,f])=>s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`);
+  s+=`<rect x="${L}" y="${T}" width="${iw}" height="${ih}" fill="none" stroke="#DCE1DF"/>`;
+  s+=`<line x1="${cx}" y1="${T}" x2="${cx}" y2="${T+ih}" stroke="#131715" stroke-width="1" stroke-dasharray="4 4" opacity=".45"/>`;
+  s+=`<line x1="${L}" y1="${cy}" x2="${L+iw}" y2="${cy}" stroke="#131715" stroke-width="1" stroke-dasharray="4 4" opacity=".45"/>`;
+  /* ejes */
+  for(let v=0;v<=hi;v+=50){ if(v<lo) continue;
+    s+=`<text x="${px(v)}" y="${T+ih+17}" font-size="10" fill="#8A9290" text-anchor="middle">${v}%</text>`;
+    s+=`<text x="${L-9}" y="${py(v)+3.5}" font-size="10" fill="#8A9290" text-anchor="end">${v}%</text>`;}
+  s+=`<text x="${L+iw}" y="${T+ih+36}" font-size="11" fill="#5C6462" text-anchor="end">Distancia de sprint, % del valor habitual de su posición</text>`;
+  s+=`<text transform="translate(15,${T+ih/2}) rotate(-90)" font-size="11" fill="#5C6462" text-anchor="middle">Carrera explosiva, % del habitual</text>`;
+
+  /* etiquetas de esquina, pequenas, para dejar sitio a los nombres */
+  const car=[
+   {ax:"der",ay:"arr",t:"🏎️ MOTOR",c:"#1F5E5C"},
+   {ax:"izq",ay:"arr",t:"🏍️ MÁS CARRERA EXPLOSIVA",c:"#9A6B12"},
+   {ax:"der",ay:"aba",t:"🚤 MÁS SPRINT",c:"#B4602A"},
+   {ax:"izq",ay:"aba",t:"⛽ ENTRAR EN JUEGO",c:"#A8323F"}];
+  const ocupados=[];
+  car.forEach(c=>{
+    const w=c.t.length*5.9+16, h=21;
+    const x=c.ax==="der"?L+iw-w-8:L+8;
+    const y=c.ay==="arr"?T+8:T+ih-h-8;
+    ocupados.push([x,y,w,h]);
+    s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="#FFFFFF" opacity=".95" stroke="#D4D8D6"/>`;
+    s+=`<text x="${x+w/2}" y="${y+14}" font-size="10.5" font-weight="700" fill="${c.c}" text-anchor="middle">${c.t}</text>`;});
+
+  /* puntos */
+  const colo=pts.map(p=>({...p,X:px(Math.max(lo+1,p.x)),Y:py(Math.max(lo+1,p.y))}));
+  colo.forEach(p=>s+=`<circle cx="${p.X.toFixed(1)}" cy="${p.Y.toFixed(1)}" r="5.5" fill="${COL[p.g]}" stroke="#fff" stroke-width="1.6"/>`);
+  colo.forEach(p=>ocupados.push([p.X-5.5,p.Y-5.5,11,11]));
+
+  /* nombres sin pisarse: se prueban cuatro sitios y si no, se sube */
+  const choca=(b)=>ocupados.some(o=>b[0]<o[0]+o[2]&&b[0]+b[2]>o[0]&&b[1]<o[1]+o[3]&&b[1]+b[3]>o[1]);
+  const orden=[...colo].sort((a,b)=>(b.x+b.y)-(a.x+a.y));
+  orden.forEach(p=>{
+    const nom=ap(p), w=nom.length*5.5+2, h=11;
+    const sitios=[[0,-9,"middle"],[0,17,"middle"],[w/2+9,4,"middle"],[-w/2-9,4,"middle"]];
+    let col=null;
+    for(const [dx,dy,an] of sitios){
+      const b=[p.X+dx-w/2,p.Y+dy-h+2,w,h];
+      if(b[0]>L&&b[0]+b[2]<L+iw&&b[1]>T&&b[1]+b[3]<T+ih&&!choca(b)){col=[dx,dy,an,b];break;}}
+    if(!col){
+      for(let k=1;k<=7;k++){
+        const dy=-9-k*11, b=[p.X-w/2,p.Y+dy-h+2,w,h];
+        if(b[1]>T&&!choca(b)){col=[0,dy,"middle",b];break;}}}
+    if(!col)col=[0,-9,"middle",[p.X-w/2,p.Y-9-h+2,w,h]];
+    ocupados.push(col[3]);
+    if(Math.abs(col[1])>14)
+      s+=`<line x1="${p.X.toFixed(1)}" y1="${p.Y.toFixed(1)}" x2="${p.X.toFixed(1)}" y2="${(p.Y+col[1]+(col[1]<0?4:-9)).toFixed(1)}" stroke="#B9C0BE" stroke-width="1"/>`;
+    s+=`<text x="${(p.X+col[0]).toFixed(1)}" y="${(p.Y+col[1]).toFixed(1)}" font-size="10" font-weight="600" fill="#131715" text-anchor="${col[2]}">${nom}</text>`;});
+
+  const expl=[
+   {t:"🏎️ MOTOR",c:"#1F5E5C",q:"Más carrera explosiva y más sprint que lo normal en su puesto.",f:"Foco en ser consistente con este motor."},
+   {t:"🏍️ MÁS CARRERA EXPLOSIVA",c:"#9A6B12",q:"Mucha distancia explosiva, menos sprint del habitual.",f:"Foco en abrir la zancada cuando hay campo libre."},
+   {t:"🚤 MÁS SPRINT",c:"#B4602A",q:"Mucho sprint, menos carrera explosiva de lo habitual.",f:"Foco en sumar metros con, sin y alrededor del balón."},
+   {t:"⛽ ENTRAR EN JUEGO",c:"#A8323F",q:"Por debajo de lo habitual en las dos cosas en esta sesión.",f:"Foco en llegar a más acciones."}];
+  document.getElementById("cuad").innerHTML=s+`</svg>`+
+   `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:16px">
+     ${expl.map(e=>`<div style="border-top:2px solid ${e.c};padding-top:9px">
+       <div style="font-size:11.5px;font-weight:700;color:${e.c};margin-bottom:5px">${e.t}</div>
+       <div style="font-size:11.5px;color:#5C6462;line-height:1.5">${e.q}</div>
+       <div style="font-size:11.5px;color:#131715;font-weight:600;margin-top:4px">${e.f}</div></div>`).join("")}
+   </div>
+   <div class="leyenda">${GRUPOS.map(g=>`<span><i class="pt" style="background:${COL[g]}"></i>${g}</span>`).join("")}
+    <span>El cruce de las dos líneas es la media de la posición en las demandas 25/26</span></div>`;
+})();
+
+/* ---------- ranking agrupado ---------- */
+(function(){
+  const W=680, NUM=26, LBL=132, BW=W-LBL-58;
+  const mx=Math.max(...D.map(o=>o.d));
+  const MED=["🥇","🥈","🥉"];
+  let y=4,s=`<svg width="${W}" height="${D.length*25+GRUPOS.length*30+10}" viewBox="0 0 ${W} ${D.length*25+GRUPOS.length*30+10}" font-family="Sora, Inter, sans-serif">`;
+  GRUPOS.forEach(g=>{
+    const f=D.filter(o=>o.g===g).sort((a,b)=>b.d-a.d);
+    s+=`<text x="0" y="${y+12}" font-size="10.5" font-weight="700" fill="${COL[g]}" letter-spacing=".04em">${g.toUpperCase()}</text>`;
+    s+=`<line x1="0" y1="${y+19}" x2="${W}" y2="${y+19}" stroke="${COL[g]}" stroke-width="2"/>`;
+    y+=30;
+    f.forEach((o,i)=>{
+      const w=o.d/mx*BW;
+      if(i<3) s+=`<text x="${NUM-10}" y="${y+15}" font-size="14" text-anchor="end">${MED[i]}</text>`;
+      else    s+=`<text x="${NUM-11}" y="${y+14}" font-size="11" font-weight="600" fill="#A2AAA8" text-anchor="end">${i+1}</text>`;
+      s+=`<text x="${LBL-10}" y="${y+14}" font-size="11.5" fill="#131715" font-weight="${i<3?600:400}" text-anchor="end">${o.n}</text>`;
+      s+=`<rect x="${LBL}" y="${y+4}" width="${w.toFixed(1)}" height="14" rx="2.5" fill="${COL[g]}" opacity="${i<3?.95:.6}"/>`;
+      s+=`<text x="${LBL+w+8}" y="${y+15}" font-size="11" font-weight="600" fill="#5C6462">${mil(o.d)}</text>`;
+      y+=25;});
+  });
+  document.getElementById("rank").innerHTML=s+`</svg>
+    <div class="leyenda"><span>Distancia total, en metros</span></div>`;
+})();
+
+/* ---------- top 5 en listas ---------- */
+(function(){
+  const L=[
+   {t:"Velocidad máxima",u:"m/s",v:[["R. Rodenas",G3,"9,34"],["L. Gil",G3,"8,76"],["A. Terol",G3,"8,42"],["C. Cabedo",G2,"8,31"],["M. German",G3,"8,30"]]},
+   {t:"Contactos",u:"",v:[["C. Cabedo",G2,"6"],["B. Sellau",G3,"5"],["D. Ribas",G2,"5"],["M. German",G3,"4"],["D. Belver",G2,"4"]]},
+   {t:"Aceleraciones > 3 m/s²",u:"",v:[["C. Cabedo",G2,"65"],["R. Rodenas",G3,"65"],["D. Belver",G2,"63"],["M. German",G3,"61"],["J. Terol",G3,"55"]]}];
+  document.getElementById("top5").innerHTML=L.map(l=>
+   `<div style="margin-bottom:22px">
+      <div style="font-size:11.5px;font-weight:600;padding-bottom:7px;border-bottom:1px solid #DCE1DF">${l.t}</div>
+      ${l.v.map((r,i)=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid #EDF0EF">
+        <span style="width:18px;font-size:${i<3?"13px":"11px"};color:#8A9290;font-weight:600;text-align:center">${i<3?["🥇","🥈","🥉"][i]:i+1}</span>
+        <i class="pt" style="background:${COL[r[1]]}"></i>
+        <span style="flex:1;font-size:12.5px">${r[0]}</span>
+        <b class="num" style="font-size:13px;font-weight:600">${r[2]}</b>
+        <s style="text-decoration:none;font-size:10.5px;color:#8A9290;width:26px">${l.u}</s></div>`).join("")}
+    </div>`).join("");
+})();
+
+/* ---------- matriz ---------- */
+(function(){
+  const MET=[{k:"d",t:"Distancia total",u:"m"},{k:"h",t:"Carrera explosiva (HMLD)",u:"m"},
+             {k:"s",t:"Distancia de sprint",u:"m"},{k:"a",t:"Aceleraciones > 3 m/s²",u:""}];
+  const W=1180, LG=150, GAP=14, FH=128;
+  const anchos={}, tot=D.length;
+  GRUPOS.forEach(g=>anchos[g]=D.filter(o=>o.g===g).length);
+  const dispo=W-LG-GAP*(GRUPOS.length-1);
+  let s=`<svg width="${W}" height="${MET.length*(FH+10)+30}" viewBox="0 0 ${W} ${MET.length*(FH+10)+30}" font-family="Sora, Inter, sans-serif">`;
+  /* cabecera de grupos */
+  let x0=LG;
+  GRUPOS.forEach(g=>{
+    const w=dispo*anchos[g]/tot;
+    s+=`<text x="${x0+w/2}" y="14" font-size="10.5" font-weight="700" fill="${COL[g]}" text-anchor="middle" letter-spacing=".04em">${g.toUpperCase()}</text>`;
+    s+=`<line x1="${x0}" y1="21" x2="${x0+w}" y2="21" stroke="${COL[g]}" stroke-width="2"/>`;
+    x0+=w+GAP;});
+  MET.forEach((m,mi)=>{
+    const top=30+mi*(FH+10);
+    const mx=Math.max(...D.map(o=>o[m.k]))*1.12;
+    s+=`<text x="0" y="${top+18}" font-size="12" font-weight="600" fill="#131715">${m.t}</text>`;
+    s+=`<text x="0" y="${top+33}" font-size="10" fill="#8A9290">máx ${mil(Math.max(...D.map(o=>o[m.k])))} ${m.u}</text>`;
+    let x=LG;
+    GRUPOS.forEach(g=>{
+      const w=dispo*anchos[g]/tot;
+      const f=D.filter(o=>o.g===g).sort((a,b)=>b[m.k]-a[m.k]);
+      s+=`<rect x="${x}" y="${top}" width="${w}" height="${FH}" rx="7" fill="${SUA[g]}"/>`;
+      /* linea de habitual */
+      if(m.k!=="a"){
+        const ref=REF[g][m.k][0];
+        if(ref<mx){const yr=top+FH-16-(ref/mx)*(FH-34);
+          s+=`<line x1="${x+6}" y1="${yr}" x2="${x+w-6}" y2="${yr}" stroke="${COL[g]}" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>`;}}
+      const paso=(w-16)/f.length, bw=Math.min(paso*.68,26);
+      f.forEach((o,i)=>{
+        const h=(o[m.k]/mx)*(FH-34);
+        const bx=x+8+paso*i+(paso-bw)/2;
+        s+=`<rect x="${bx.toFixed(1)}" y="${(top+FH-16-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(h,1).toFixed(1)}" rx="3" fill="${COL[g]}" opacity="${o[m.k]>=REF[g][m.k]?.95:.6}"/>`;
+        s+=`<text x="${(bx+bw/2).toFixed(1)}" y="${(top+FH-20-h).toFixed(1)}" font-size="8.5" fill="#3F4846" text-anchor="middle" paint-order="stroke" stroke="${SUA[g]}" stroke-width="2.8" stroke-linejoin="round">${m.k==="a"?o[m.k]:mil(o[m.k])}</text>`;
+        s+=`<text x="${(bx+bw/2).toFixed(1)}" y="${top+FH-5}" font-size="8.5" fill="#5C6462" text-anchor="middle">${ap(o).slice(0,9)}</text>`;});
+      x+=w+GAP;});
+  });
+  document.getElementById("mat").innerHTML=s+`</svg>
+   <div class="leyenda"><span>Barra a tope de color: por encima del valor habitual del puesto</span>
+   <span>Línea de puntos: valor habitual del puesto en las demandas 25/26</span></div>`;
+})();
+
+/* ---------- tabla de analisis ---------- */
+(function(){
+  const obj=70;
+  let h=`<table><thead><tr><th>Jugadora</th><th>Con qué se compara</th><th>Referencia</th>
+    <th>Esta sesión</th><th>% de la referencia</th><th style="width:210px"></th></tr></thead><tbody>`;
+  GRUPOS.forEach(g=>{
+    const f=D.filter(o=>o.g===g).sort((a,b)=>b.h/REF[b.g].h[0]-a.h/REF[a.g].h[0]);
+    h+=`<tr class="grp" style="color:${COL[g]}"><td colspan="6">${g.toUpperCase()}</td></tr>`;
+    f.forEach((o,i)=>{
+      const ref=REF[g].h[0], p=o.h/ref*100;
+      const sello=i<3?`<span class="sello s-j">ella · 6</span>`:(i<7?`<span class="sello s-p">posición · ${f.length*5}</span>`:`<span class="sello s-e">equipo</span>`);
+      const col=p>=obj?"#1F5E5C":(p>=obj-15?"#9A6B12":"#C2C8C6");
+      h+=`<tr><td class="nm">${o.n}${sello}</td>
+        <td style="text-align:left;color:#5C6462;font-size:11.5px">${i<3?"su media de 5 partidos":(i<7?"media de su posición":"media del equipo")}</td>
+        <td class="num" style="color:#5C6462">${mil(Math.round(ref))} m</td>
+        <td class="num" style="font-weight:600">${mil(o.h)} m</td>
+        <td class="num ${p>=obj?"ok":"no"}">${dec(p,0)}%</td>
+        <td><div class="cel"><i class="bar" style="width:${Math.min(p,150)/150*150}px;background:${col}"></i>
+          ${p>=obj?'<span style="color:#1F5E5C;font-size:11px;font-weight:600">llega</span>':'<span style="color:#8A9290;font-size:11px">—</span>'}</div></td></tr>`;});
+  });
+  document.getElementById("tabla").innerHTML=h+`</tbody></table>
+    <div class="leyenda"><span><i class="pt" style="background:#1F5E5C"></i>Pasa del 70%</span>
+    <span><i class="pt" style="background:#9A6B12"></i>Entre el 55% y el 70%</span>
+    <span><i class="pt" style="background:#C2C8C6"></i>Por debajo del 55%</span>
+    <span>La etiqueta dice contra qué se compara y con cuántos partidos</span></div>`;
+  document.getElementById("btnR").onclick=()=>{
+    document.getElementById("aj").classList.toggle("ver");
+    document.getElementById("btnR").classList.toggle("on");};
+  document.querySelectorAll(".seg").forEach(sg=>sg.querySelectorAll("button").forEach(b=>
+    b.onclick=()=>{sg.querySelectorAll("button").forEach(y=>y.classList.remove("on"));b.classList.add("on")}));
+})();
+
+/* ---------- semana ---------- */
+(function(){
+  const dias=[["Lun","Descanso",0,0],["Mar","Entreno · 78 min",4120,0],["Mié","Descanso",0,0],
+              ["Jue","Entreno · 92 min",6380,0],["Vie","Activación · 35 min",1240,0],
+              ["Sáb","Zarautz",0,7647],["Dom","Descanso",0,0]];
+  const W=1180,H=250,T=22,B=52,L=56, ih=H-T-B;
+  const mx=Math.max(...dias.map(d=>d[2]+d[3]))*1.15;
+  const paso=(W-L-20)/dias.length;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Sora, Inter, sans-serif">`;
+  for(let v=0;v<=mx;v+=2000){const y=T+ih-v/mx*ih;
+    s+=`<line x1="${L}" y1="${y}" x2="${W-20}" y2="${y}" stroke="#EDF0EF"/>`;
+    s+=`<text x="${L-9}" y="${y+3.5}" font-size="10" fill="#8A9290" text-anchor="end">${mil(v)}</text>`;}
+  dias.forEach((d,i)=>{
+    const x=L+paso*i+paso*.16, bw=paso*.68;
+    const he=d[2]/mx*ih, hp=d[3]/mx*ih;
+    if(he)s+=`<rect x="${x}" y="${T+ih-he}" width="${bw}" height="${he}" rx="4" fill="#9FBEBB"/>`;
+    if(hp)s+=`<rect x="${x}" y="${T+ih-hp}" width="${bw}" height="${hp}" rx="4" fill="#1F5E5C"/>`;
+    if(!he&&!hp)s+=`<line x1="${x}" y1="${T+ih}" x2="${x+bw}" y2="${T+ih}" stroke="#DCE1DF" stroke-width="3"/>`;
+    s+=`<text x="${x+bw/2}" y="${T+ih+18}" font-size="12" font-weight="600" fill="#131715" text-anchor="middle">${d[0]}</text>`;
+    s+=`<text x="${x+bw/2}" y="${T+ih+32}" font-size="10" fill="#8A9290" text-anchor="middle">${d[1]}</text>`;
+    const tv=d[2]+d[3];
+    if(tv)s+=`<text x="${x+bw/2}" y="${T+ih-Math.max(he,hp)-7}" font-size="11" font-weight="600" fill="#131715" text-anchor="middle">${mil(tv)}</text>`;});
+  s+=`<text x="${L-9}" y="${T-5}" font-size="10.5" fill="#5C6462" text-anchor="end">m</text>`;
+  document.getElementById("sem").innerHTML=s+`</svg>
+   <div class="leyenda"><span><i class="pt" style="background:#1F5E5C"></i>Partido</span>
+   <span><i class="pt" style="background:#9FBEBB"></i>Entrenamiento</span>
+   <span>Suma del equipo en carrera explosiva · el partido pesa el 44% de la semana</span></div>`;
+})();
+
+/* ---------- 7 vs 28 dias ---------- */
+(function(){
+  const sem=["S36","S37","S38","S39","S40","S41","S42","S43"];
+  const a7=[9800,11000,8600,10500,11900,15800,10400,11300];
+  const c28=[0,0,0,9975,10500,11700,12150,12350];
+  const camb=[null,12.2,-21.8,22.1,13.3,32.8,-34.2,8.7];
+  const W=1180,H=326,T=20,L=58,B=118, ih=H-T-B;
+  const mx=17000, paso=(W-L-20)/sem.length;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Sora, Inter, sans-serif">`;
+  for(let v=0;v<=mx;v+=4000){const y=T+ih-v/mx*ih;
+    s+=`<line x1="${L}" y1="${y}" x2="${W-20}" y2="${y}" stroke="#EDF0EF"/>`;
+    s+=`<text x="${L-9}" y="${y+3.5}" font-size="10" fill="#8A9290" text-anchor="end">${mil(v)}</text>`;}
+  const X=i=>L+paso*i+paso/2, Y=v=>T+ih-v/mx*ih;
+  s+=`<polyline fill="none" stroke="#9FBEBB" stroke-width="2.5" stroke-dasharray="6 4" points="${c28.map((v,i)=>v?`${X(i)},${Y(v)}`:null).filter(Boolean).join(" ")}"/>`;
+  s+=`<polyline fill="none" stroke="#1F5E5C" stroke-width="2.8" points="${a7.map((v,i)=>`${X(i)},${Y(v)}`).join(" ")}"/>`;
+  a7.forEach((v,i)=>s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="4.5" fill="#1F5E5C" stroke="#fff" stroke-width="1.6"/>`);
+  c28.forEach((v,i)=>{if(v)s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="3.5" fill="#fff" stroke="#9FBEBB" stroke-width="2"/>`;});
+  sem.forEach((w,i)=>s+=`<text x="${X(i)}" y="${T+ih+16}" font-size="11" fill="#5C6462" text-anchor="middle">${w}</text>`);
+  /* barras de cambio semanal */
+  const bT=T+ih+44, bh=46;
+  s+=`<line x1="${L}" y1="${bT+bh/2}" x2="${W-20}" y2="${bT+bh/2}" stroke="#DCE1DF"/>`;
+  camb.forEach((c,i)=>{ if(c===null)return;
+    const al=Math.min(Math.abs(c),70)/70*(bh/2);
+    const y=c>0?bT+bh/2-al:bT+bh/2;
+    const f=Math.abs(c)>15?"#9A6B12":"#9FBEBB";
+    s+=`<rect x="${X(i)-16}" y="${y}" width="32" height="${al}" fill="${f}" rx="2"/>`;
+    s+=`<text x="${X(i)}" y="${c>0?y-5:y+al+12}" font-size="10" font-weight="600" fill="#5C6462" text-anchor="middle">${c>0?"+":""}${dec(c,0)}%</text>`;});
+  s+=`<text x="${L-9}" y="${bT+bh/2+3.5}" font-size="10" fill="#8A9290" text-anchor="end">0%</text>`;
+  s+=`<text x="${L-9}" y="${bT-3}" font-size="10" fill="#5C6462" text-anchor="end">cambio</text>`;
+  document.getElementById("ac").innerHTML=s+`</svg>
+   <div class="leyenda"><span><i class="pt" style="background:#1F5E5C"></i>Carga de 7 días</span>
+   <span><i class="pt" style="background:#9FBEBB"></i>Media de 28 días</span>
+   <span><i class="pt" style="background:#9A6B12"></i>Salto de más del 15% respecto a la semana anterior</span></div>`;
+})();
+
+/* ---------- drills ---------- */
+(function(){
+  const T=[["Partido · Zarautz",9.9,1,"#131715"],["Juego reducido 7v7 · 40×35",11.2,0,"#343C8A"],
+           ["Transición 3 oleadas",10.4,0,"#343C8A"],["Ataque posicional 9v9",7.8,0,"#343C8A"],
+           ["Touch continuo 6v6",6.1,0,"#343C8A"],["Melé y salida",2.4,0,"#343C8A"],
+           ["Circuito de contacto",1.9,0,"#343C8A"]];
+  const W=1180,H=322,L=232,R=70, iw=W-L-R, fh=36, TOP=26;
+  const mx=13, part=T[0][1];
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Sora, Inter, sans-serif">`;
+  const px=v=>L+v/mx*iw;
+  for(let v=0;v<=mx;v+=2){s+=`<line x1="${px(v)}" y1="${TOP}" x2="${px(v)}" y2="${TOP+T.length*fh+10}" stroke="#EDF0EF"/>`;
+    s+=`<text x="${px(v)}" y="${TOP+T.length*fh+26}" font-size="10" fill="#8A9290" text-anchor="middle">${v}</text>`;}
+  s+=`<rect x="${px(part)-1}" y="${TOP}" width="2" height="${T.length*fh+2}" fill="#131715" opacity=".55"/>`;
+  s+=`<text x="${px(part)}" y="${TOP-9}" font-size="10.5" font-weight="600" fill="#131715" text-anchor="middle">ritmo del partido</text>`;
+  T.forEach((t,i)=>{
+    const y=TOP+6+i*fh;
+    s+=`<text x="${L-12}" y="${y+16}" font-size="12" fill="#131715" font-weight="${t[2]?600:400}" text-anchor="end">${t[0]}</text>`;
+    s+=`<rect x="${L}" y="${y+4}" width="${(px(t[1])-L).toFixed(1)}" height="17" rx="3" fill="${t[3]}" opacity="${t[2]?.9:(t[1]>=part?.9:.42)}"/>`;
+    s+=`<text x="${px(t[1])+8}" y="${y+17}" font-size="11.5" font-weight="600" fill="#5C6462">${dec(t[1],1)}</text>`;});
+  s+=`<text x="${W-R+34}" y="${TOP+T.length*fh+48}" font-size="10.5" fill="#5C6462" text-anchor="end">metros de carrera explosiva por minuto de juego</text>`;
+  document.getElementById("drill").innerHTML=s+`</svg>
+   <div class="leyenda"><span>Dos tareas de siete llegan al ritmo del partido</span>
+   <span>Las de contacto no se miden con esto: ahí lo que cuenta son los impactos</span></div>`;
+})();
+
+/* ---------- bip ---------- */
+(function(){
+  /* secuencias */
+  const W=1180,H=150,L=16,T=28, iw=W-L-20, carril=52;
+  const rnd=(a=>()=>(a=a*48271%2147483647)/2147483647)(97);
+  let seqs=[],t=0;
+  while(t<68){const dur=(12+rnd()*52)/60, pausa=(14+rnd()*56)/60;
+    if(t+dur>68)break; seqs.push([t,dur]); t+=dur+pausa;}
+  const juego=seqs.reduce((a,b)=>a+b[1],0);
+  const med=juego/seqs.length*60;
+  const larga=Math.max(...seqs.map(x=>x[1]))*60;
+  const iLarga=seqs.find(x=>x[1]*60===larga)[0];
+  const mmss=m=>`${Math.floor(m)}:${String(Math.round((m%1)*60)).padStart(2,"0")}`;
+  const K=[["Balón en juego",mmss(juego),"de 68 minutos de reloj"],
+           ["Secuencias",String(seqs.length),`una cada ${dec(68/seqs.length,1)} min`],
+           ["Duración media",`${Math.round(med)} s`,`la más larga, ${Math.round(larga)} s en el minuto ${Math.round(iLarga)}`],
+           ["Ratio juego : parada",dec(juego/(68-juego),2),"cada minuto jugado, uno parado"]];
+  document.getElementById("kbip").innerHTML=K.map(k=>
+   `<div class="kpi"><div class="et">${k[0]}</div>
+     <div class="vl"><b class="num">${k[1]}</b></div><div class="dl">${k[2]}</div></div>`).join("");
+  const largas=seqs.filter(x=>x[1]>1.3).length;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Sora, Inter, sans-serif">`;
+  const px=m=>L+m/70*iw;
+  s+=`<rect x="${L}" y="${T}" width="${px(35)-L}" height="${carril}" fill="#F4F7F6"/>`;
+  s+=`<rect x="${px(35)}" y="${T}" width="${px(70)-px(35)}" height="${carril}" fill="#EEF2F1"/>`;
+  seqs.forEach(([a,d])=>{
+    const w=Math.max(px(a+d)-px(a),2.5);
+    s+=`<rect x="${px(a).toFixed(1)}" y="${T+8}" width="${w.toFixed(1)}" height="${carril-16}" rx="2" fill="#1F5E5C" opacity="${d>1.3?1:.62}"/>`;});
+  s+=`<line x1="${px(35)}" y1="${T-6}" x2="${px(35)}" y2="${T+carril+6}" stroke="#131715" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  s+=`<text x="${px(35)+7}" y="${T-10}" font-size="10.5" font-weight="600" fill="#131715">descanso</text>`;
+  for(let m=0;m<=70;m+=10)s+=`<text x="${px(m)}" y="${T+carril+20}" font-size="10" fill="#8A9290" text-anchor="middle">${m}'</text>`;
+  s+=`<text x="${L}" y="${T-10}" font-size="10.5" fill="#5C6462">cada bloque es una secuencia de juego</text>`;
+  s+=`<text x="${L}" y="${T+carril+42}" font-size="11.5" fill="#131715">En color pleno, las ${largas} secuencias que pasan de 1 min 20 s: son las que de verdad fatigan.</text>`;
+  document.getElementById("bip").innerHTML=s+`</svg>`;
+})();
+</script>
+</body></html>
