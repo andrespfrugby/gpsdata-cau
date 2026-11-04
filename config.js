@@ -51,6 +51,12 @@ window.CAU_CONFIG = {
      frente a "la más intensa", "jugador" frente a "jugadora"). Si no está
      aquí, se deduce del nombre: lo que lleve "femenino", "women" o "chicas"
      se toma como femenino y el resto como masculino. */
+  /* Lo que sale en el lateral y en la pestaña del navegador. Cámbialo a lo
+     que quieras: "Control de carga", "Rendimiento CAU", "Análisis de cargas"… */
+  siglas: "CAU",
+  titulo: "Control de carga",
+  subtitulo: "Rugby · temporada 25/26",
+
   generoEquipo: { "DHb": "m", "Femenino": "f" },
 
   umbralImpacto: {
