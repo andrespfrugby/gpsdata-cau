@@ -552,6 +552,89 @@ const sesion = () => DATOS.filter(r => r.squad === F.squad && idSesion(r) === F.
 
 /* ---------- pintado ---------- */
 /** Cuatro cifras fijas para leer la sesión antes de entrar en detalle. */
+/**
+ * Una rayita por jugadora y la mediana en negro. Dice de un vistazo si la
+ * media sale de un grupo apretado o de tres que corren mucho y ocho que
+ * entraron al final, que es una sesión muy distinta con el mismo número.
+ */
+function tiraDispersion(vals) {
+  const limpios = vals.filter(v => isFinite(v));
+  if (limpios.length < 3) return "";
+  const mx = Math.max(...limpios);
+  if (!mx) return "";
+  const ord = limpios.slice().sort((a, b) => a - b);
+  const med = ord[Math.floor(ord.length / 2)];
+  const W = 120, H = 20;
+  let s = `<svg class="disp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <title>Cada rayita es una jugadora · la marca gruesa es la mediana</title>
+    <line x1="0" y1="15" x2="${W}" y2="15" stroke="currentColor" opacity=".22" vector-effect="non-scaling-stroke"/>`;
+  for (const v of limpios) {
+    const x = (v / mx) * (W - 2) + 1;
+    s += `<line x1="${x.toFixed(1)}" y1="5" x2="${x.toFixed(1)}" y2="15" stroke="currentColor"
+            opacity=".55" vector-effect="non-scaling-stroke"/>`;
+  }
+  const xm = (med / mx) * (W - 2) + 1;
+  s += `<line x1="${xm.toFixed(1)}" y1="2" x2="${xm.toFixed(1)}" y2="18" stroke="currentColor"
+          stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  return s + `</svg>`;
+}
+
+/* ---------- balón en juego dentro del reporte ---------- */
+function bipDeSesion() {
+  const partido = Object.keys(PAREJAS).find(p => PAREJAS[p] === F.fecha);
+  if (!partido) return null;
+  const fases = BIP.filter(f => f.partido === partido && f.duracion > 0)
+                   .sort((a, b) => (a.inicio || 0) - (b.inicio || 0));
+  return fases.length ? { partido, fases } : null;
+}
+
+function bloqueBipReporte() {
+  const d = bipDeSesion();
+  if (!d) return "";
+  const r = resumirBip(d.fases);
+  const t0 = Math.min(...d.fases.map(f => f.inicio || 0));
+  const finMs = Math.max(...d.fases.map(f => (f.inicio || 0) + f.duracion * 1000));
+  const reloj = Math.max(1, (finMs - t0) / 60000);
+  const larga = d.fases.reduce((a, b) => b.duracion > a.duracion ? b : a, d.fases[0]);
+  const minLarga = (larga.inicio - t0) / 60000;
+
+  const W = 1180, L = 14, T = 26, carril = 46, iw = W - L - 18, H = T + carril + 48;
+  const px = m => L + m / reloj * iw;
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  s += `<rect x="${L}" y="${T}" width="${iw}" height="${carril}" rx="5" fill="#F2F5F4"/>`;
+  for (const f of d.fases) {
+    const a = ((f.inicio || 0) - t0) / 60000;
+    const w = Math.max(px(a + f.duracion / 60) - px(a), 2);
+    s += `<rect x="${px(a).toFixed(1)}" y="${T + 7}" width="${w.toFixed(1)}" height="${carril - 14}"
+            rx="2" fill="#1F5E5C" opacity="${f.duracion >= 80 ? 1 : .6}"><title>${
+            esc(f.nombre || f.id)} · ${mmss(f.duracion)}</title></rect>`;
+  }
+  const pasoMin = reloj > 50 ? 10 : 5;
+  for (let m = 0; m <= reloj; m += pasoMin) {
+    s += `<text x="${px(m).toFixed(1)}" y="${T + carril + 18}" font-size="10" fill="#8A9290" text-anchor="middle">${m}'</text>`;
+  }
+  s += `<text x="${L}" y="${T - 9}" font-size="10.5" fill="#5C6462">cada bloque es una secuencia de juego · en color pleno las que pasan de 1 min 20 s</text>`;
+  s += `</svg>`;
+
+  return `<section class="panel ancho bipReporte">
+    <h3>Balón en juego <span class="uni">${esc(d.partido)}</span></h3>
+    <div class="celdas cuatro" style="margin:10px 0 4px">
+      <div class="c dest"><span>Balón en juego</span><b>${mmss(r.total)}</b>
+        <span>de ${nf(reloj, 0)} minutos de reloj</span></div>
+      <div class="c"><span>Secuencias</span><b>${r.n}</b>
+        <span>una cada ${nf(reloj / r.n, 1)} min</span></div>
+      <div class="c"><span>Duración media</span><b>${nf(r.media, 0)} s</b>
+        <span>la más larga, ${mmss(larga.duracion)} en el minuto ${nf(minLarga, 0)}</span></div>
+      <div class="c"><span>Ratio juego : parada</span><b>${nf(r.media / (r.mediaDescanso || 1), 2)}</b>
+        <span>${nf(r.mediaDescanso, 0)} s de parada de media</span></div>
+    </div>
+    ${s}
+    <p class="sub" style="margin:4px 0 0">Para las jugadoras: jugamos ${mmss(r.total)} de balón en juego
+      en secuencias de ${nf(r.media, 0)} segundos de media. Por eso el acondicionamiento se trabaja en
+      bloques cortos y repetidos, y no corriendo veinte minutos seguidos.</p>
+  </section>`;
+}
+
 function resumen(filas) {
   return `<div class="resumen cinco">${RESUMEN.map(r => {
     if (!filas.some(x => r.col in x.crudo)) return "";
@@ -580,6 +663,7 @@ function resumen(filas) {
               : (filas[0].esPartido ? "partido anterior" : "sesión anterior")
           }</span>${chispa(serie, r.tipo)}`
         : `<span class="vs sola">primer${filas[0].esPartido ? " partido" : "a sesión"} registrad${filas[0].esPartido ? "o" : "a"}</span>`}
+      ${tiraDispersion(vals)}
     </div>`;
   }).join("")}</div>`;
 }
@@ -608,7 +692,7 @@ function serieEquipo(col, cuantas = 6) {
 /** Minigráfico de área con la evolución del equipo. */
 function chispa(vals, tipo) {
   if (vals.length < 2) return "";
-  const col = tipo === "vol" ? "#6E9A9B" : "#A0A7D8";
+  const col = tipo === "vol" ? "#2F615C" : "#343C8A";
   const w = 200, h = 32, p = 4;
   const alto = Math.max(...vals), bajo = Math.min(...vals);
   const suelo = bajo - (alto - bajo) * 0.25, techo = alto + (alto - bajo) * 0.2 || alto * 1.1 || 1;
@@ -681,10 +765,10 @@ function decimales(vals) {
 /* Un color por línea. Las cuatro del rugby llevan el suyo fijo; cualquier otra
    que aparezca coge uno de la reserva, para que nunca se repita con las demás. */
 const COLOR_PUESTO = {
-  "Primera línea":"#EFB5B9", "Segunda línea":"#F0E199",
-  "Tercera línea":"#6E9A9B", "Tres cuartos":"#A0A7D8"
+  "Primera línea":"#A8323F", "Segunda línea":"#9A6B12",
+  "Tercera línea":"#2F615C", "Tres cuartos":"#343C8A"
 };
-const RESERVA = ["#C7B8E7", "#F5C4AF", "#8FB8C9", "#D9A8C4"];
+const RESERVA = ["#5B4A86", "#B4602A", "#4A7E92", "#8E5A78"];
 function colorPuesto(p, todos) {
   if (COLOR_PUESTO[p]) return COLOR_PUESTO[p];
   const sueltos = todos.filter(x => !COLOR_PUESTO[x]);
@@ -735,13 +819,13 @@ function panel(col, filas, indice) {
     const altoG = CAB + l.length * ALTO;
     g += `<rect x="0" y="${y}" width="${W}" height="${altoG}" fill="${c}" opacity=".05" rx="4"/>
           <text x="6" y="${y + 12}" fill="${c}" font-size="10.5" letter-spacing=".04em">${esc(p).toUpperCase()}</text>
-          <text x="${L}" y="${y + 12}" fill="#6B7A94" font-size="10">media ${fmt(col, m, decMedia(dec))}</text>`;
+          <text x="${L}" y="${y + 12}" fill="#8A9290" font-size="10">media ${fmt(col, m, decMedia(dec))}</text>`;
     const y0 = y + CAB;
     l.forEach((r, i) => {
       const v = Math.abs(r.crudo[col] || 0), fy = y0 + i * ALTO, an = x(v) - L;
-      g += `<text x="${L - 9}" y="${fy + 13}" fill="#9EABC2" font-size="11" text-anchor="end">${esc(r.jugador)}</text>
+      g += `<text x="${L - 9}" y="${fy + 13}" fill="#5C6462" font-size="11" text-anchor="end">${esc(r.jugador)}</text>
             <rect x="${L}" y="${fy + 3}" width="${Math.max(0, an).toFixed(1)}" height="13" rx="3" fill="${c}" opacity=".85"/>
-            <text x="${(x(v) + 7).toFixed(1)}" y="${fy + 13.5}" fill="#E9EEF7" font-size="10.5">${fmt(col, v, dec)}</text>`;
+            <text x="${(x(v) + 7).toFixed(1)}" y="${fy + 13.5}" fill="#131715" font-size="10.5">${fmt(col, v, dec)}</text>`;
     });
     // La media de la línea cruza solo su propio bloque, no el gráfico entero.
     g += `<line x1="${x(m).toFixed(1)}" x2="${x(m).toFixed(1)}" y1="${y0 + 1}" y2="${(y0 + l.length * ALTO - 2).toFixed(1)}"
@@ -771,17 +855,17 @@ function catalogoDisponible(filas) {
  */
 function rosco(p, umbral) {
   const r = 13, c = 2 * Math.PI * r, off = c * (1 - Math.min(p, 100) / 100);
-  const tono = p >= umbral ? "#6E9A9B" : (p >= umbral - 15 ? "#F0E199" : "#4A5A78");
+  const tono = p >= umbral ? "#2F615C" : (p >= umbral - 15 ? "#9A6B12" : "#A2AAA8");
   const a = -Math.PI / 2 + 2 * Math.PI * umbral / 100;
   const x1 = 18 + (r - 3.5) * Math.cos(a), y1 = 18 + (r - 3.5) * Math.sin(a);
   const x2 = 18 + (r + 3.5) * Math.cos(a), y2 = 18 + (r + 3.5) * Math.sin(a);
   return `<svg class="rosco" viewBox="0 0 36 36" role="img" aria-label="${nf(p)}% de su marca">
-    <circle cx="18" cy="18" r="${r}" fill="none" stroke="#1F2B42" stroke-width="5"/>
+    <circle cx="18" cy="18" r="${r}" fill="none" stroke="#F5F7F6" stroke-width="5"/>
     <circle cx="18" cy="18" r="${r}" fill="none" stroke="${tono}" stroke-width="5" stroke-linecap="round"
       stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 18 18)"/>
     <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-      stroke="#E9EEF7" stroke-width="1.5" opacity=".8"/>
-    <text x="18" y="21.5" text-anchor="middle" font-size="11" font-weight="600" fill="#E9EEF7">${nf(p)}</text>
+      stroke="#131715" stroke-width="1.5" opacity=".8"/>
+    <text x="18" y="21.5" text-anchor="middle" font-size="11" font-weight="600" fill="#131715">${nf(p)}</text>
   </svg>`;
 }
 
@@ -807,14 +891,14 @@ function gruposDe(filas) {
 }
 /* Color de cada grupo y el tinte de su panel: base, oscuro (papel), fondo. */
 const COLOR_GRUPO = {
-  "Primeras líneas":          { base:"#E2838C", papel:"#9C4B52", fondoOsc:"#2A1A20", fondoCla:"#FBEEF0" },
-  "Segundas y terceras líneas":{ base:"#6E9A9B", papel:"#2F615C", fondoOsc:"#152523", fondoCla:"#EAF4F2" },
-  "Tres cuartos":             { base:"#9AA2E0", papel:"#454C92", fondoOsc:"#1A1C2E", fondoCla:"#EFF0FA" }
+  "Primeras líneas":          { base:"#9C4B52", papel:"#9C4B52", fondoOsc:"#FBEEF0", fondoCla:"#FBEEF0" },
+  "Segundas y terceras líneas":{ base:"#2F615C", papel:"#2F615C", fondoOsc:"#EAF4F2", fondoCla:"#EAF4F2" },
+  "Tres cuartos":             { base:"#454C92", papel:"#454C92", fondoOsc:"#EFF0FA", fondoCla:"#EFF0FA" }
 };
 const RESERVA_GRUPO = [
-  { base:"#F0E199", papel:"#8A7A2E", fondoOsc:"#262318", fondoCla:"#FBF7E6" },
-  { base:"#C7B8E7", papel:"#5B4A86", fondoOsc:"#1F1A2B", fondoCla:"#F3EFFB" },
-  { base:"#F5C4AF", papel:"#8E5338", fondoOsc:"#2A1E18", fondoCla:"#FCF0EA" }
+  { base:"#9A6B12", papel:"#8A7A2E", fondoOsc:"#FBF7E6", fondoCla:"#FBF7E6" },
+  { base:"#5B4A86", papel:"#5B4A86", fondoOsc:"#F3EFFB", fondoCla:"#F3EFFB" },
+  { base:"#B4602A", papel:"#8E5338", fondoOsc:"#FCF0EA", fondoCla:"#FCF0EA" }
 ];
 function tonoGrupo(g, todos) {
   if (COLOR_GRUPO[g]) return COLOR_GRUPO[g];
@@ -966,10 +1050,10 @@ function bloqueMatriz(filas, cols, ordenPor) {
     const dec = Math.max(...vals) >= 100 ? 0 : bruto;
     const tope = Math.max(...vals) * 1.12 || 1;
     const y0 = TOP + mi * (FH + 6), ih = FH - 16;
-    g += `<text x="2" y="${(y0 + ih / 2).toFixed(0)}" fill="#E9EEF7" font-size="10.5">${esc(etiquetaChip(col))}<title>${esc(nombreMetrica(col))}</title></text>
-          <text x="2" y="${(y0 + ih / 2 + 12).toFixed(0)}" fill="#6B7A94" font-size="9">${esc(unidad(col) || "")}</text>
+    g += `<text x="2" y="${(y0 + ih / 2).toFixed(0)}" fill="#131715" font-size="10.5">${esc(etiquetaChip(col))}<title>${esc(nombreMetrica(col))}</title></text>
+          <text x="2" y="${(y0 + ih / 2 + 12).toFixed(0)}" fill="#8A9290" font-size="9">${esc(unidad(col) || "")}</text>
           <line x1="${(bloques[0].x - 6).toFixed(1)}" x2="${(bloques[bloques.length - 1].x + bloques[bloques.length - 1].w + 6).toFixed(1)}"
-            y1="${y0 + ih}" y2="${y0 + ih}" stroke="#28364F"/>`;
+            y1="${y0 + ih}" y2="${y0 + ih}" stroke="#DCE1DF"/>`;
     for (const { p, rs, x, w } of bloques) {
       const c = tonoGrupo(p, puestos).base, paso = paso0;
       const dentro = x + (w - paso * rs.length) / 2;
@@ -985,7 +1069,7 @@ function bloqueMatriz(filas, cols, ordenPor) {
                 height="${Math.max(1, h).toFixed(1)}" rx="4" fill="${c}" opacity="${v >= m ? 1 : .42}"/>`;
         // Siempre horizontal y encima de la barra: girado dentro quedaba
         // enterrado en la base, lejos de lo que mide.
-        g += `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 5).toFixed(1)}" fill="#C9D3E4"
+        g += `<text x="${cx.toFixed(1)}" y="${(y0 + ih - h - 5).toFixed(1)}" fill="#3F4846"
                 font-size="9.5" text-anchor="middle">${fmt(col, v, dec)}</text>`;
       });
     }
@@ -1000,12 +1084,12 @@ function bloqueMatriz(filas, cols, ordenPor) {
       if (dosLineas) {
         const t = r.jugador.trim().split(/\s+/);
         const ini = t.length > 1 ? t[0] : "", ape = t.length > 1 ? t.slice(1).join(" ") : t[0];
-        g += `<text x="${cx.toFixed(1)}" y="${yb + 10}" fill="#6B7A94" font-size="${(fzNom - 0.6).toFixed(1)}"
+        g += `<text x="${cx.toFixed(1)}" y="${yb + 10}" fill="#8A9290" font-size="${(fzNom - 0.6).toFixed(1)}"
                 text-anchor="middle">${esc(ini)}</text>
-              <text x="${cx.toFixed(1)}" y="${yb + 21}" fill="#C9D3E4" font-size="${fzNom.toFixed(1)}"
+              <text x="${cx.toFixed(1)}" y="${yb + 21}" fill="#3F4846" font-size="${fzNom.toFixed(1)}"
                 text-anchor="middle">${esc(ape)}<title>${esc(r.jugador)}</title></text>`;
       } else {
-        g += `<text x="${cx.toFixed(1)}" y="${yb + 13}" fill="#C9D3E4" font-size="${mini.toFixed(1)}"
+        g += `<text x="${cx.toFixed(1)}" y="${yb + 13}" fill="#3F4846" font-size="${mini.toFixed(1)}"
                 text-anchor="middle">${esc(r.jugador)}</text>`;
       }
     });
@@ -1046,23 +1130,23 @@ function scatter(filas) {
   const x = v => L + (v - bajo) / (alto - bajo) * iw;
   const y = v => T + ih - (v - bajo) / (alto - bajo) * ih;
   const cx = L + iw / 2, cy = T + ih / 2;
-  let g = `<rect x="${cx.toFixed(1)}" y="${T}" width="${(W - R - cx).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#6AAA96" opacity=".22"/>
-    <rect x="${L}" y="${T}" width="${(cx - L).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#E0CD6E" opacity=".22"/>
-    <rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${(W - R - cx).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#E69656" opacity=".22"/>
-    <rect x="${L}" y="${cy.toFixed(1)}" width="${(cx - L).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#E05860" opacity=".22"/>`;
+  let g = `<rect x="${cx.toFixed(1)}" y="${T}" width="${(W - R - cx).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#1F5E5C" opacity=".22"/>
+    <rect x="${L}" y="${T}" width="${(cx - L).toFixed(1)}" height="${(cy - T).toFixed(1)}" fill="#9A6B12" opacity=".22"/>
+    <rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${(W - R - cx).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#B4602A" opacity=".22"/>
+    <rect x="${L}" y="${cy.toFixed(1)}" width="${(cx - L).toFixed(1)}" height="${(T + ih - cy).toFixed(1)}" fill="#C0392B" opacity=".22"/>`;
   // Las rayas de referencia salen del 100% hacia los dos lados, con un paso
   // redondo, para que la retícula siga siendo legible con cualquier rango.
   const paso = [10, 20, 25, 50, 100, 200].find(p => m / p <= 3.5) || 500;
   for (let k = -Math.floor(m / paso); k <= Math.floor(m / paso); k++) {
     const v = 100 + k * paso;
     if (v < 0 || v < bajo || v > alto) continue;
-    g += `<line x1="${x(v).toFixed(1)}" x2="${x(v).toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#1B263B"/>
-          <line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#1B263B"/>
-          <text x="${x(v).toFixed(1)}" y="${T + ih + 13}" fill="#6B7A94" font-size="9" text-anchor="middle">${v}%</text>
-          <text x="${L - 6}" y="${(y(v) + 3).toFixed(1)}" fill="#6B7A94" font-size="9" text-anchor="end">${v}%</text>`;
+    g += `<line x1="${x(v).toFixed(1)}" x2="${x(v).toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#E2E6E4"/>
+          <line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#E2E6E4"/>
+          <text x="${x(v).toFixed(1)}" y="${T + ih + 13}" fill="#8A9290" font-size="9" text-anchor="middle">${v}%</text>
+          <text x="${L - 6}" y="${(y(v) + 3).toFixed(1)}" fill="#8A9290" font-size="9" text-anchor="end">${v}%</text>`;
   }
-  g += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>
-        <line x1="${L}" x2="${W - R}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#F0E199" stroke-width="1.4" stroke-dasharray="5 3"/>`;
+  g += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${T}" y2="${T + ih}" stroke="#9A6B12" stroke-width="1.4" stroke-dasharray="5 3"/>
+        <line x1="${L}" x2="${W - R}" y1="${cy.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#9A6B12" stroke-width="1.4" stroke-dasharray="5 3"/>`;
 
   // Los carteles de cada cuadrante. Se dibujan con el texto en su sitio pero
   // sin colocar: el ancho real de una frase no se puede calcular contando
@@ -1070,19 +1154,19 @@ function scatter(filas) {
   // pintados, en ajustaCarteles().
   const TX = textosCuadrante();
   const quads = [
-    ["verde", "#6AAA96", cx, T, W - R - cx, cy - T, "end"],
-    ["amar",  "#E0CD6E", L, T, cx - L, cy - T, "start"],
-    ["nara",  "#E69656", cx, cy, W - R - cx, T + ih - cy, "end"],
-    ["rojo",  "#E05860", L, cy, cx - L, T + ih - cy, "start"]
+    ["verde", "#1F5E5C", cx, T, W - R - cx, cy - T, "end"],
+    ["amar",  "#9A6B12", L, T, cx - L, cy - T, "start"],
+    ["nara",  "#B4602A", cx, cy, W - R - cx, T + ih - cy, "end"],
+    ["rojo",  "#C0392B", L, cy, cx - L, T + ih - cy, "start"]
   ];
   for (const [k, col, qx, qy, qw, qh, anc] of quads) {
     const t = TX[k];
-    let c = `<rect class="fondo" x="0" y="0" width="10" height="10" rx="8" fill="#0D1420" opacity=".82"/>
+    let c = `<rect class="fondo" x="0" y="0" width="10" height="10" rx="8" fill="#FFFFFF" opacity=".82"/>
       <text x="10" y="20" fill="${col}" font-size="13.5" font-weight="700" letter-spacing=".03em"
         ><tspan font-size="19">${t.emo}</tspan><tspan dx="6">${esc(t.tit)}</tspan></text>`;
     let ty = 36;
     for (const l of t.desc) {
-      c += `<text x="10" y="${ty}" fill="#C9D3E4" font-size="10.5">${esc(l)}</text>`;
+      c += `<text x="10" y="${ty}" fill="#3F4846" font-size="10.5">${esc(l)}</text>`;
       ty += 12.6;
     }
     ty += 4;
@@ -1095,12 +1179,20 @@ function scatter(filas) {
             data-qw="${qw.toFixed(1)}" data-qh="${qh.toFixed(1)}" data-anc="${anc}">${c}</g>`;
   }
 
+  // Los nombres se pintan en su sitio de siempre y se recolocan después, ya
+  // medidos, en colocaNombres(): contando letras no se sabe lo que ocupa una
+  // palabra y con veinte jugadoras se pisan unas a otras.
   for (const p of pts) {
-    g += `<circle cx="${x(p.a).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="6" fill="${p.c}" stroke="#0D1420" stroke-width="1.2"><title>${esc(p.nom)} · ${esc(p.pos)}</title></circle>
-          <text x="${x(p.a).toFixed(1)}" y="${(y(p.b) - 10).toFixed(1)}" fill="#E9EEF7" font-size="8.6" text-anchor="middle">${esc(p.nom)}</text>`;
+    g += `<circle cx="${x(p.a).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="5.5" fill="${p.c}" stroke="#FFFFFF" stroke-width="1.4"><title>${esc(p.nom)} · ${esc(p.pos)}</title></circle>`;
   }
-  g += `<text x="${(L + iw / 2).toFixed(0)}" y="${H - 4}" fill="#C9D3E4" font-size="11" text-anchor="middle">${esc(nombreMetrica(F.sc.x))}</text>
-        <text x="13" y="${(T + ih / 2).toFixed(0)}" fill="#C9D3E4" font-size="11" text-anchor="middle"
+  g += `<g class="guias" stroke="#B9C0BE" stroke-width="1"></g>`;
+  for (const p of pts) {
+    g += `<text class="nomPt" data-px="${x(p.a).toFixed(1)}" data-py="${y(p.b).toFixed(1)}"
+            x="${x(p.a).toFixed(1)}" y="${(y(p.b) - 10).toFixed(1)}" fill="#131715"
+            font-size="9.2" font-weight="600" text-anchor="middle">${esc(p.nom)}</text>`;
+  }
+  g += `<text x="${(L + iw / 2).toFixed(0)}" y="${H - 4}" fill="#3F4846" font-size="11" text-anchor="middle">${esc(nombreMetrica(F.sc.x))}</text>
+        <text x="13" y="${(T + ih / 2).toFixed(0)}" fill="#3F4846" font-size="11" text-anchor="middle"
           transform="rotate(-90 13 ${(T + ih / 2).toFixed(0)})">${esc(nombreMetrica(F.sc.y))}</text>`;
   return `<svg class="cols" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dispersión por posición">${g}</svg>`;
 }
@@ -1196,12 +1288,64 @@ function cajas100(filas) {
  * ajusta la caja a ese tamaño y elige la esquina de su cuadrante que menos
  * bolitas tape. Si no cabe en ninguna, el cartel se quita.
  */
+/**
+ * Coloca los nombres del cuadrante sin que se pisen. Se prueban cuatro sitios
+ * alrededor de la bolita y, si ninguno está libre, se sube con una guía fina
+ * hasta encontrar hueco. Las cajas que ya se han colocado (los carteles de
+ * cuadrante) cuentan como ocupadas.
+ */
+function colocaNombres(svg, ocupadas, limites) {
+  const guias = svg.querySelector("g.guias");
+  const nombres = [...svg.querySelectorAll("text.nomPt")];
+  const pisa = b => ocupadas.some(o =>
+    b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
+  // Las bolitas también ocupan.
+  for (const t of nombres) {
+    ocupadas.push({ x:+t.dataset.px - 6, y:+t.dataset.py - 6, w:12, h:12 });
+  }
+  // De fuera hacia dentro: a las de los extremos se les da sitio primero.
+  nombres.sort((a, b) => (+b.dataset.px + +b.dataset.py) - (+a.dataset.px + +a.dataset.py));
+  for (const t of nombres) {
+    const px = +t.dataset.px, py = +t.dataset.py;
+    const m = t.getBBox(), an = m.width + 2, al = m.height * .78;
+    const sitios = [[0, -9], [0, 16], [an / 2 + 9, 3.5], [-an / 2 - 9, 3.5]];
+    let puesto = null;
+    for (const [dx, dy] of sitios) {
+      const c = { x:px + dx - an / 2, y:py + dy - al + 1, w:an, h:al };
+      if (c.x > limites.x && c.x + c.w < limites.x + limites.w
+          && c.y > limites.y && c.y + c.h < limites.y + limites.h && !pisa(c)) { puesto = [dx, dy, c]; break; }
+    }
+    if (!puesto) {
+      for (let k = 1; k <= 7 && !puesto; k++) {
+        const dy = -9 - k * (al + 1.5);
+        const c = { x:px - an / 2, y:py + dy - al + 1, w:an, h:al };
+        if (c.y > limites.y && !pisa(c)) puesto = [0, dy, c];
+      }
+    }
+    // Último recurso: se coloca encima aunque roce. Antes se borraba el
+    // nombre y quedaba una bolita anónima, que es peor que un roce.
+    if (!puesto) {
+      const c = { x:px - an / 2, y:py - 9 - al + 1, w:an, h:al };
+      puesto = [0, -9, c];
+    }
+    ocupadas.push(puesto[2]);
+    t.setAttribute("x", (px + puesto[0]).toFixed(1));
+    t.setAttribute("y", (py + puesto[1]).toFixed(1));
+    if (Math.abs(puesto[1]) > 14 && guias) {
+      const fin = py + puesto[1] + (puesto[1] < 0 ? 4 : -9);
+      guias.insertAdjacentHTML("beforeend",
+        `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${fin.toFixed(1)}"/>`);
+    }
+  }
+}
+
 function ajustaCarteles() {
   const svg = document.querySelector("#cuadrante svg.cols");
   if (!svg) return;
   const bolas = [...svg.querySelectorAll("circle")].map(c => ({
     x:+c.getAttribute("cx"), y:+c.getAttribute("cy")
   }));
+  const puestas = [];
   for (const g of svg.querySelectorAll("g.cartel")) {
     const caja = g.getBBox();          // incluye el rect de 10x10, da igual
     const textos = [...g.querySelectorAll("text")];
@@ -1231,7 +1375,10 @@ function ajustaCarteles() {
     fondo.setAttribute("width", an.toFixed(1));
     fondo.setAttribute("height", al.toFixed(1));
     g.setAttribute("transform", `translate(${mejor[0].toFixed(1)} ${mejor[1].toFixed(1)})`);
+    puestas.push({ x:mejor[0], y:mejor[1], w:an, h:al });
   }
+  const vb = (svg.getAttribute("viewBox") || "0 0 100 100").split(/\s+/).map(Number);
+  colocaNombres(svg, puestas, { x:vb[0] + 2, y:vb[1] + 2, w:vb[2] - 4, h:vb[3] - 4 });
 }
 
 /** Los dos desplegables del scatter, nativos del navegador. */
@@ -1245,95 +1392,364 @@ function selectorEje(eje, filas) {
 }
 
 /* ---------- % de carga sobre las demandas de juego ---------- */
-const FC = { escenario:"p50" };
+/* ---------- motor de referencia ---------- */
+/**
+ * Todo lo que compara un dato con "lo normal" pasa por aquí: la barra de
+ * control, la ruedecita de criterios y la cascada que baja de jugadora a
+ * posición y de posición a equipo cuando no hay partidos suficientes.
+ *
+ * Por qué una media móvil y no un z-score por defecto: con cinco o seis
+ * partidos por jugadora la desviación típica del denominador se mueve tanto
+ * que dos sesiones iguales pueden dar z muy distintos. El porcentaje de una
+ * media no tiene denominador frágil. El z-score queda como cuarta opción y
+ * solo se pinta cuando hay observaciones de sobra.
+ */
+const FR = {
+  nivel:"jugadora",     // jugadora | posicion | equipo
+  modo:"media",         // media | alto | maximo | z | demandas
+  objetivo:70,
+  ventana:5,            // cuántos partidos entran en la referencia
+  minObs:5,             // por debajo de esto la referencia baja de nivel sola
+  minZ:8,               // partidos mínimos para que el z-score se pinte
+  soloPartidos:true,
+  minutos:null,         // minutos mínimos por puesto; se copia de config
+  escenario:"p50",      // solo para el modo "demandas"
+  abierto:false
+};
+const FC = FR;   // antes el escenario vivía en FC; se mantiene el nombre
 
-/** Color según lo cerca que se queda del 100% de la demanda. */
+const NIVELES = [["jugadora", "Ella misma"], ["posicion", "Su posición"], ["equipo", "El equipo"]];
+const MODOS = [["media", "Media de la ventana"], ["alto", "Perfil alto (p90)"],
+               ["maximo", "Máximo"], ["z", "Z-score"], ["demandas", "Demandas 25/26"]];
+
+function minutosMin(puesto) {
+  if (!FR.minutos) FR.minutos = Object.assign({}, C.minutosPartido || {});
+  return FR.minutos[puesto] ?? FR.minutos._defecto ?? 0;
+}
+
+/** Una sesión cuenta para la referencia si es del tipo pedido, llega a los
+ *  minutos mínimos de su puesto y trae la métrica. */
+function valeParaRef(r, col) {
+  return (!FR.soloPartidos || r.esPartido)
+      && r.minutos >= minutosMin(r.posicion)
+      && r.crudo[col] != null && !isNaN(r.crudo[col]);
+}
+
+function ultimasSesiones(filas, n) {
+  const ids = [...new Set(filas.map(x => idSesion(x)))].slice(-n);
+  const set = new Set(ids);
+  return filas.filter(x => set.has(idSesion(x)));
+}
+
+function muestraRef(r, col, nivel) {
+  const antes = DATOS.filter(x => x.squad === r.squad && x.fechaMs < r.fechaMs && valeParaRef(x, col));
+  let pool;
+  if (nivel === "jugadora")      pool = antes.filter(x => x.jugador === r.jugador).slice(-FR.ventana);
+  else if (nivel === "posicion") pool = ultimasSesiones(antes.filter(x => x.posicion === r.posicion), FR.ventana);
+  else                           pool = ultimasSesiones(antes, FR.ventana);
+  return pool.map(x => Math.abs(x.crudo[col]));
+}
+
+function percentil(ordenados, p) {
+  if (!ordenados.length) return null;
+  const i = (p / 100) * (ordenados.length - 1);
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  return ordenados[lo] + (ordenados[hi] - ordenados[lo]) * (i - lo);
+}
+
+function estadistica(vals) {
+  const n = vals.length;
+  if (!n) return null;
+  const media = vals.reduce((a, b) => a + b, 0) / n;
+  const sd = n > 1 ? Math.sqrt(vals.reduce((a, b) => a + (b - media) ** 2, 0) / (n - 1)) : 0;
+  const ord = vals.slice().sort((a, b) => a - b);
+  return { n, media, sd, p90:percentil(ord, 90), max:ord[n - 1], min:ord[0] };
+}
+
+const ORDEN_NIVEL = ["jugadora", "posicion", "equipo"];
+/**
+ * La cascada: se empieza en el nivel que pida la barra y se baja mientras no
+ * haya observaciones suficientes. Devuelve también con qué nivel se ha
+ * quedado, para poder decirlo en la fila en vez de esconderlo.
+ */
+function referencia(r, col) {
+  const desde = Math.max(0, ORDEN_NIVEL.indexOf(FR.nivel));
+  let ultimo = null;
+  for (let i = desde; i < ORDEN_NIVEL.length; i++) {
+    const e = estadistica(muestraRef(r, col, ORDEN_NIVEL[i]));
+    if (!e) continue;
+    ultimo = Object.assign({ nivel:ORDEN_NIVEL[i] }, e);
+    if (e.n >= FR.minObs) return ultimo;
+  }
+  return ultimo ? Object.assign({ flojo:true }, ultimo) : null;
+}
+
+function demandaDe(r, col) {
+  const D = C.demandas;
+  const i = (D && D.metricas || []).indexOf(col);
+  const v = D && D.valores && D.valores[r.posicion] && D.valores[r.posicion][FR.escenario];
+  return (i >= 0 && v) ? v[i] : null;
+}
+
+/** El número contra el que se compara, según el modo elegido en la barra. */
+function valorRef(e, r, col) {
+  if (FR.modo === "demandas") return demandaDe(r, col);
+  if (!e) return null;
+  if (FR.modo === "alto")   return e.p90;
+  if (FR.modo === "maximo") return e.max;
+  return e.media;
+}
+
+const ETIQUETA_NIVEL = { jugadora:"ella", posicion:"posición", equipo:"equipo" };
+const CLASE_NIVEL = { jugadora:"s-jug", posicion:"s-pos", equipo:"s-eq" };
+
+/* ---------- barra de control y ruedecita ---------- */
+function barraRef() {
+  const seg = (grupo, ops, activo) => `<div class="segR" data-g="${grupo}">${
+    ops.map(([v, t]) => `<button data-v="${v}" class="${v === activo ? "on" : ""}">${esc(t)}</button>`).join("")
+  }</div>`;
+  const D = C.demandas;
+  return `<section class="barraRef noPdf">
+    <div class="filaRef">
+      <div class="campoR"><label>Comparar contra</label>${seg("nivel", NIVELES, FR.nivel)}</div>
+      <div class="campoR"><label>Qué referencia</label>${seg("modo", MODOS, FR.modo)}</div>
+      ${FR.modo === "demandas" && D ? `<div class="campoR"><label>Escenario</label>
+        <select id="fEscenario">${(D.escenarios || []).map(([v, t]) =>
+          `<option value="${v}"${v === FR.escenario ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div>` : ""}
+      ${FR.modo === "z" ? "" : `<div class="campoR"><label>Objetivo</label>
+        <div class="objR"><input id="fObjetivo" type="number" min="0" max="300" step="5" value="${FR.objetivo}"><span>%</span></div></div>`}
+      <button class="ruedaR${FR.abierto ? " on" : ""}" id="btnCriterios"
+        title="Criterios de selección de datos" aria-expanded="${FR.abierto}">⚙</button>
+    </div>
+    ${FR.abierto ? panelCriterios() : ""}
+  </section>`;
+}
+
+function panelCriterios() {
+  const puestos = [...new Set(DATOS.filter(r => r.squad === F.squad).map(r => r.posicion))].sort();
+  if (!FR.minutos) FR.minutos = Object.assign({}, C.minutosPartido || {});
+  return `<div class="ajustesR">
+    <div class="gridR">
+      <div class="blqR"><h4>Minutos mínimos para entrar en la referencia</h4>
+        ${puestos.map(p => `<div class="filaC"><span>${esc(p)}</span>
+          <input type="number" class="minPuesto" data-p="${esc(p)}" min="0" max="120" value="${minutosMin(p)}"></div>`).join("")}
+        <p class="notaR">Un partido por debajo de esos minutos sigue saliendo en el reporte,
+          pero no cuenta para calcular lo habitual.</p></div>
+      <div class="blqR"><h4>Ventana</h4>
+        <div class="filaC"><span>Partidos que cuentan</span>
+          <input type="number" id="crVentana" min="2" max="20" value="${FR.ventana}"></div>
+        <div class="filaC"><span>Mínimo para fiarse</span>
+          <input type="number" id="crMinObs" min="1" max="20" value="${FR.minObs}"></div>
+        <div class="filaC"><span>Tipo de sesión</span>
+          <select id="crTipo"><option value="1"${FR.soloPartidos ? " selected" : ""}>Solo partidos</option>
+            <option value="0"${FR.soloPartidos ? "" : " selected"}>Partidos y entrenos</option></select></div>
+        <p class="notaR">Con menos partidos válidos que el mínimo, la referencia baja de nivel sola.</p></div>
+      <div class="blqR"><h4>Cuándo se pinta el z-score</h4>
+        <div class="filaC"><span>Partidos mínimos</span>
+          <input type="number" id="crMinZ" min="3" max="40" value="${FR.minZ}"></div>
+        <p class="notaR">Con cinco o seis partidos la desviación típica se mueve demasiado
+          y el z-score dice más del ruido que de la jugadora. Por debajo de este número se
+          muestra en gris y sin semáforo.</p></div>
+    </div>
+    <div class="cascadaR">
+      ${ORDEN_NIVEL.map((n, i) => {
+        const act = ORDEN_NIVEL.indexOf(FR.nivel) === i;
+        const pie = i === 0 ? `${FR.minObs} partidos válidos o más` : (i === 1 ? "si ella no llega" : "si la posición tampoco");
+        return `${i ? '<span class="fleR">→</span>' : ""}<div class="pasoR${act ? " act" : ""}">
+          <b>${esc(NIVELES[i][1])}</b><s>${esc(pie)}</s></div>`;
+      }).join("")}
+    </div>
+    <p class="notaR">Cada fila lleva una etiqueta con qué se ha usado y cuántos partidos hay detrás,
+      para que no haya ningún número sin saber de dónde sale.</p>
+  </div>`;
+}
+
+/* ---------- tabla de referencia ---------- */
 function tintePct(p) {
-  if (p >= 100) return "background:rgba(110,154,155,.30)";
-  if (p >= 75)  return "background:rgba(110,154,155,.16)";
-  if (p >= 50)  return "background:rgba(240,225,153,.14)";
-  return "background:rgba(224,107,112,.13)";
+  if (p >= 100) return "background:rgba(31,94,92,.22)";
+  if (p >= 75)  return "background:rgba(31,94,92,.12)";
+  if (p >= 50)  return "background:rgba(154,107,18,.12)";
+  return "background:rgba(168,50,63,.10)";
+}
+function tinteZ(z) {
+  const a = Math.abs(z);
+  if (a < 1) return "";
+  if (z > 0) return a >= 2 ? "background:rgba(31,94,92,.22)" : "background:rgba(31,94,92,.12)";
+  return a >= 2 ? "background:rgba(168,50,63,.16)" : "background:rgba(168,50,63,.09)";
+}
+
+function celdaRef(r, col) {
+  const v = Math.abs(r.crudo[col] ?? NaN);
+  if (isNaN(v)) return `<td class="n">–</td>`;
+  const e = referencia(r, col);
+  const ref = valorRef(e, r, col);
+  const dem = demandaDe(r, col);
+  const tip = JSON.stringify({
+    j:r.jugador, c:nombreCorto(col), v,
+    med:e ? e.media : null, mx:e ? e.max : null, p90:e ? e.p90 : null,
+    n:e ? e.n : 0, niv:e ? e.nivel : "", dem
+  });
+  if (FR.modo === "z") {
+    if (!e || !e.sd) return `<td class="n" data-tip='${esc(tip)}'>–</td>`;
+    const z = (v - e.media) / e.sd;
+    const flojo = e.n < FR.minZ;
+    return `<td class="n${flojo ? " flojo" : ""}" style="${flojo ? "" : tinteZ(z)}" data-tip='${esc(tip)}'>
+      ${z > 0 ? "+" : ""}${nf(z, 2)}<i>${nf(v, 0)}</i></td>`;
+  }
+  if (!ref) return `<td class="n" data-tip='${esc(tip)}'>–<i>${nf(v, 0)}</i></td>`;
+  const p = v / ref * 100;
+  const llega = p >= FR.objetivo;
+  return `<td class="n${llega ? " llega" : ""}" style="${tintePct(p)}" data-tip='${esc(tip)}'>
+    ${nf(p, 0)}%<i>${nf(v, 0)}</i></td>`;
 }
 
 function porcentajeCarga() {
-  const D = C.demandas;
-  if (!D || !D.valores) return `<p class="empty">No hay demandas de juego configuradas.</p>`;
   const filas = sesion();
   if (!filas.length) return `<p class="empty">Elige una sesión con datos.</p>`;
+  const D = C.demandas;
+  const mets = (FR.modo === "demandas" && D ? D.metricas : F.matriz.concat(["Player Load"]))
+    .filter((m, i, a) => a.indexOf(m) === i && todasMetricas().includes(m));
+  if (!mets.length) return `<p class="empty">Los datos cargados no traen ninguna de las métricas del catálogo.</p>`;
 
-  const mets = D.metricas;
-  const esc_ = FC.escenario;
-  const conDemanda = filas.filter(r => D.valores[r.posicion]);
-  if (!conDemanda.length) {
-    return `<p class="empty">Ningún jugador de esta sesión tiene una posición con demandas definidas.</p>`;
+  const orden = ORDEN_GRUPO.slice();
+  const jugadoras = filas.slice().sort((a, b) => {
+    const ia = orden.indexOf(grupoDe(a.posicion)), ib = orden.indexOf(grupoDe(b.posicion));
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+        || a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador);
+  });
+
+  let grupoActual = "", cuerpo = "";
+  for (const r of jugadoras) {
+    const g = grupoDe(r.posicion);
+    if (g !== grupoActual) {
+      grupoActual = g;
+      cuerpo += `<tr class="grupoRef" style="color:${tonoGrupo(g, orden).papel}">
+        <td colspan="${3 + mets.length}">${esc(g.toUpperCase())}</td></tr>`;
+    }
+    // La procedencia se decide una vez por jugadora, con la métrica principal:
+    // si no tiene partidos suficientes, no los tiene para ninguna columna.
+    const e0 = referencia(r, mets[0]);
+    const niv = e0 ? e0.nivel : "equipo";
+    cuerpo += `<tr>
+      <td class="nomR">${esc(r.jugador)}<span class="selloR ${CLASE_NIVEL[niv]}">${
+        ETIQUETA_NIVEL[niv]}${e0 ? " · " + e0.n : ""}</span></td>
+      <td class="pos">${esc(r.posicion)}</td>
+      <td class="n">${nf(r.minutos)}</td>
+      ${mets.map(m => celdaRef(r, m)).join("")}</tr>`;
   }
 
-  const jugadores = conDemanda.slice().sort((a, b) =>
-    a.posicion.localeCompare(b.posicion) || a.jugador.localeCompare(b.jugador));
-
-  const pct = (r, i) => {
-    const ref = D.valores[r.posicion][esc_][i];
-    const v = Math.abs(r.crudo[mets[i]] || 0);
-    return ref ? v / ref * 100 : null;
-  };
-
-  const cuerpo = jugadores.map(r => `<tr>
-    <td>${esc(r.jugador)}</td><td class="pos">${esc(r.posicion)}</td>
-    <td class="n">${nf(r.minutos)}</td>
-    ${mets.map((m, i) => {
-      const p = pct(r, i);
-      if (p == null) return `<td class="n">–</td>`;
-      return `<td class="n" style="${tintePct(p)}">${nf(p, 0)}%<i>${nf(Math.abs(r.crudo[m] || 0), 0)}</i></td>`;
-    }).join("")}
-  </tr>`).join("");
-
-  // Media del equipo por métrica y por puesto.
-  const puestos = [...new Set(jugadores.map(r => r.posicion))].sort();
-  const resumenPuestos = puestos.map(pu => {
-    const suyos = jugadores.filter(r => r.posicion === pu);
-    return `<tr class="media"><td>Media</td><td class="pos">${esc(pu)}</td>
-      <td class="n">${nf(suyos.reduce((t, r) => t + r.minutos, 0) / suyos.length)}</td>
-      ${mets.map((m, i) => {
-        const v = suyos.reduce((t, r) => t + (pct(r, i) || 0), 0) / suyos.length;
-        return `<td class="n" style="${tintePct(v)}">${nf(v, 0)}%</td>`;
-      }).join("")}
-    </tr>`;
-  }).join("");
+  const sub = FR.modo === "z"
+    ? "Desviaciones típicas respecto a su referencia · debajo, el valor de la sesión"
+    : `Porcentaje de la referencia · en verde las que pasan del ${FR.objetivo}% · debajo, el valor de la sesión`;
 
   return `<section class="panel">
     <div class="row">
-      <div><h3>${esc(D.etiqueta || "Demandas de juego")}</h3>
-        <p class="sub" style="margin:0">Porcentaje de la demanda de partido de su posición · debajo, el valor de la sesión</p></div>
-      <select id="fEscenario">${(D.escenarios || []).map(([v, t]) =>
-        `<option value="${v}"${v === esc_ ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+      <div><h3>${esc(tituloRef())}</h3>
+        <p class="sub" style="margin:0">${esc(sub)}</p></div>
     </div>
-    <div class="scroll"><table class="datos carga">
-      <thead><tr><th>Jugador</th><th>Posición</th><th class="n">Min</th>
+    <div class="scroll"><table class="datos carga ref">
+      <thead><tr><th>Jugadora</th><th>Posición</th><th class="n">Min</th>
         ${mets.map(m => `<th class="n">${esc(nombreCorto(m))}</th>`).join("")}</tr></thead>
       <tbody>${cuerpo}</tbody>
-      <tfoot>${resumenPuestos}</tfoot>
     </table></div>
     <div class="leyenda">
-      <span><i class="sw" style="background:rgba(110,154,155,.30)"></i>100% o más</span>
-      <span><i class="sw" style="background:rgba(110,154,155,.16)"></i>75-100%</span>
-      <span><i class="sw" style="background:rgba(240,225,153,.14)"></i>50-75%</span>
-      <span><i class="sw" style="background:rgba(224,107,112,.13)"></i>menos del 50%</span>
+      ${FR.modo === "z"
+        ? `<span><i class="sw" style="background:rgba(31,94,92,.22)"></i>2 o más por encima</span>
+           <span><i class="sw" style="background:rgba(31,94,92,.12)"></i>entre 1 y 2 por encima</span>
+           <span><i class="sw" style="background:rgba(168,50,63,.09)"></i>entre 1 y 2 por debajo</span>
+           <span><i class="sw" style="background:rgba(168,50,63,.16)"></i>2 o más por debajo</span>
+           <span>En gris, las que no llegan a ${FR.minZ} partidos</span>`
+        : `<span><i class="sw" style="background:rgba(31,94,92,.22)"></i>100% o más</span>
+           <span><i class="sw" style="background:rgba(31,94,92,.12)"></i>75-100%</span>
+           <span><i class="sw" style="background:rgba(154,107,18,.12)"></i>50-75%</span>
+           <span><i class="sw" style="background:rgba(168,50,63,.10)"></i>menos del 50%</span>`}
+      <span>La etiqueta del nombre dice con qué se compara y con cuántos partidos</span>
     </div>
   </section>`;
+}
+
+function tituloRef() {
+  const n = NIVELES.find(x => x[0] === FR.nivel)[1];
+  const m = MODOS.find(x => x[0] === FR.modo)[1];
+  if (FR.modo === "demandas") {
+    const et = ((C.demandas || {}).escenarios || []).find(x => x[0] === FR.escenario);
+    return `Demandas de juego · ${et ? et[1] : FR.escenario}`;
+  }
+  return `${n} · ${m.toLowerCase()} de los últimos ${FR.ventana} partidos`;
+}
+
+/* ---------- tooltip con la referencia de debajo ---------- */
+function enganchaTip(raiz) {
+  let caja = document.getElementById("tipRef");
+  if (!caja) {
+    caja = document.createElement("div");
+    caja.id = "tipRef"; caja.className = "tipRef"; caja.hidden = true;
+    document.body.appendChild(caja);
+  }
+  raiz.querySelectorAll("td[data-tip]").forEach(td => {
+    td.addEventListener("mouseenter", () => {
+      let d; try { d = JSON.parse(td.dataset.tip); } catch (e) { return; }
+      const fila = (et, v, dec = 0) => v == null || isNaN(v) ? "" :
+        `<div class="tr"><span>${et}</span><b>${nf(v, dec)}</b></div>`;
+      caja.innerHTML = `<h5>${esc(d.j)} · ${esc(d.c)}</h5>
+        ${fila("Esta sesión", d.v)}
+        ${fila(`Su habitual (${d.niv === "jugadora" ? d.n + " partidos" : ETIQUETA_NIVEL[d.niv] || "referencia"})`, d.med)}
+        ${fila("Máximo de la ventana", d.mx)}
+        ${fila("Perfil alto (p90)", d.p90)}
+        ${fila("Demanda de su puesto", d.dem)}
+        <div class="pieT">${d.med ? nf(d.v / d.med * 100, 0) + "% de lo habitual" : "sin referencia todavía"}${
+          d.mx ? " · " + nf(d.v / d.mx * 100, 0) + "% del máximo" : ""}</div>`;
+      caja.hidden = false;
+      const b = td.getBoundingClientRect();
+      const x = Math.min(b.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - 280);
+      caja.style.left = Math.max(8, x) + "px";
+      caja.style.top = (b.bottom + window.scrollY + 7) + "px";
+    });
+    td.addEventListener("mouseleave", () => { caja.hidden = true; });
+  });
+}
+
+function enganchaBarraRef() {
+  document.querySelectorAll(".segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
+    b.onclick = () => { FR[sg.dataset.g] = b.dataset.v; recordar(); pintar(); };
+  }));
+  const rue = $("#btnCriterios");
+  if (rue) rue.onclick = () => { FR.abierto = !FR.abierto; recordar(); pintar(); };
+  const obj = $("#fObjetivo");
+  if (obj) obj.onchange = e => { FR.objetivo = Math.max(0, num(e.target.value) || 70); recordar(); pintar(); };
+  const esce = $("#fEscenario");
+  if (esce) esce.onchange = e => { FR.escenario = e.target.value; recordar(); pintar(); };
+  const liga = (id, campo, min, max) => {
+    const el = $("#" + id);
+    if (el) el.onchange = ev => {
+      FR[campo] = Math.min(max, Math.max(min, num(ev.target.value) || min));
+      recordar(); pintar();
+    };
+  };
+  liga("crVentana", "ventana", 2, 20);
+  liga("crMinObs", "minObs", 1, 20);
+  liga("crMinZ", "minZ", 3, 40);
+  const tipo = $("#crTipo");
+  if (tipo) tipo.onchange = e => { FR.soloPartidos = e.target.value === "1"; recordar(); pintar(); };
+  document.querySelectorAll(".minPuesto").forEach(inp => inp.onchange = e => {
+    if (!FR.minutos) FR.minutos = Object.assign({}, C.minutosPartido || {});
+    FR.minutos[e.target.dataset.p] = Math.max(0, num(e.target.value));
+    recordar(); pintar();
+  });
 }
 
 function vistaCarga() {
   cabecera();
   $("#notas").innerHTML = "";
-  $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
+  $("#selectores").innerHTML = barraRef();
   $("#tabla").innerHTML = porcentajeCarga();
-  const sel = $("#fEscenario");
-  if (sel) sel.onchange = e => { FC.escenario = e.target.value; pintar(); };
+  enganchaBarraRef();
+  enganchaTip($("#tabla"));
 }
 
 /* ---------- carga aguda:crónica ---------- */
-const FA = { metrica:"Distance (metres)", semanas:6 };
+const FA = { metrica:"Distance (metres)", semanas:6, vista:"equipo", quien:"" };
 const METRICAS_ACWR = [
   { id:"Distance (metres)", lbl:"Distancia", dec:0 },
   { id:HMLD,                lbl:"HMLD",      dec:0 },
@@ -1391,14 +1807,223 @@ function semanasHasta(hasta, n) {
   });
 }
 
-function vistaAcwr() {
+/* ---------- la semana ---------- */
+/**
+ * Dos preguntas distintas y dos gráficos distintos.
+ * Arriba, cómo se repartió la carga entre los días de esta semana.
+ * Abajo, cómo va la carga de 7 días contra la media de 28, en dos líneas en
+ * vez de en un ratio: el ratio agudo:crónico se queda en un solo número que
+ * no dice si ha subido la semana o si ha bajado el mes, y además no está
+ * respaldado — con denominadores inventados la relación con la lesión sale
+ * parecida (Impellizzeri et al., 2020). El aviso útil es el salto de una
+ * semana a la siguiente, y eso es la barra de abajo.
+ */
+/** Un paso de rejilla redondo (1, 2 o 5 por década) para unas cinco líneas. */
+function pasoEje(mx, objetivo = 5) {
+  const bruto = Math.max(mx, 1) / objetivo;
+  const mag = Math.pow(10, Math.floor(Math.log10(bruto)));
+  const n = bruto / mag;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
+}
+/** Miles con punto siempre: es-ES no agrupa los de cuatro cifras y en un eje
+ *  quedaba "15.000" encima de "5000". */
+function nfEje(v) {
+  const s = Math.round(Math.abs(v)).toString();
+  return (v < 0 ? "-" : "") + (s.length > 3 ? s.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : s);
+}
+
+const DIAS_SEM = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+function colSemana() {
+  const hay = todasMetricas();
+  for (const c of [HMLD, "Distance (metres)", "Player Load"]) if (hay.includes(c)) return c;
+  return hay[0];
+}
+
+function filasSemana() {
+  const base = DATOS.filter(r => r.squad === F.squad);
+  if (FA.vista === "jugadora" && FA.quien) return base.filter(r => r.jugador === FA.quien);
+  if (FA.vista === "grupo" && FA.quien)    return base.filter(r => grupoDe(r.posicion) === FA.quien);
+  return base;
+}
+
+/** Media por jugadora presente, para que el eje valga igual en las tres vistas. */
+function mediaPorJugadora(filas, col) {
+  const js = new Set(filas.map(r => r.jugador));
+  if (!js.size) return 0;
+  return filas.reduce((t, r) => t + Math.abs(r.crudo[col] || 0), 0) / js.size;
+}
+
+function selectorSemana() {
+  const grupos = gruposDe(DATOS.filter(r => r.squad === F.squad));
+  const jugadoras = [...new Set(DATOS.filter(r => r.squad === F.squad).map(r => r.jugador))].sort();
+  const seg = [["equipo", "Equipo"], ["grupo", "Por grupo"], ["jugadora", "Por jugadora"]];
+  let lista = "";
+  if (FA.vista === "grupo") lista = `<select id="semQuien">${grupos.map(g =>
+    `<option${g === FA.quien ? " selected" : ""}>${esc(g)}</option>`).join("")}</select>`;
+  if (FA.vista === "jugadora") lista = `<select id="semQuien">${jugadoras.map(j =>
+    `<option${j === FA.quien ? " selected" : ""}>${esc(j)}</option>`).join("")}</select>`;
+  return `<section class="barraRef noPdf"><div class="filaRef">
+    <div class="campoR"><label>Ver la carga de</label>
+      <div class="segR" data-g="vista">${seg.map(([v, t]) =>
+        `<button data-v="${v}" class="${v === FA.vista ? "on" : ""}">${esc(t)}</button>`).join("")}</div></div>
+    ${lista ? `<div class="campoR"><label>Cuál</label>${lista}</div>` : ""}
+    <div class="campoR"><label>Semanas en la tendencia</label>
+      <div class="objR"><input id="semCuantas" type="number" min="4" max="20" value="${FA.semanas}"><span>sem</span></div></div>
+  </div></section>`;
+}
+
+function formaSemana(ref) {
+  const col = colSemana();
+  const todas = filasSemana();
+  const lunes = new Date(ref.fecha); lunes.setHours(0, 0, 0, 0);
+  lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+
+  const dias = DIAS_SEM.map((nom, i) => {
+    const d = new Date(lunes); d.setDate(d.getDate() + i);
+    const sig = new Date(d); sig.setDate(sig.getDate() + 1);
+    const delDia = todas.filter(r => r.fecha >= d && r.fecha < sig);
+    const partido = delDia.filter(r => r.esPartido), entreno = delDia.filter(r => !r.esPartido);
+    const nombres = [...new Set(delDia.map(r => r.sesion))].filter(Boolean);
+    const mins = delDia.length ? Math.round(delDia.reduce((t, r) => t + r.minutos, 0) / delDia.length) : 0;
+    return { nom, fecha:d,
+      partido: mediaPorJugadora(partido, col), entreno: mediaPorJugadora(entreno, col),
+      rotulo: nombres.length ? (nombres[0].length > 22 ? nombres[0].slice(0, 21) + "…" : nombres[0]) + (mins ? " · " + mins + " min" : "") : "Descanso" };
+  });
+
+  const total = dias.reduce((t, d) => t + d.partido + d.entreno, 0);
+  const pesoPartido = total ? dias.reduce((t, d) => t + d.partido, 0) / total * 100 : 0;
+  const W = 1180, H = 258, T = 22, B = 56, L = 60, ih = H - T - B;
+  const mx = Math.max(...dias.map(d => d.partido + d.entreno), 1) * 1.16;
+  const paso = (W - L - 20) / 7;
+  const paso10 = pasoEje(mx);
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  for (let v = 0; v <= mx; v += paso10) {
+    const y = T + ih - v / mx * ih;
+    s += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - 20}" y2="${y.toFixed(1)}" stroke="#EDF0EF"/>`;
+    s += `<text x="${L - 9}" y="${(y + 3.5).toFixed(1)}" font-size="10" fill="#8A9290" text-anchor="end">${nfEje(v)}</text>`;
+  }
+  dias.forEach((d, i) => {
+    const x = L + paso * i + paso * .17, bw = paso * .66;
+    const he = d.entreno / mx * ih, hp = d.partido / mx * ih;
+    if (he) s += `<rect x="${x.toFixed(1)}" y="${(T + ih - he).toFixed(1)}" width="${bw.toFixed(1)}" height="${he.toFixed(1)}" rx="4" fill="#9FBEBB"/>`;
+    if (hp) s += `<rect x="${x.toFixed(1)}" y="${(T + ih - hp).toFixed(1)}" width="${bw.toFixed(1)}" height="${hp.toFixed(1)}" rx="4" fill="#1F5E5C"/>`;
+    if (!he && !hp) s += `<line x1="${x.toFixed(1)}" y1="${T + ih}" x2="${(x + bw).toFixed(1)}" y2="${T + ih}" stroke="#DCE1DF" stroke-width="3"/>`;
+    const tv = d.partido + d.entreno;
+    if (tv) s += `<text x="${(x + bw / 2).toFixed(1)}" y="${(T + ih - Math.max(he, hp) - 7).toFixed(1)}" font-size="11" font-weight="600" text-anchor="middle">${nfEje(tv)}</text>`;
+    s += `<text x="${(x + bw / 2).toFixed(1)}" y="${T + ih + 18}" font-size="12" font-weight="600" text-anchor="middle">${d.nom}</text>`;
+    s += `<text x="${(x + bw / 2).toFixed(1)}" y="${T + ih + 33}" font-size="9.5" fill="#8A9290" text-anchor="middle">${esc(d.rotulo)}</text>`;
+  });
+  s += `</svg>`;
+
+  const quien = FA.vista === "equipo" ? "del equipo" : (FA.vista === "grupo" ? "de " + (FA.quien || "") : "de " + (FA.quien || ""));
+  return `<section class="panel ancho">
+    <h3>Forma de la semana <span class="uni">${esc(nombreCorto(col))} · media por jugadora</span></h3>
+    <p class="sub">Semana del ${esc(dias[0].fecha.toLocaleDateString("es-ES", { day:"numeric", month:"long" }))}
+      al ${esc(dias[6].fecha.toLocaleDateString("es-ES", { day:"numeric", month:"long" }))} ·
+      carga ${esc(quien)} · el partido pesa el ${nf(pesoPartido, 0)}% de la semana</p>
+    ${s}
+    <div class="leyenda">
+      <span><i class="sw" style="background:#1F5E5C"></i>Partido</span>
+      <span><i class="sw" style="background:#9FBEBB"></i>Entrenamiento</span>
+      <span>Cada barra es lo que hizo de media una jugadora que estuvo ese día</span>
+    </div>
+  </section>`;
+}
+
+function agudaCronica(ref) {
+  const col = colSemana();
+  const todas = filasSemana();
+  const n = Math.max(5, FA.semanas);
+  const semanas = semanasHasta(ref.fecha, n);
+  const porSemana = semanas.map(s => mediaPorJugadora(todas.filter(r => r.fecha >= s.ini && r.fecha < s.fin), col));
+  // La crónica es la media de las cuatro semanas que acaban en esa: no se
+  // pinta hasta que hay cuatro, porque antes es la misma cifra con otro nombre.
+  const cronica = porSemana.map((_, i) => i < 3 ? null
+    : porSemana.slice(i - 3, i + 1).reduce((a, b) => a + b, 0) / 4);
+  const cambio = porSemana.map((v, i) => i === 0 || !porSemana[i - 1] ? null : (v / porSemana[i - 1] - 1) * 100);
+
+  const W = 1180, H = 330, T = 20, L = 62, B = 122, ih = H - T - B;
+  const mx = Math.max(...porSemana, ...cronica.filter(v => v != null), 1) * 1.18;
+  const paso = (W - L - 20) / n;
+  const X = i => L + paso * i + paso / 2, Y = v => T + ih - v / mx * ih;
+  const paso10 = pasoEje(mx);
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  for (let v = 0; v <= mx; v += paso10) {
+    s += `<line x1="${L}" y1="${Y(v).toFixed(1)}" x2="${W - 20}" y2="${Y(v).toFixed(1)}" stroke="#EDF0EF"/>`;
+    s += `<text x="${L - 9}" y="${(Y(v) + 3.5).toFixed(1)}" font-size="10" fill="#8A9290" text-anchor="end">${nfEje(v)}</text>`;
+  }
+  const ptsC = cronica.map((v, i) => v == null ? null : `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean);
+  if (ptsC.length > 1) s += `<polyline fill="none" stroke="#9FBEBB" stroke-width="2.5" stroke-dasharray="6 4" points="${ptsC.join(" ")}"/>`;
+  s += `<polyline fill="none" stroke="#1F5E5C" stroke-width="2.8" points="${porSemana.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")}"/>`;
+  porSemana.forEach((v, i) => s += `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4.5" fill="#1F5E5C" stroke="#fff" stroke-width="1.6"/>`);
+  cronica.forEach((v, i) => { if (v != null) s += `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.5" fill="#fff" stroke="#9FBEBB" stroke-width="2"/>`; });
+  semanas.forEach((w, i) => s += `<text x="${X(i).toFixed(1)}" y="${T + ih + 16}" font-size="10.5" fill="#5C6462" text-anchor="middle">${
+    esc(w.ini.toLocaleDateString("es-ES", { day:"2-digit", month:"2-digit" }))}</text>`);
+
+  const bT = T + ih + 44, bh = 46;
+  s += `<line x1="${L}" y1="${bT + bh / 2}" x2="${W - 20}" y2="${bT + bh / 2}" stroke="#DCE1DF"/>`;
+  s += `<text x="${L - 9}" y="${bT + bh / 2 + 3.5}" font-size="10" fill="#8A9290" text-anchor="end">0%</text>`;
+  s += `<text x="${L - 9}" y="${bT - 3}" font-size="10" fill="#5C6462" text-anchor="end">cambio</text>`;
+  cambio.forEach((c, i) => {
+    if (c == null || !isFinite(c)) return;
+    const al = Math.min(Math.abs(c), 70) / 70 * (bh / 2);
+    const y = c > 0 ? bT + bh / 2 - al : bT + bh / 2;
+    s += `<rect x="${(X(i) - 16).toFixed(1)}" y="${y.toFixed(1)}" width="32" height="${al.toFixed(1)}" rx="2" fill="${Math.abs(c) > 15 ? "#9A6B12" : "#9FBEBB"}"/>`;
+    s += `<text x="${X(i).toFixed(1)}" y="${(c > 0 ? y - 5 : y + al + 12).toFixed(1)}" font-size="10" font-weight="600" fill="#5C6462" text-anchor="middle">${c > 0 ? "+" : ""}${nf(c, 0)}%</text>`;
+  });
+  s += `</svg>`;
+
+  const ult = cambio[cambio.length - 1];
+  const aviso = ult != null && isFinite(ult) && Math.abs(ult) > 15
+    ? `<div class="aviso espera" style="margin:14px 0 0">La última semana ha cambiado un
+        <b>${ult > 0 ? "+" : ""}${nf(ult, 0)}%</b> respecto a la anterior en ${esc(nombreCorto(col))}.
+        Por encima del 15% es cuando conviene mirar qué día se ha ido la carga.</div>`
+    : "";
+
+  return `<section class="panel ancho">
+    <h3>Carga de 7 días frente a la de 28 <span class="uni">${esc(nombreCorto(col))}</span></h3>
+    <p class="sub">Dos líneas en vez de un ratio: la continua es la semana, la punteada la media de las
+      cuatro anteriores. La barra de abajo es el cambio de una semana a la siguiente.</p>
+    ${s}
+    <div class="leyenda">
+      <span><i class="sw" style="background:#1F5E5C"></i>Carga de la semana</span>
+      <span><i class="sw" style="background:#9FBEBB"></i>Media de 28 días</span>
+      <span><i class="sw" style="background:#9A6B12"></i>Salto de más del 15%</span>
+    </div>
+    ${aviso}
+  </section>`;
+}
+
+function enganchaSemana() {
+  document.querySelectorAll(".barraRef .segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      FA.vista = b.dataset.v;
+      FA.quien = "";
+      if (FA.vista === "grupo") FA.quien = gruposDe(DATOS.filter(r => r.squad === F.squad))[0] || "";
+      if (FA.vista === "jugadora") FA.quien = [...new Set(DATOS.filter(r => r.squad === F.squad).map(r => r.jugador))].sort()[0] || "";
+      recordar(); pintar();
+    };
+  }));
+  const q = $("#semQuien");
+  if (q) q.onchange = e => { FA.quien = e.target.value; recordar(); pintar(); };
+  const c = $("#semCuantas");
+  if (c) c.onchange = e => { FA.semanas = Math.min(20, Math.max(4, num(e.target.value) || 6)); recordar(); pintar(); };
+}
+
+function vistaSemana() {
   cabecera();
   $("#notas").innerHTML = "";
-  $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
 
   const ref = sesion()[0];
-  if (!ref) { $("#tabla").innerHTML = `<p class="empty">Elige una sesión para fijar la fecha de referencia.</p>`; return; }
+  if (!ref) {
+    $("#selectores").innerHTML = "";
+    $("#tabla").innerHTML = `<p class="empty">Elige una sesión para fijar la semana de referencia.</p>`;
+    return;
+  }
+  $("#selectores").innerHTML = selectorSemana();
+  const arriba = formaSemana(ref) + agudaCronica(ref);
 
   const jugadores = [...new Set(DATOS.filter(r => r.squad === F.squad).map(r => r.jugador))];
   const semanas = semanasHasta(ref.fecha, FA.semanas);
@@ -1457,7 +2082,7 @@ function vistaAcwr() {
     ${METRICAS_ACWR.map(m => {
       const a = f.ratios[m.id];
       const cl = clase(a && a.ratio);
-      return `<td class="n acwr ${cl}" data-m="${esc(m.id)}">${a && a.ratio != null ? nf(a.ratio, 2) : "–"}</td>`;
+      return `<td class="n" data-m="${esc(m.id)}">${a && a.ratio != null ? nf(a.ratio, 2) : "–"}</td>`;
     }).join("")}
     <td class="n ${f.delta == null ? "" : f.delta >= 15 ? "acwr alta" : f.delta <= -15 ? "acwr baja" : ""}">
       ${f.delta == null ? "–" : (f.delta > 0 ? "+" : "") + nf(f.delta, 0) + "%"}</td>
@@ -1473,25 +2098,31 @@ function vistaAcwr() {
     return `<tr><td>${esc(f.jugador)}</td><td class="pos">${esc(f.posicion)}</td>
       <td class="n">${nf(a.aguda, detalle.dec)}</td>
       <td class="n">${nf(a.cronica, detalle.dec)}</td>
-      <td class="n acwr ${clase(a.ratio)}">${a.ratio == null ? "–" : nf(a.ratio, 2)}</td>
+      <td class="n">${a.ratio == null ? "–" : nf(a.ratio, 2)}</td>
       <td class="n">${a.sesiones}</td>
       <td>${a.ratio == null
         ? `<span class="tag na">${a.reincorporacion ? "Vuelve de parón" : "Sin histórico"}</span>`
-        : `<span class="tag ${clase(a.ratio)}">${clase(a.ratio) === "alta" ? "Por encima" : clase(a.ratio) === "baja" ? "Por debajo" : "En rango"}</span>`}</td>
+        : `<span class="tag na">${nf(a.aguda / (a.cronica || 1), 2)} veces su media</span>`}</td>
     </tr>`;
   }).join("");
 
-  $("#tabla").innerHTML = `${aviso}
+  $("#tabla").innerHTML = `${arriba}${aviso}
   <div class="celdas cuatro">
     <div class="c"><span>Referencia</span><b style="font-size:16px">${esc(fechaLarga(ref.fecha))}</b></div>
-    <div class="c dest"><span>ACWR medio · distancia</span><b>${mediaRatio == null ? "–" : nf(mediaRatio, 2)}</b></div>
-    <div class="c"><span>Con alguna métrica sobre ${nf(alto(), 2)}</span><b>${alarmas}</b></div>
-    <div class="c"><span>Jugadores</span><b>${filas.length}</b></div>
+    <div class="c dest"><span>Jugadoras con salto &gt; 15% esta semana</span><b>${
+      filas.filter(f => f.delta != null && Math.abs(f.delta) > 15).length}</b></div>
+    <div class="c"><span>Cambio medio de la semana</span><b>${(() => {
+      const d = filas.map(f => f.delta).filter(v => v != null && isFinite(v));
+      return d.length ? (d.reduce((a, b) => a + b, 0) / d.length > 0 ? "+" : "") + nf(d.reduce((a, b) => a + b, 0) / d.length, 0) + "%" : "–";
+    })()}</b></div>
+    <div class="c"><span>Jugadoras</span><b>${filas.length}</b></div>
   </div>
 
   <section class="panel">
-    <h3>Ratio agudo:crónico por métrica</h3>
-    <p class="sub">Carga de 7 días sobre la media semanal de los 28 anteriores · pulsa una columna para ver el detalle</p>
+    <h3>Ratio agudo:crónico por métrica <span class="uni">descriptivo</span></h3>
+    <p class="sub">Carga de 7 días sobre la media semanal de los 28 anteriores. Se muestra sin semáforo
+      a propósito: el rango 0,8–1,3 no está respaldado, y con denominadores inventados la relación con
+      la lesión sale parecida (Impellizzeri et al., 2020). El aviso que sí sirve es el Δ semana.</p>
     <div class="scroll"><table class="datos acwrtabla">
       <thead><tr><th>Jugador</th><th>Posición</th>
         ${METRICAS_ACWR.map(m => `<th class="n col" data-m="${esc(m.id)}">${esc(m.lbl)}${m.id === detalle.id ? " ·" : ""}</th>`).join("")}
@@ -1499,10 +2130,8 @@ function vistaAcwr() {
       <tbody>${cuerpo}</tbody>
     </table></div>
     <div class="leyenda">
-      <span><i class="sw" style="background:#F08A90"></i>por encima de ${nf(alto(), 2)}</span>
-      <span><i class="sw" style="background:var(--teal)"></i>en rango</span>
-      <span><i class="sw" style="background:var(--lav)"></i>por debajo de ${nf(bajo(), 2)}</span>
-      <span>Δ semana: cambio de distancia respecto a la semana anterior</span>
+      <span>Δ semana: cambio respecto a la semana anterior · en color a partir del 15%</span>
+      <span>Pulsa una columna de métrica para ver de dónde sale su ratio</span>
     </div>
   </section>
 
@@ -1520,6 +2149,7 @@ function vistaAcwr() {
     FA.metrica = th.dataset.m;
     pintar();
   });
+  enganchaSemana();
 }
 
 /* ---------- análisis por bloques ---------- */
@@ -1585,8 +2215,86 @@ function porMinuto(filas) {
   return vals;
 }
 
+/**
+ * El ritmo del partido, por minuto, con la misma ventana que usa el motor de
+ * referencia. Es la vara de medir: una tarea que no lo alcanza nunca no está
+ * preparando a nadie para lo que le va a pedir el sábado.
+ */
+function ritmoPartido(col, grupo) {
+  const base = DATOS.filter(r => r.squad === F.squad && r.esPartido
+    && r.minutos >= minutosMin(r.posicion)
+    && (!grupo || grupoDe(r.posicion) === grupo));
+  const ult = ultimasSesiones(base, FR.ventana);
+  if (!ult.length) return null;
+  return porMinuto(ult)[col];
+}
+
+function barrasTareas(bloques, grupo) {
+  let m = METRICAS_DRILL.find(x => x.id === FD.met) || METRICAS_DRILL[2];
+  // Si la métrica elegida viene a cero en todos los bloques (datos sin esa
+  // columna), se pasa a la primera que sí traiga números en vez de pintar
+  // seis barras vacías.
+  if (!bloques.some(b => b.vals[m.id] > 0)) {
+    const alt = METRICAS_DRILL.find(x => bloques.some(b => b.vals[x.id] > 0));
+    if (alt) m = alt;
+  }
+  const part = ritmoPartido(m.id, grupo);
+  const lista = bloques.slice().sort((a, b) => b.vals[m.id] - a.vals[m.id]);
+  if (!lista.length) return "";
+
+  const W = 1180, L = 268, R = 78, fh = 34, TOP = 28;
+  const iw = W - L - R;
+  const H = TOP + lista.length * fh + 58;
+  const mx = Math.max(...lista.map(b => b.vals[m.id]), part || 0) * 1.14 || 1;
+  const px = v => L + v / mx * iw;
+  const paso = pasoEje(mx, 6);
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  for (let v = 0; v <= mx; v += paso) {
+    s += `<line x1="${px(v).toFixed(1)}" y1="${TOP}" x2="${px(v).toFixed(1)}" y2="${TOP + lista.length * fh + 8}" stroke="#EDF0EF"/>`;
+    s += `<text x="${px(v).toFixed(1)}" y="${TOP + lista.length * fh + 25}" font-size="10" fill="#8A9290" text-anchor="middle">${nf(v, paso < 1 ? 1 : 0)}</text>`;
+  }
+  if (part) {
+    s += `<rect x="${(px(part) - 1).toFixed(1)}" y="${TOP}" width="2" height="${lista.length * fh + 4}" fill="#131715" opacity=".55"/>`;
+    s += `<text x="${px(part).toFixed(1)}" y="${TOP - 9}" font-size="10.5" font-weight="600" text-anchor="middle">ritmo del partido · ${nf(part, m.dec)}</text>`;
+  }
+  lista.forEach((b, i) => {
+    const y = TOP + 5 + i * fh, v = b.vals[m.id];
+    const llega = part && v >= part;
+    const nom = b.nombre.length > 38 ? b.nombre.slice(0, 37) + "…" : b.nombre;
+    s += `<text x="${L - 12}" y="${y + 15}" font-size="12" text-anchor="end">${esc(nom)}</text>`;
+    s += `<rect x="${L}" y="${y + 3}" width="${Math.max(px(v) - L, 1).toFixed(1)}" height="16" rx="3" fill="#454C92" opacity="${llega ? .92 : .4}"/>`;
+    s += `<text x="${(px(v) + 8).toFixed(1)}" y="${y + 16}" font-size="11.5" font-weight="600" fill="#5C6462">${nf(v, m.dec)}</text>`;
+  });
+  s += `<text x="${W - 20}" y="${H - 8}" font-size="10.5" fill="#5C6462" text-anchor="end">${esc(m.lbl)} · por minuto de juego</text>`;
+  s += `</svg>`;
+
+  const llegan = part ? lista.filter(b => b.vals[m.id] >= part).length : 0;
+  const grupos = gruposDe(DATOS.filter(r => r.squad === F.squad));
+  return `<section class="panel ancho">
+    <h3>¿Qué tarea llega a la intensidad del partido?</h3>
+    <p class="sub">Todo por minuto, que es la única forma de comparar un bloque de seis minutos con un
+      partido de setenta. La línea vertical es el ritmo medio de los últimos ${FR.ventana} partidos.</p>
+    <div class="filaRef noPdf" style="margin:0 0 14px">
+      <div class="campoR"><label>Métrica</label>
+        <div class="segR" data-g="met">${METRICAS_DRILL.map(x =>
+          `<button data-v="${esc(x.id)}" class="${x.id === m.id ? "on" : ""}">${esc(x.lbl)}</button>`).join("")}</div></div>
+      <div class="campoR"><label>Puesto</label>
+        <div class="segR" data-g="grupo"><button data-v="" class="${grupo ? "" : "on"}">Todas</button>${
+          grupos.map(g => `<button data-v="${esc(g)}" class="${g === grupo ? "on" : ""}">${esc(g)}</button>`).join("")}</div></div>
+    </div>
+    ${s}
+    <div class="leyenda">
+      <span>${part ? `${llegan} de ${lista.length} ${llegan === 1 ? "tarea llega" : "tareas llegan"} al ritmo del partido`
+                   : "Todavía no hay partidos con los que fijar el ritmo de referencia"}</span>
+      <span>Las tareas de contacto no se miden bien con esto: ahí lo que cuenta son los impactos</span>
+    </div>
+  </section>`;
+}
+
 function drillAnalysis() {
-  const filas = BLOQUES.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0);
+  const grupo = FD.grupo;
+  const filas = BLOQUES.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0
+    && (!grupo || grupoDe(r.posicion) === grupo));
   if (!filas.length) {
     return `<div class="empty"><p>Esta sesión no tiene bloques parciales guardados.</p>
       <p style="font-size:12px">Solo aparecen aquí los splits que no son la sesión o el partido completo.</p></div>`;
@@ -1654,7 +2362,8 @@ function drillAnalysis() {
     </tr>` : ""}
   </tfoot>`;
 
-  return `<section class="panel">
+  return `${barrasTareas(bloques, grupo)}
+  <section class="panel">
     <h3>Bloques de la sesión</h3>
     <div class="scroll"><table class="datos drills">
       <thead><tr>
@@ -1688,12 +2397,16 @@ function vistaDrill() {
     FD.orden = { col:c, asc: FD.orden.col === c ? !FD.orden.asc : false };
     pintar();
   });
+  document.querySelectorAll("#tabla .segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
+    b.onclick = () => { FD[sg.dataset.g] = b.dataset.v; recordar(); pintar(); };
+  }));
 }
 
 /* ---------- balón en juego ---------- */
 let BIP = [];                 // fases guardadas, una por secuencia
 const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloques
-             ordenJug:{ col:"", asc:false } };      // orden de la tabla de jugadores
+             ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
+             met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
 const FB = { partido:"", vista:"partido", sesionGps:"", metrica:"Distance (metres)" };
 const PAREJAS = {};   // partido de BiP -> sesión de GPS que le corresponde
 
@@ -2537,28 +3250,28 @@ function graficaJugador(v, col) {
     // Con métricas enteras de rango corto (impactos, power plays) cuatro cortes
     // dan la misma cifra repetida: se escribe solo cuando cambia.
     const etq = nf(n, dec ? 1 : 0);
-    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#1B263B"/>`;
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#E2E6E4"/>`;
     if (etq !== previa) {
-      g += `<text x="${L - 9}" y="${yy + 4}" fill="#6B7A94" font-size="11" text-anchor="end">${etq}</text>`;
+      g += `<text x="${L - 9}" y="${yy + 4}" fill="#8A9290" font-size="11" text-anchor="end">${etq}</text>`;
       previa = etq;
     }
   }
-  g += `<line x1="${L}" x2="${W - R}" y1="${y(media)}" y2="${y(media)}" stroke="#6E9A9B" stroke-width="1.5" stroke-dasharray="5 4"/>
-        <text x="${W - R}" y="${y(media) - 7}" fill="#6E9A9B" font-size="11" text-anchor="end">media ${nf(media, dec)}</text>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${y(media)}" y2="${y(media)}" stroke="#2F615C" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="${W - R}" y="${y(media) - 7}" fill="#2F615C" font-size="11" text-anchor="end">media ${nf(media, dec)}</text>`;
 
   const d = v.map((r, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(valorJug(r, col)).toFixed(1)}`).join(" ");
   g += `<path d="${d} L${x(v.length - 1).toFixed(1)},${T + ih} L${L},${T + ih} Z" fill="url(#degJug)"/>
-        <path d="${d}" fill="none" stroke="#A0A7D8" stroke-width="2.2" stroke-linejoin="round"/>`;
+        <path d="${d}" fill="none" stroke="#343C8A" stroke-width="2.2" stroke-linejoin="round"/>`;
 
-  g += `<line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" stroke="#26344F"/>
-        <text x="${L - 9}" y="${base + 4}" fill="#6B7A94" font-size="10" text-anchor="end">min</text>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${base}" y2="${base}" stroke="#DCE1DF"/>
+        <text x="${L - 9}" y="${base + 4}" fill="#8A9290" font-size="10" text-anchor="end">min</text>`;
   v.forEach((r, i) => {
     const h = Math.max(2, r.minutos / maxMin * altoBarra);
     g += `<rect x="${(x(i) - anchoB / 2).toFixed(1)}" y="${(base - h).toFixed(1)}" width="${anchoB.toFixed(1)}"
-           height="${h.toFixed(1)}" rx="3" fill="${r.esPartido ? "#3B3346" : "#26344F"}"/>
-          <text x="${x(i).toFixed(1)}" y="${H - 12}" fill="#6B7A94" font-size="10.5" text-anchor="middle">${diaCorto(r.fecha)}</text>`;
+           height="${h.toFixed(1)}" rx="3" fill="${r.esPartido ? "#3B3346" : "#DCE1DF"}"/>
+          <text x="${x(i).toFixed(1)}" y="${H - 12}" fill="#8A9290" font-size="10.5" text-anchor="middle">${diaCorto(r.fecha)}</text>`;
     if (v.length <= 18) g += `<text x="${x(i).toFixed(1)}" y="${(base - h - 5).toFixed(1)}"
-           fill="#9EABC2" font-size="10.5" text-anchor="middle">${nf(r.minutos)}'</text>`;
+           fill="#5C6462" font-size="10.5" text-anchor="middle">${nf(r.minutos)}'</text>`;
   });
   v.forEach((r, i) => {
     const n = valorJug(r, col);
@@ -2566,17 +3279,17 @@ function graficaJugador(v, col) {
     if (v.length <= 16) {
       // En los extremos se ancla al borde, que si no la cifra se sale del lienzo.
       const anc = i === 0 ? "start" : i === v.length - 1 ? "end" : "middle";
-      g += `<text x="${x(i).toFixed(1)}" y="${(y(n) - 11).toFixed(1)}" fill="#C8D2E4" font-size="10.5"
+      g += `<text x="${x(i).toFixed(1)}" y="${(y(n) - 11).toFixed(1)}" fill="#5C6462" font-size="10.5"
              text-anchor="${anc}">${fmt(col, n, dec)}</text>`;
     }
     g += `<circle class="ptJug" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(n).toFixed(1)}"
-           r="${r.esPartido ? 6 : 4.5}" fill="${r.esPartido ? "#EFB5B9" : "#A0A7D8"}" stroke="#151F33" stroke-width="2"/>`;
+           r="${r.esPartido ? 6 : 4.5}" fill="${r.esPartido ? "#A8323F" : "#343C8A"}" stroke="#FFFFFF" stroke-width="2"/>`;
   });
 
   return `<svg viewBox="0 0 ${W} ${H}" class="svgJug" role="img" aria-label="Evolución de ${esc(nombreMetrica(col))}">
     <defs><linearGradient id="degJug" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#A0A7D8" stop-opacity=".22"/>
-      <stop offset="100%" stop-color="#A0A7D8" stop-opacity="0"/></linearGradient></defs>${g}</svg>`;
+      <stop offset="0%" stop-color="#343C8A" stop-opacity=".22"/>
+      <stop offset="100%" stop-color="#343C8A" stop-opacity="0"/></linearGradient></defs>${g}</svg>`;
 }
 
 /** Cómo se llama el filtro activo, para el encabezado del PDF. */
@@ -2705,10 +3418,10 @@ function vistaJugador() {
   // El informe puede llevar varias métricas: la principal y las que añadas.
   const extras = FJ.metricas.filter(m => m !== col && (m === "__min" || disponibles.includes(m)));
   const leyenda = `<div class="leyenda">
-    <span><i class="sw" style="background:#EFB5B9"></i> Partido</span>
-    <span><i class="sw" style="background:#A0A7D8"></i> Entrenamiento</span>
-    <span><i class="sw ln" style="background:#6E9A9B"></i> Su media en la ventana</span>
-    <span><i class="sw" style="background:#26344F"></i> Minutos</span>
+    <span><i class="sw" style="background:#A8323F"></i> Partido</span>
+    <span><i class="sw" style="background:#343C8A"></i> Entrenamiento</span>
+    <span><i class="sw ln" style="background:#2F615C"></i> Su media en la ventana</span>
+    <span><i class="sw" style="background:#DCE1DF"></i> Minutos</span>
   </div>`;
   const grafico = (c, principal) => `<section class="panel ancho">
       <h3>${principal ? "Evolución · " : ""}${esc(c === "__min" ? "Minutos" : nombreMetrica(c))}</h3>
@@ -2786,7 +3499,7 @@ function pintar() {
     t.setAttribute("aria-selected", t.id === "tab-" + F.pestana));
   document.body.classList.toggle("sinSesion", F.pestana === "jugador");
   if (F.pestana === "jugador") return vistaJugador();
-  if (F.pestana === "acwr") return vistaAcwr();
+  if (F.pestana === "semana") return vistaSemana();
   if (F.pestana === "carga") return vistaCarga();
   if (F.pestana === "drill") return vistaDrill();
   if (F.pestana === "bip") return vistaBip();
@@ -2836,6 +3549,7 @@ function pintar() {
       ${scatter(filas)}
     </section>`;
   $("#paneles").innerHTML = `
+    ${bloqueBipReporte()}
     ${matriz(filas)}
     <div class="leyPaneles">
       <span>Cada bloque es una línea, con su color y su media punteada dentro</span>
@@ -2960,9 +3674,9 @@ function recordar() {
   try {
     localStorage.setItem(GUARDA, JSON.stringify({
       squad:F.squad, fecha:F.fecha, metricas:F.metricas, matriz:F.matriz, sc:F.sc,
-      pestana:F.pestana, escenario:FC.escenario,
-      metricaAcwr:FA.metrica, jugador:FJ,
-      parejas:PAREJAS, ordenDrill:FD.orden
+      pestana:F.pestana, escenario:FR.escenario, referencia:FR,
+      metricaAcwr:FA.metrica, semana:FA, jugador:FJ,
+      parejas:PAREJAS, ordenDrill:FD.orden, drill:{ met:FD.met, grupo:FD.grupo }
     }));
   } catch (e) { /* navegador sin almacenamiento, no pasa nada */ }
 }
@@ -2975,10 +3689,14 @@ function recuperar() {
     if (Array.isArray(p.matriz) && p.matriz.length) F.matriz = p.matriz;
     if (p.sc && p.sc.x && p.sc.y) F.sc = p.sc;
     if (p.ordenDrill) FD.orden = p.ordenDrill;
-    if (p.escenario) FC.escenario = p.escenario;
+    if (p.drill) Object.assign(FD, p.drill);
+    if (p.escenario) FR.escenario = p.escenario;
+    if (p.referencia) Object.assign(FR, p.referencia);
     if (p.metricaAcwr) FA.metrica = p.metricaAcwr;
+    if (p.semana) Object.assign(FA, p.semana);
     if (p.jugador) Object.assign(FJ, p.jugador);
-    if (p.pestana) F.pestana = p.pestana;
+    // "acwr" era el nombre viejo de la pestaña: se traduce en vez de dejar la app en blanco.
+    if (p.pestana) F.pestana = p.pestana === "acwr" ? "semana" : p.pestana;
     if (p.parejas) Object.assign(PAREJAS, p.parejas);
   } catch (e) { /* preferencias corruptas: se ignoran */ }
 }
