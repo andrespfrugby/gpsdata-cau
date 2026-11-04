@@ -47,6 +47,12 @@ window.CAU_CONFIG = {
   // Umbral en G de la columna "Impacts" de Catapult, para etiquetarla bien.
   // Admite un número para todos o uno por equipo, como aquí. No cambia ningún
   // cálculo, solo el título de la columna.
+  /* Género de cada equipo, para que los textos concuerden ("el más intenso"
+     frente a "la más intensa", "jugador" frente a "jugadora"). Si no está
+     aquí, se deduce del nombre: lo que lleve "femenino", "women" o "chicas"
+     se toma como femenino y el resto como masculino. */
+  generoEquipo: { "DHb": "m", "Femenino": "f" },
+
   umbralImpacto: {
     _defecto: 6,
     "Femenino": 5
