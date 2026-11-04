@@ -1,5 +1,6 @@
 (() => {
 "use strict";
+const VERSION = "20261104a";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -528,7 +529,9 @@ async function cargar() {
   }
 }
 function setEstado(txt, live) {
-  $("#estadoTxt").textContent = txt;
+  // La versión va pegada al estado: si tras subir los archivos aquí sigue
+  // saliendo la de antes, lo que está corriendo es la copia vieja.
+  $("#estadoTxt").innerHTML = esc(txt) + `<br><span class="ver">v${esc(VERSION)}</span>`;
   $("#estado .dot").className = "dot" + (live ? " live" : "");
 }
 
