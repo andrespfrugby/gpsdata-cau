@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261104a";   // se muestra abajo en el lateral
+const VERSION = "20261104b";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -2568,6 +2568,7 @@ function vistaDrill() {
 /* ---------- balón en juego ---------- */
 let BIP = [];                 // fases guardadas, una por secuencia
 let AVISO_BIP = "";           // lo que el Apps Script cuenta si el enlace falla
+const DURACION_PARTE = {};    // "partido|parte" -> segundos reales de esa parte
 const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloques
              ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
@@ -2934,9 +2935,13 @@ function agregaBip(fases) {
   if (!fases.length) return null;
   const dur = fases.map(f => f.duracion);
   const bip = dur.reduce((a, b) => a + b, 0);
+  // Si el export trae la fila "task" de esa parte, su duración es el reloj de
+  // verdad. Si no, se estima de la primera a la última fase, que se queda corto.
+  const partes = [...new Set(fases.map(f => f.partido + "|" + f.parte))];
+  const reloj = partes.reduce((t, k) => t + (DURACION_PARTE[k] || 0), 0);
   const ini = Math.min(...fases.map(f => f.inicio || 0));
   const fin = Math.max(...fases.map(f => (f.inicio || 0) + f.duracion * 1000));
-  const raw = (fin - ini) / 1000 || bip;
+  const raw = reloj || (fin - ini) / 1000 || bip;
   const post = fases.map(f => f.post).filter(v => v > 0);
   const rest = post.length ? post.reduce((a, b) => a + b, 0) / post.length : 0;
   const media = bip / fases.length;
@@ -2981,7 +2986,12 @@ function datosBip() {
       todo.raw = h1.raw + h2.raw;
       todo.pct = todo.raw ? todo.bip / todo.raw : 0;
       todo.p5 = Math.max(h1.p5, h2.p5);
+      // Las medias del partido son la media de las dos partes, no el montón
+      // entero junto: es como lo calcula tu Excel y así los números coinciden.
       todo.wr = (h1.wr + h2.wr) / 2;
+      todo.media = (h1.media + h2.media) / 2;
+      todo.m30 = (h1.m30 + h2.m30) / 2;
+      todo.rest = (h1.rest + h2.rest) / 2;
     }
     return { id:nom, nom, fecha:fases[0].fecha, temp:temporadaDe(fases[0].fecha),
              all:todo, h1:h1 || todo, h2:h2 || todo,
@@ -3369,18 +3379,32 @@ async function leerBip(file) {
 }
 
 /** Deja las filas del CSV de BiP en la forma que usa la app. */
+/**
+ * Pasa las filas crudas a fases. Las de entity_type = task no son fases: son
+ * la duración real de cada parte, y se guardan aparte porque con ellas el % de
+ * balón en juego sale exacto en vez de estimado a ojo entre la primera y la
+ * última fase.
+ */
 function normalizaBip(objetos, partido) {
   const salida = [];
   for (const o of objetos) {
     const m = {};
     for (const [k, v] of Object.entries(o)) m[clave(k)] = v;
-    // El CSV crudo trae rucks y partes mezclados; lo guardado en el Sheets ya viene filtrado.
-    if ("entitytype" in m && String(m.entitytype).trim().toLowerCase() !== "bip") continue;
+    const tipo = "entitytype" in m ? String(m.entitytype).trim().toLowerCase() : "bip";
+    const nomPartido = String(m.activityname || partido || "").trim() || partido;
+    const parte = String(m.taskname || "").trim() || "Parte 1";
+
+    if (tipo === "task") {
+      const d = num(m.durationseconds);
+      if (nomPartido && d > 0) DURACION_PARTE[nomPartido + "|" + parte] = d;
+      continue;
+    }
+    if (tipo !== "bip") continue;
     if (!m.bipid && !m.bipname) continue;
+
     const inicio = num(m.starttimeunixms);
     salida.push({
-      partido: String(m.activityname || partido || "").trim() || partido,
-      parte: String(m.taskname || "").trim() || "Parte 1",
+      partido: nomPartido, parte,
       id: String(m.bipid || "").trim(),
       nombre: String(m.bipname || "").trim(),
       rucks: num(m.ruckcount),
@@ -3393,7 +3417,6 @@ function normalizaBip(objetos, partido) {
   return salida;
 }
 
-/* ---------- cargar ficheros ---------- */
 let ULTIMO = null;   // resultado del último fichero leído
 
 function vistaCargar() {
