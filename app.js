@@ -1161,31 +1161,28 @@ function scatter(filas) {
   // sin colocar: el ancho real de una frase no se puede calcular contando
   // letras, así que el hueco y el tamaño de la caja se ajustan después, ya
   // pintados, en ajustaCarteles().
+  // Los cuatro carteles grandes tapaban puntos: dentro del lienzo se queda
+  // solo una pastilla pequeña en cada esquina y la explicación baja a la
+  // leyenda de debajo, donde además se lee mucho mejor.
   const TX = textosCuadrante();
   const quads = [
-    ["verde", "#1F5E5C", cx, T, W - R - cx, cy - T, "end"],
-    ["amar",  "#9A6B12", L, T, cx - L, cy - T, "start"],
-    ["nara",  "#B4602A", cx, cy, W - R - cx, T + ih - cy, "end"],
-    ["rojo",  "#C0392B", L, cy, cx - L, T + ih - cy, "start"]
+    ["verde", "#1F5E5C", cx, T, W - R - cx, cy - T, "der", "arr"],
+    ["amar",  "#9A6B12", L, T, cx - L, cy - T, "izq", "arr"],
+    ["nara",  "#B4602A", cx, cy, W - R - cx, T + ih - cy, "der", "aba"],
+    ["rojo",  "#C0392B", L, cy, cx - L, T + ih - cy, "izq", "aba"]
   ];
-  for (const [k, col, qx, qy, qw, qh, anc] of quads) {
+  for (const [k, col, qx, qy, qw, qh, ax, ay] of quads) {
     const t = TX[k];
-    let c = `<rect class="fondo" x="0" y="0" width="10" height="10" rx="8" fill="#FFFFFF" opacity=".82"/>
-      <text x="10" y="20" fill="${col}" font-size="13.5" font-weight="700" letter-spacing=".03em"
-        ><tspan font-size="19">${t.emo}</tspan><tspan dx="6">${esc(t.tit)}</tspan></text>`;
-    let ty = 36;
-    for (const l of t.desc) {
-      c += `<text x="10" y="${ty}" fill="#3F4846" font-size="10.5">${esc(l)}</text>`;
-      ty += 12.6;
-    }
-    ty += 4;
-    t.foco.forEach((l, i) => {
-      c += `<text x="10" y="${ty}" fill="${col}" font-size="10.5" font-weight="600">${
-        i === 0 ? "→ Foco en " : ""}${esc(l)}</text>`;
-      ty += 12.6;
-    });
-    g += `<g class="cartel" data-qx="${qx.toFixed(1)}" data-qy="${qy.toFixed(1)}"
-            data-qw="${qw.toFixed(1)}" data-qh="${qh.toFixed(1)}" data-anc="${anc}">${c}</g>`;
+    const rot = t.fle;
+    const an = Math.min(qw - 12, rot.length * 5.9 + 20), al = 21;
+    if (an < 70) continue;
+    const px0 = ax === "izq" ? qx + 6 : qx + qw - an - 6;
+    const py0 = ay === "arr" ? qy + 6 : qy + qh - al - 6;
+    g += `<g class="cartel" data-qx="${px0.toFixed(1)}" data-qy="${py0.toFixed(1)}">
+      <rect class="fondo" x="${px0.toFixed(1)}" y="${py0.toFixed(1)}" width="${an.toFixed(1)}"
+        height="${al}" rx="10" fill="#FFFFFF" opacity=".94" stroke="#D4D8D6"/>
+      <text x="${(px0 + an / 2).toFixed(1)}" y="${(py0 + 14.5).toFixed(1)}" fill="${col}" font-size="10.5"
+        font-weight="700" text-anchor="middle" letter-spacing=".01em">${esc(rot)}</text></g>`;
   }
 
   // Los nombres se pintan en su sitio de siempre y se recolocan después, ya
@@ -1227,10 +1224,22 @@ const unaUn = () => esFem() ? "una" : "un";
 const unaJugadora = () => esFem() ? "una jugadora" : "un jugador";
 const companeras = () => esFem() ? "compañeras" : "compañeros";
 
+/** Los cuatro cuadrantes explicados debajo del gráfico, en cuatro columnas. */
+function leyendaCuadrantes() {
+  const TX = textosCuadrante();
+  const cols = [["verde", "#1F5E5C"], ["amar", "#9A6B12"], ["nara", "#B4602A"], ["rojo", "#C0392B"]];
+  return `<div class="leyCuad">${cols.map(([k, col]) => {
+    const t = TX[k];
+    return `<div style="border-top:2px solid ${col}">
+      <b style="color:${col}">${t.emo} ${esc(t.tit)}</b>
+      <span>${esc(t.desc.join(" "))}.</span>
+      <i>Foco en ${esc(t.foco.join(" "))}.</i></div>`;
+  }).join("")}</div>`;
+}
+
 /** Una línea, no un párrafo: lo demás lo cuentan los cuadrantes. */
 function explicaScatter() {
-  return `<p class="sub">Cada ${esFem() ? "jugadora" : "jugador"} se compara con ${esFem() ? "las" : "los"} de su misma posición.
-    El 100% es el promedio de su línea ese día, no un objetivo.</p>`;
+  return `<p class="sub">Comparación con el promedio de tu posición.</p>`;
 }
 
 /* Cómo se llama cada métrica cuando se habla con las jugadoras, y qué hay que
@@ -1253,26 +1262,35 @@ const claro = c => CLARO[c] || etiquetaChip(c).toLowerCase();
 const foco = c => FOCO[c] || ("sumar " + claro(c));
 
 /** Los cuatro carteles de dentro del gráfico. */
+/** Primera letra en mayúscula, para arrancar una frase. */
+const cap = t => String(t).charAt(0).toUpperCase() + String(t).slice(1);
+
 function textosCuadrante() {
   const ex = claro(F.sc.x), ey = claro(F.sc.y);
+  // Dentro del gráfico van las flechas con el nombre de la métrica, que es lo
+  // que una jugadora necesita para saber dónde está. El vehículo es el nombre
+  // de la zona y vive en la leyenda de debajo, donde hay sitio para explicarlo.
+  const corto = c => {
+    const t = CLARO[c] || etiquetaChip(c).toLowerCase();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  const X = corto(F.sc.x), Y = corto(F.sc.y);
   return {
-    verde:{ emo:"🏎️", tit:"MOTOR",
-            desc:envuelve(cap(ex) + " y " + ey + " por encima de su posición"),
+    verde:{ emo:"🏎️", tit:"F1", fle:`↑ ${Y}   ↑ ${X}`,
+            desc:envuelve(cap(ex) + " y " + ey + " por encima de lo normal en tu puesto"),
             foco:envuelve("ser consistente con este motor") },
-    amar: { emo:"🏍️", tit:"↑ " + etiquetaChip(F.sc.y).toUpperCase(),
+    amar: { emo:"🏍️", tit:"Moto", fle:`↑ ${Y}   ↓ ${X}`,
             desc:envuelve("Más " + ey + ", menos " + ex),
             foco:envuelve(foco(F.sc.x).replace("|", " ")) },
-    nara: { emo:"🚤", tit:"↑ " + etiquetaChip(F.sc.x).toUpperCase(),
+    nara: { emo:"🚤", tit:"Lancha", fle:`↑ ${X}   ↓ ${Y}`,
             desc:envuelve("Más " + ex + ", menos " + ey),
             foco:envuelve(foco(F.sc.y).replace("|", " ")) },
-    rojo: { emo:"⛽", tit:"ENTRAR EN JUEGO",
-            desc:envuelve("Menos " + ex + " y menos " + ey + " que su posición"),
+    rojo: { emo:"⛽", tit:"Entrar en juego", fle:`↓ ${Y}   ↓ ${X}`,
+            desc:envuelve(cap(ex) + " y " + ey + " por debajo de lo normal en tu puesto"),
             foco:envuelve("aparecer en más jugadas: apoyo, patada y recolocación") }
   };
 }
-const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
 
-/** Parte un texto en líneas cortas para que el cartel no se coma el cuadrante. */
 function envuelve(txt, max = 28) {
   const out = [];
   let linea = "";
@@ -1294,36 +1312,27 @@ function cajas100(filas) {
   const x = F.sc.x, y = F.sc.y;
   const dx = decMedia(decimales(filas.map(r => Math.abs(r.crudo[x] || 0))));
   const dy = decMedia(decimales(filas.map(r => Math.abs(r.crudo[y] || 0))));
-  return `<div class="cajas100">
-    <span class="t100">El 100% de cada línea en esta sesión</span>
-    ${puestos.map(p => {
-      const rs = filas.filter(r => grupoDe(r.posicion) === p);
-      return `<div class="c100" style="border-left-color:${tonoGrupo(p, puestos).base}">
-        <span>${esc(p)}</span>
-        <div class="par"><b>${fmt(x, mediaDe(rs, x), dx)}${unidad(x) ? " " + esc(unidad(x)) : ""}</b><i>${esc(etiquetaChip(x))}</i></div>
-        <div class="par"><b>${fmt(y, mediaDe(rs, y), dy)}${unidad(y) ? " " + esc(unidad(y)) : ""}</b><i>${esc(etiquetaChip(y))}</i></div>
-      </div>`;
-    }).join("")}
-  </div>`;
+  // Tres cajas para esto ocupaban media pantalla. El dato hay que darlo —sin
+  // él nadie sabe contra qué es ese 100%— pero cabe en una línea.
+  const partes = puestos.map(p => {
+    const rs = filas.filter(r => grupoDe(r.posicion) === p);
+    return `<span><i style="background:${tonoGrupo(p, puestos).base}"></i>${esc(p)}
+      <b>${fmt(x, mediaDe(rs, x), dx)}${unidad(x) ? " " + esc(unidad(x)) : ""}</b>
+      y <b>${fmt(y, mediaDe(rs, y), dy)}${unidad(y) ? " " + esc(unidad(y)) : ""}</b></span>`;
+  }).join("");
+  return `<p class="ref100">${partes}</p>`;
 }
 
 /**
- * Coloca los carteles del scatter una vez pintados: mide el texto de verdad,
- * ajusta la caja a ese tamaño y elige la esquina de su cuadrante que menos
- * bolitas tape. Si no cabe en ninguna, el cartel se quita.
- */
-/**
  * Coloca los nombres del cuadrante sin que se pisen. Se prueban cuatro sitios
  * alrededor de la bolita y, si ninguno está libre, se sube con una guía fina
- * hasta encontrar hueco. Las cajas que ya se han colocado (los carteles de
- * cuadrante) cuentan como ocupadas.
+ * hasta encontrar hueco. Las pastillas de esquina cuentan como ocupadas.
  */
 function colocaNombres(svg, ocupadas, limites) {
   const guias = svg.querySelector("g.guias");
   const nombres = [...svg.querySelectorAll("text.nomPt")];
   const pisa = b => ocupadas.some(o =>
     b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
-  // Las bolitas también ocupan.
   for (const t of nombres) {
     ocupadas.push({ x:+t.dataset.px - 6, y:+t.dataset.py - 6, w:12, h:12 });
   }
@@ -1349,8 +1358,7 @@ function colocaNombres(svg, ocupadas, limites) {
     // Último recurso: se coloca encima aunque roce. Antes se borraba el
     // nombre y quedaba una bolita anónima, que es peor que un roce.
     if (!puesto) {
-      const c = { x:px - an / 2, y:py - 9 - al + 1, w:an, h:al };
-      puesto = [0, -9, c];
+      puesto = [0, -9, { x:px - an / 2, y:py - 9 - al + 1, w:an, h:al }];
     }
     ocupadas.push(puesto[2]);
     t.setAttribute("x", (px + puesto[0]).toFixed(1));
@@ -1366,40 +1374,14 @@ function colocaNombres(svg, ocupadas, limites) {
 function ajustaCarteles() {
   const svg = document.querySelector("#cuadrante svg.cols");
   if (!svg) return;
-  const bolas = [...svg.querySelectorAll("circle")].map(c => ({
-    x:+c.getAttribute("cx"), y:+c.getAttribute("cy")
-  }));
   const puestas = [];
+  // Las pastillas de esquina ya vienen colocadas; solo hay que apuntarlas para
+  // que los nombres de las jugadoras no se las coman.
   for (const g of svg.querySelectorAll("g.cartel")) {
-    const caja = g.getBBox();          // incluye el rect de 10x10, da igual
-    const textos = [...g.querySelectorAll("text")];
-    let an = 0, al = 0;
-    for (const t of textos) {
-      const b = t.getBBox();
-      an = Math.max(an, b.x + b.width);
-      al = Math.max(al, b.y + b.height);
-    }
-    an += 10; al += 8;                 // el mismo aire que lleva a la izquierda
-    const qx = +g.dataset.qx, qy = +g.dataset.qy;
-    const qw = +g.dataset.qw, qh = +g.dataset.qh, anc = g.dataset.anc;
-    if (qw < an + 12 || qh < al + 12) { g.remove(); continue; }
-    const izq = qx + 6, der = qx + qw - an - 6;
-    const arr = qy + 8, abj = qy + qh - al - 8;
-    const fuera = anc === "start" ? izq : der, dentro = anc === "start" ? der : izq;
-    const cand = [[fuera, arr], [fuera, abj], [dentro, arr], [dentro, abj]];
-    // El nombre del jugador va encima de su bolita y ocupa a los lados.
-    const tapa = (bx, by) => bolas.filter(p =>
-      p.x > bx - 26 && p.x < bx + an + 26 && p.y > by - 20 && p.y < by + al + 6).length;
-    let mejor = cand[0], suyo = tapa(cand[0][0], cand[0][1]);
-    for (const c of cand.slice(1)) {
-      const n = tapa(c[0], c[1]);
-      if (n < suyo) { mejor = c; suyo = n; }
-    }
-    const fondo = g.querySelector("rect.fondo");
-    fondo.setAttribute("width", an.toFixed(1));
-    fondo.setAttribute("height", al.toFixed(1));
-    g.setAttribute("transform", `translate(${mejor[0].toFixed(1)} ${mejor[1].toFixed(1)})`);
-    puestas.push({ x:mejor[0], y:mejor[1], w:an, h:al });
+    const r = g.querySelector("rect.fondo");
+    if (!r) continue;
+    puestas.push({ x:+r.getAttribute("x"), y:+r.getAttribute("y"),
+                   w:+r.getAttribute("width"), h:+r.getAttribute("height") });
   }
   const vb = (svg.getAttribute("viewBox") || "0 0 100 100").split(/\s+/).map(Number);
   colocaNombres(svg, puestas, { x:vb[0] + 2, y:vb[1] + 2, w:vb[2] - 4, h:vb[3] - 4 });
@@ -4006,8 +3988,26 @@ function engancharJugador(v) {
   });
 }
 
+/** El rótulo del lateral y el título de la pestaña del navegador. */
+function rotulaMarca() {
+  const tit = C.titulo || "Control de carga";
+  const t = $("#bTitulo"), sb = $("#bSub");
+  if (t) t.textContent = tit;
+  if (sb) {
+    sb.textContent = C.subtitulo || "";
+    sb.style.display = sb.textContent ? "" : "none";
+  }
+  const m = $(".brand .mark");
+  if (m && C.siglas) m.textContent = C.siglas;
+  document.title = tit + (C.siglas ? " · " + C.siglas : "");
+}
+
 function pintar() {
   recordar();
+  rotulaMarca();
+  // El rótulo de la pestaña de jugadora concuerda con el equipo elegido.
+  const etJug = document.querySelector("#tab-jugador .et");
+  if (etJug) etJug.textContent = JUG();
   // La pestaña se recuerda entre recargas: el resaltado tiene que ir con ella.
   document.querySelectorAll(".tab").forEach(t =>
     t.setAttribute("aria-selected", t.id === "tab-" + F.pestana));
@@ -4056,11 +4056,13 @@ function pintar() {
   // El cuadrante va en su propio hueco, entre el ranking y la tabla.
   $("#cuadrante").innerHTML = `
     <section class="panel disp">
-      <h3>Dispersión por posición <span class="uni">% de la media de su puesto</span></h3>
+      <h3>Cuadrante de acciones de alta intensidad
+        <span class="uni">${esc(nombreCorto(F.sc.x))} frente a ${esc(nombreCorto(F.sc.y))} · % de la media de tu puesto</span></h3>
       <div class="ejes noPdf">${selectorEje("x", filas)}${selectorEje("y", filas)}</div>
       ${explicaScatter()}
       ${cajas100(filas)}
       ${scatter(filas)}
+      ${leyendaCuadrantes()}
     </section>`;
   $("#paneles").innerHTML = `
     ${bloqueBipReporte()}
