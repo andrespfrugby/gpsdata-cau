@@ -94,12 +94,20 @@ const RESUMEN = [
 
 /* Las cinco tarjetas de podio. Cada una mide algo distinto: dos de velocidad,
    una mecánica, una de contacto y el volumen al final. */
+/**
+ * Los cinco rankings del reporte. La distancia total salió de aquí porque ya
+ * es el primer KPI de arriba y además la gana siempre quien más minutos juega.
+ * En su lugar entran la distancia explosiva, que es lo que de verdad se
+ * acumula, y una medida por minuto: ahí una jugadora de veinte minutos puede
+ * ganar a una de ochenta, que es justo lo que los demás rankings esconden.
+ */
 const TOP3 = [
   { col:"Sprint Distance (m)",      ico:"🚀",  titulo:"HSR · distancia a alta velocidad", corto:"HSR" },
+  { col:HMLD,                       ico:"🔥",  titulo:"Distancia explosiva (HMLD)",   corto:"HMLD" },
   { col:"Top Speed (m/s)",          ico:"⚡",  titulo:"Velocidad máxima (m/s)",       corto:"Vel. máx m/s" },
   { col:ACC3,                       ico:"🏎️", titulo:"Aceleraciones > 3 m/s²",       corto:"ACC > 3 m/s²" },
-  { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" },
-  { col:"Distance (metres)",        ico:"🛳️", titulo:"Distancia total (m)",          corto:"Distancia (m)" }
+  { col:ACDC3MIN,                   ico:"🌶️", titulo:"La más intensa · ACC+DECC por minuto", corto:"ACC+DECC / min" },
+  { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" }
 ];
 
 /* Los nombres se dejan tal cual salen en el Sheets, para que no haya dudas
@@ -1117,7 +1125,7 @@ function scatter(filas) {
                  b:Math.abs(r.crudo[F.sc.y] || 0) / my * 100 });
     }
   }
-  const W = 1180, H = 430, L = 56, R = 16, T = 14, B = 38;
+  const W = 1180, H = 330, L = 56, R = 16, T = 14, B = 36;
   const iw = W - L - R, ih = H - T - B;
   // Los dos ejes van simétricos alrededor del 100%, así el cruce cae siempre
   // justo en el centro y los cuatro cuadrantes miden lo mismo: el cartel de
@@ -1408,10 +1416,14 @@ const FR = {
   nivel:"jugadora",     // jugadora | posicion | equipo
   modo:"media",         // media | alto | maximo | z | demandas
   objetivo:70,
-  ventana:5,            // cuántos partidos entran en la referencia
+  ventana:5,            // cuántas sesiones entran en la referencia
   minObs:5,             // por debajo de esto la referencia baja de nivel sola
-  minZ:8,               // partidos mínimos para que el z-score se pinte
-  soloPartidos:true,
+  minZ:8,               // sesiones mínimas para que el z-score se pinte
+  tipo:"md",            // partido | md | entreno | todo
+  eventos:[],           // sesiones elegidas a mano; vacío = ventana automática
+  color:"objetivo",     // objetivo | fijo — de dónde salen las bandas de color
+  margenes:[80, 60],    // % del objetivo donde empiezan el verde claro y el ocre
+  umbrales:[100, 75, 50],   // los tres cortes, cuando el color va por fijos
   minutos:null,         // minutos mínimos por puesto; se copia de config
   escenario:"p50",      // solo para el modo "demandas"
   abierto:false
@@ -1421,33 +1433,59 @@ const FC = FR;   // antes el escenario vivía en FC; se mantiene el nombre
 const NIVELES = [["jugadora", "Ella misma"], ["posicion", "Su posición"], ["equipo", "El equipo"]];
 const MODOS = [["media", "Media de la ventana"], ["alto", "Perfil alto (p90)"],
                ["maximo", "Máximo"], ["z", "Z-score"], ["demandas", "Demandas 25/26"]];
+const TIPOS = [["md", "Mismo tipo de sesión"], ["partido", "Solo partidos"],
+               ["entreno", "Solo entrenos"], ["todo", "Todas"]];
 
 function minutosMin(puesto) {
   if (!FR.minutos) FR.minutos = Object.assign({}, C.minutosPartido || {});
   return FR.minutos[puesto] ?? FR.minutos._defecto ?? 0;
 }
 
-/** Una sesión cuenta para la referencia si es del tipo pedido, llega a los
- *  minutos mínimos de su puesto y trae la métrica. */
-function valeParaRef(r, col) {
-  return (!FR.soloPartidos || r.esPartido)
-      && r.minutos >= minutosMin(r.posicion)
-      && r.crudo[col] != null && !isNaN(r.crudo[col]);
+/** Cómo se llama un MD en texto: MD0 es el partido. */
+const nombreMD = md => md === 0 || md === "0" ? "partido" : (md == null || md === "" ? "sin MD" : "MD-" + Math.abs(num(md)));
+
+/**
+ * Una sesión entra en la referencia si es del tipo pedido, llega a los minutos
+ * mínimos (solo se exigen en partidos, que es donde tienen sentido) y trae la
+ * métrica. Comparar un MD-4 contra partidos pinta la tabla entera de rojo sin
+ * que eso signifique nada: por eso el tipo por defecto es "mismo tipo".
+ */
+function valeParaRef(x, col, act) {
+  if (FR.tipo === "partido" && !x.esPartido) return false;
+  if (FR.tipo === "entreno" && x.esPartido) return false;
+  if (FR.tipo === "md" && act && x.md !== act.md) return false;
+  const minReq = x.esPartido ? minutosMin(x.posicion) : 0;
+  return x.minutos >= minReq && x.crudo[col] != null && !isNaN(x.crudo[col]);
 }
 
+/** Las últimas n sesiones, o exactamente las elegidas a mano en la ruedecita. */
 function ultimasSesiones(filas, n) {
+  if (FR.eventos && FR.eventos.length) {
+    const set = new Set(FR.eventos);
+    return filas.filter(x => set.has(idSesion(x)));
+  }
   const ids = [...new Set(filas.map(x => idSesion(x)))].slice(-n);
   const set = new Set(ids);
   return filas.filter(x => set.has(idSesion(x)));
 }
 
 function muestraRef(r, col, nivel) {
-  const antes = DATOS.filter(x => x.squad === r.squad && x.fechaMs < r.fechaMs && valeParaRef(x, col));
+  const antes = DATOS.filter(x => x.squad === r.squad && x.fechaMs < r.fechaMs && valeParaRef(x, col, r));
   let pool;
-  if (nivel === "jugadora")      pool = antes.filter(x => x.jugador === r.jugador).slice(-FR.ventana);
-  else if (nivel === "posicion") pool = ultimasSesiones(antes.filter(x => x.posicion === r.posicion), FR.ventana);
-  else                           pool = ultimasSesiones(antes, FR.ventana);
+  if (nivel === "jugadora") {
+    const suyas = antes.filter(x => x.jugador === r.jugador);
+    pool = (FR.eventos && FR.eventos.length)
+      ? suyas.filter(x => FR.eventos.includes(idSesion(x)))
+      : suyas.slice(-FR.ventana);
+  } else if (nivel === "posicion") pool = ultimasSesiones(antes.filter(x => x.posicion === r.posicion), FR.ventana);
+  else                            pool = ultimasSesiones(antes, FR.ventana);
   return pool.map(x => Math.abs(x.crudo[col]));
+}
+
+/** Cuántas sesiones de ese tipo tiene registradas esa jugadora en total. */
+function registradasDe(r, col) {
+  return DATOS.filter(x => x.squad === r.squad && x.jugador === r.jugador
+    && x.fechaMs < r.fechaMs && valeParaRef(x, col, r)).length;
 }
 
 function percentil(ordenados, p) {
@@ -1469,8 +1507,8 @@ function estadistica(vals) {
 const ORDEN_NIVEL = ["jugadora", "posicion", "equipo"];
 /**
  * La cascada: se empieza en el nivel que pida la barra y se baja mientras no
- * haya observaciones suficientes. Devuelve también con qué nivel se ha
- * quedado, para poder decirlo en la fila en vez de esconderlo.
+ * haya observaciones suficientes. Devuelve con qué nivel se ha quedado, para
+ * poder decirlo en la fila en vez de esconderlo.
  */
 function referencia(r, col) {
   const desde = Math.max(0, ORDEN_NIVEL.indexOf(FR.nivel));
@@ -1503,12 +1541,51 @@ function valorRef(e, r, col) {
 const ETIQUETA_NIVEL = { jugadora:"ella", posicion:"posición", equipo:"equipo" };
 const CLASE_NIVEL = { jugadora:"s-jug", posicion:"s-pos", equipo:"s-eq" };
 
+/* ---------- qué sesiones entran ---------- */
+/** Las candidatas de la ventana para el equipo, de la más vieja a la más nueva. */
+function candidatasRef() {
+  const act = sesion()[0];
+  if (!act) return [];
+  const col = (todasMetricas()[0]) || "Distance (metres)";
+  const base = DATOS.filter(x => x.squad === F.squad && x.fechaMs < act.fechaMs && valeParaRef(x, col, act));
+  const vistas = new Map();
+  for (const x of base) if (!vistas.has(idSesion(x))) vistas.set(idSesion(x), x);
+  return [...vistas.values()];
+}
+
+function eventosVentana() {
+  const todas = candidatasRef();
+  if (FR.eventos && FR.eventos.length) return todas.filter(x => FR.eventos.includes(idSesion(x)));
+  return todas.slice(-FR.ventana);
+}
+
+const rotuloEvento = x => `${x.fecha.toLocaleDateString("es-ES", { day:"2-digit", month:"short" })} · ${
+  x.sesion || nombreMD(x.md)}`;
+
+function notaEventos() {
+  if (FR.modo === "demandas") return "";
+  const usados = eventosVentana();
+  if (!usados.length) return `<p class="notaEv">Todavía no hay sesiones anteriores del tipo elegido con las que comparar.</p>`;
+  const act = sesion()[0];
+  const manual = FR.eventos && FR.eventos.length;
+  const tipo = FR.tipo === "md" && act ? `del mismo tipo que esta (${esc(nombreMD(act.md))})`
+             : FR.tipo === "partido" ? "partidos"
+             : FR.tipo === "entreno" ? "entrenos" : "sesiones de cualquier tipo";
+  return `<p class="notaEv"><b>${manual ? "Sesiones elegidas a mano" : `Las ${usados.length} sesiones de la referencia`}</b>
+    · ${esc(tipo)}: ${usados.map(x => esc(rotuloEvento(x))).join(" · ")}.
+    ${FR.nivel === "jugadora"
+      ? "A nivel de jugadora cada una usa las suyas, así que si faltó a alguna, su ventana es más corta: el número de la etiqueta lo dice."
+      : ""}</p>`;
+}
+
 /* ---------- barra de control y ruedecita ---------- */
 function barraRef() {
   const seg = (grupo, ops, activo) => `<div class="segR" data-g="${grupo}">${
     ops.map(([v, t]) => `<button data-v="${v}" class="${v === activo ? "on" : ""}">${esc(t)}</button>`).join("")
   }</div>`;
   const D = C.demandas;
+  const act = sesion()[0];
+  const etTipo = FR.tipo === "md" && act ? `Qué sesiones entran · hoy es ${esc(nombreMD(act.md))}` : "Qué sesiones entran";
   return `<section class="barraRef noPdf">
     <div class="filaRef">
       <div class="campoR"><label>Comparar contra</label>${seg("nivel", NIVELES, FR.nivel)}</div>
@@ -1521,6 +1598,14 @@ function barraRef() {
       <button class="ruedaR${FR.abierto ? " on" : ""}" id="btnCriterios"
         title="Criterios de selección de datos" aria-expanded="${FR.abierto}">⚙</button>
     </div>
+    ${FR.modo === "demandas" ? "" : `<div class="filaRef" style="margin-top:12px">
+      <div class="campoR"><label>${etTipo}</label>${seg("tipo", TIPOS, FR.tipo)}</div>
+      <div class="campoR"><label>Ventana</label>
+        <div class="objR"><input id="fVentana" type="number" min="2" max="20" value="${FR.ventana}"><span>sesiones</span></div></div>
+      ${FR.eventos && FR.eventos.length
+        ? `<div class="campoR"><label>&nbsp;</label>
+           <button id="btnLimpiaEv" class="bot">Quitar la selección a mano (${FR.eventos.length})</button></div>` : ""}
+    </div>`}
     ${FR.abierto ? panelCriterios() : ""}
   </section>`;
 }
@@ -1528,47 +1613,81 @@ function barraRef() {
 function panelCriterios() {
   const puestos = [...new Set(DATOS.filter(r => r.squad === F.squad).map(r => r.posicion))].sort();
   if (!FR.minutos) FR.minutos = Object.assign({}, C.minutosPartido || {});
+  const cand = candidatasRef().slice(-18).reverse();
+  const u = FR.umbrales;
   return `<div class="ajustesR">
     <div class="gridR">
-      <div class="blqR"><h4>Minutos mínimos para entrar en la referencia</h4>
+      <div class="blqR"><h4>Minutos mínimos del partido</h4>
         ${puestos.map(p => `<div class="filaC"><span>${esc(p)}</span>
           <input type="number" class="minPuesto" data-p="${esc(p)}" min="0" max="120" value="${minutosMin(p)}"></div>`).join("")}
-        <p class="notaR">Un partido por debajo de esos minutos sigue saliendo en el reporte,
-          pero no cuenta para calcular lo habitual.</p></div>
-      <div class="blqR"><h4>Ventana</h4>
-        <div class="filaC"><span>Partidos que cuentan</span>
-          <input type="number" id="crVentana" min="2" max="20" value="${FR.ventana}"></div>
-        <div class="filaC"><span>Mínimo para fiarse</span>
+        <p class="notaR">Solo se exigen en partidos. Un partido por debajo sigue saliendo en el reporte,
+          pero no cuenta para calcular lo habitual. En los entrenos no se aplica.</p></div>
+
+      <div class="blqR"><h4>Umbrales de color</h4>
+        <div class="filaC"><span>Las bandas salen de</span>
+          <select id="crColor">
+            <option value="objetivo"${FR.color === "objetivo" ? " selected" : ""}>El objetivo de arriba</option>
+            <option value="fijo"${FR.color === "fijo" ? " selected" : ""}>Umbrales fijos</option>
+          </select></div>
+        ${FR.color === "objetivo" ? `
+        <div class="filaC"><span>Verde claro desde el … % del objetivo</span>
+          <input type="number" class="margen" data-i="0" min="5" max="99" value="${FR.margenes[0]}"></div>
+        <div class="filaC"><span>Ocre desde el … % del objetivo</span>
+          <input type="number" class="margen" data-i="1" min="5" max="98" value="${FR.margenes[1]}"></div>
+        <p class="notaR">Con el objetivo en ${FR.objetivo}%: verde a partir de ${cortes()[0]}%,
+          verde claro desde ${cortes()[1]}%, ocre desde ${cortes()[2]}% y rojo por debajo.</p>` : `
+        <div class="filaC"><span>Verde fuerte, a partir de</span>
+          <input type="number" class="umbral" data-i="0" min="1" max="400" value="${u[0]}"></div>
+        <div class="filaC"><span>Verde claro, a partir de</span>
+          <input type="number" class="umbral" data-i="1" min="1" max="400" value="${u[1]}"></div>
+        <div class="filaC"><span>Ocre, a partir de</span>
+          <input type="number" class="umbral" data-i="2" min="1" max="400" value="${u[2]}"></div>`}
+        <div class="filaC"><span>Mínimo para fiarse de la referencia</span>
           <input type="number" id="crMinObs" min="1" max="20" value="${FR.minObs}"></div>
-        <div class="filaC"><span>Tipo de sesión</span>
-          <select id="crTipo"><option value="1"${FR.soloPartidos ? " selected" : ""}>Solo partidos</option>
-            <option value="0"${FR.soloPartidos ? "" : " selected"}>Partidos y entrenos</option></select></div>
-        <p class="notaR">Con menos partidos válidos que el mínimo, la referencia baja de nivel sola.</p></div>
-      <div class="blqR"><h4>Cuándo se pinta el z-score</h4>
-        <div class="filaC"><span>Partidos mínimos</span>
+        <div class="filaC"><span>Sesiones para pintar el z-score</span>
           <input type="number" id="crMinZ" min="3" max="40" value="${FR.minZ}"></div>
-        <p class="notaR">Con cinco o seis partidos la desviación típica se mueve demasiado
-          y el z-score dice más del ruido que de la jugadora. Por debajo de este número se
-          muestra en gris y sin semáforo.</p></div>
+        <p class="notaR">Por debajo del mínimo para fiarse, la referencia baja de nivel sola. Con menos
+          sesiones de las que pide el z-score, el número sale en gris y sin color.</p></div>
+
+      <div class="blqR"><h4>Elegir las sesiones a mano</h4>
+        <p class="notaR" style="margin:0 0 8px">Si no marcas ninguna, se usan las
+          ${FR.ventana} últimas del tipo elegido. Si marcas, se usan exactamente esas.</p>
+        <div class="listaEv">${cand.length ? cand.map(x => {
+          const id = idSesion(x);
+          return `<label class="evR"><input type="checkbox" class="chkEv" value="${esc(id)}"${
+            FR.eventos.includes(id) ? " checked" : ""}><span>${esc(rotuloEvento(x))}</span>
+            <s>${esc(nombreMD(x.md))}</s></label>`;
+        }).join("") : `<p class="notaR">No hay sesiones anteriores del tipo elegido.</p>`}</div></div>
     </div>
     <div class="cascadaR">
       ${ORDEN_NIVEL.map((n, i) => {
         const act = ORDEN_NIVEL.indexOf(FR.nivel) === i;
-        const pie = i === 0 ? `${FR.minObs} partidos válidos o más` : (i === 1 ? "si ella no llega" : "si la posición tampoco");
+        const pie = i === 0 ? `${FR.minObs} sesiones válidas o más` : (i === 1 ? "si ella no llega" : "si la posición tampoco");
         return `${i ? '<span class="fleR">→</span>' : ""}<div class="pasoR${act ? " act" : ""}">
           <b>${esc(NIVELES[i][1])}</b><s>${esc(pie)}</s></div>`;
       }).join("")}
     </div>
-    <p class="notaR">Cada fila lleva una etiqueta con qué se ha usado y cuántos partidos hay detrás,
-      para que no haya ningún número sin saber de dónde sale.</p>
   </div>`;
 }
 
 /* ---------- tabla de referencia ---------- */
+/**
+ * Los tres cortes de color. Por defecto cuelgan del objetivo, que es lo que
+ * uno espera: si pones el objetivo en el 20%, el verde empieza en el 20%.
+ * Quien quiera bandas fijas las pone en la ruedecita.
+ */
+function cortes() {
+  if (FR.color === "fijo") return FR.umbrales.slice(0, 3);
+  // Proporcionales y no en puntos: con el objetivo al 20%, restar 15 y 30
+  // puntos dejaba las bandas pegadas al cero.
+  const o = FR.objetivo, m = FR.margenes;
+  return [o, Math.max(1, Math.round(o * m[0] / 100)), Math.max(1, Math.round(o * m[1] / 100))];
+}
 function tintePct(p) {
-  if (p >= 100) return "background:rgba(31,94,92,.22)";
-  if (p >= 75)  return "background:rgba(31,94,92,.12)";
-  if (p >= 50)  return "background:rgba(154,107,18,.12)";
+  const [a, b, c] = cortes();
+  if (p >= a) return "background:rgba(31,94,92,.22)";
+  if (p >= b) return "background:rgba(31,94,92,.12)";
+  if (p >= c) return "background:rgba(154,107,18,.12)";
   return "background:rgba(168,50,63,.10)";
 }
 function tinteZ(z) {
@@ -1583,11 +1702,10 @@ function celdaRef(r, col) {
   if (isNaN(v)) return `<td class="n">–</td>`;
   const e = referencia(r, col);
   const ref = valorRef(e, r, col);
-  const dem = demandaDe(r, col);
   const tip = JSON.stringify({
     j:r.jugador, c:nombreCorto(col), v,
     med:e ? e.media : null, mx:e ? e.max : null, p90:e ? e.p90 : null,
-    n:e ? e.n : 0, niv:e ? e.nivel : "", dem
+    n:e ? e.n : 0, niv:e ? e.nivel : "", dem:demandaDe(r, col), reg:registradasDe(r, col)
   });
   if (FR.modo === "z") {
     if (!e || !e.sd) return `<td class="n" data-tip='${esc(tip)}'>–</td>`;
@@ -1598,8 +1716,7 @@ function celdaRef(r, col) {
   }
   if (!ref) return `<td class="n" data-tip='${esc(tip)}'>–<i>${nf(v, 0)}</i></td>`;
   const p = v / ref * 100;
-  const llega = p >= FR.objetivo;
-  return `<td class="n${llega ? " llega" : ""}" style="${tintePct(p)}" data-tip='${esc(tip)}'>
+  return `<td class="n${p >= FR.objetivo ? " llega" : ""}" style="${tintePct(p)}" data-tip='${esc(tip)}'>
     ${nf(p, 0)}%<i>${nf(v, 0)}</i></td>`;
 }
 
@@ -1627,20 +1744,21 @@ function porcentajeCarga() {
         <td colspan="${3 + mets.length}">${esc(g.toUpperCase())}</td></tr>`;
     }
     // La procedencia se decide una vez por jugadora, con la métrica principal:
-    // si no tiene partidos suficientes, no los tiene para ninguna columna.
+    // si no tiene sesiones suficientes, no las tiene para ninguna columna.
     const e0 = referencia(r, mets[0]);
     const niv = e0 ? e0.nivel : "equipo";
     cuerpo += `<tr>
-      <td class="nomR">${esc(r.jugador)}<span class="selloR ${CLASE_NIVEL[niv]}">${
-        ETIQUETA_NIVEL[niv]}${e0 ? " · " + e0.n : ""}</span></td>
+      <td class="nomR">${esc(r.jugador)}<span class="selloR ${CLASE_NIVEL[niv]}"
+        title="Sesiones que hay detrás de su referencia">${ETIQUETA_NIVEL[niv]}${e0 ? " · " + e0.n : ""}</span></td>
       <td class="pos">${esc(r.posicion)}</td>
       <td class="n">${nf(r.minutos)}</td>
       ${mets.map(m => celdaRef(r, m)).join("")}</tr>`;
   }
 
+  const u = cortes();
   const sub = FR.modo === "z"
     ? "Desviaciones típicas respecto a su referencia · debajo, el valor de la sesión"
-    : `Porcentaje de la referencia · en verde las que pasan del ${FR.objetivo}% · debajo, el valor de la sesión`;
+    : `Porcentaje de la referencia · en negrita las que pasan del ${FR.objetivo}% · debajo, el valor de la sesión`;
 
   return `<section class="panel">
     <div class="row">
@@ -1658,13 +1776,14 @@ function porcentajeCarga() {
            <span><i class="sw" style="background:rgba(31,94,92,.12)"></i>entre 1 y 2 por encima</span>
            <span><i class="sw" style="background:rgba(168,50,63,.09)"></i>entre 1 y 2 por debajo</span>
            <span><i class="sw" style="background:rgba(168,50,63,.16)"></i>2 o más por debajo</span>
-           <span>En gris, las que no llegan a ${FR.minZ} partidos</span>`
-        : `<span><i class="sw" style="background:rgba(31,94,92,.22)"></i>100% o más</span>
-           <span><i class="sw" style="background:rgba(31,94,92,.12)"></i>75-100%</span>
-           <span><i class="sw" style="background:rgba(154,107,18,.12)"></i>50-75%</span>
-           <span><i class="sw" style="background:rgba(168,50,63,.10)"></i>menos del 50%</span>`}
-      <span>La etiqueta del nombre dice con qué se compara y con cuántos partidos</span>
+           <span>En gris, las que no llegan a ${FR.minZ} sesiones</span>`
+        : `<span><i class="sw" style="background:rgba(31,94,92,.22)"></i>${u[0]}% o más</span>
+           <span><i class="sw" style="background:rgba(31,94,92,.12)"></i>${u[1]}-${u[0]}%</span>
+           <span><i class="sw" style="background:rgba(154,107,18,.12)"></i>${u[2]}-${u[1]}%</span>
+           <span><i class="sw" style="background:rgba(168,50,63,.10)"></i>menos del ${u[2]}%</span>`}
+      <span>La etiqueta del nombre dice con qué se compara y cuántas sesiones hay detrás</span>
     </div>
+    ${notaEventos()}
   </section>`;
 }
 
@@ -1675,7 +1794,12 @@ function tituloRef() {
     const et = ((C.demandas || {}).escenarios || []).find(x => x[0] === FR.escenario);
     return `Demandas de juego · ${et ? et[1] : FR.escenario}`;
   }
-  return `${n} · ${m.toLowerCase()} de los últimos ${FR.ventana} partidos`;
+  const act = sesion()[0];
+  const tipo = FR.eventos && FR.eventos.length ? "sesiones elegidas a mano"
+    : FR.tipo === "md" && act ? `${nombreMD(act.md)} anteriores`
+    : FR.tipo === "partido" ? "partidos anteriores"
+    : FR.tipo === "entreno" ? "entrenos anteriores" : "sesiones anteriores";
+  return `${n} · ${m.toLowerCase()} de ${FR.eventos.length ? "" : "los últimos " + FR.ventana + " "}${tipo}`;
 }
 
 /* ---------- tooltip con la referencia de debajo ---------- */
@@ -1693,12 +1817,13 @@ function enganchaTip(raiz) {
         `<div class="tr"><span>${et}</span><b>${nf(v, dec)}</b></div>`;
       caja.innerHTML = `<h5>${esc(d.j)} · ${esc(d.c)}</h5>
         ${fila("Esta sesión", d.v)}
-        ${fila(`Su habitual (${d.niv === "jugadora" ? d.n + " partidos" : ETIQUETA_NIVEL[d.niv] || "referencia"})`, d.med)}
+        ${fila(`Su habitual (${d.niv === "jugadora" ? d.n + " sesiones" : ETIQUETA_NIVEL[d.niv] || "referencia"})`, d.med)}
         ${fila("Máximo de la ventana", d.mx)}
         ${fila("Perfil alto (p90)", d.p90)}
         ${fila("Demanda de su puesto", d.dem)}
         <div class="pieT">${d.med ? nf(d.v / d.med * 100, 0) + "% de lo habitual" : "sin referencia todavía"}${
-          d.mx ? " · " + nf(d.v / d.mx * 100, 0) + "% del máximo" : ""}</div>`;
+          d.mx ? " · " + nf(d.v / d.mx * 100, 0) + "% del máximo" : ""}<br>
+          ${d.n} ${d.n === 1 ? "sesión usada" : "sesiones usadas"} de ${d.reg} registradas de esta jugadora</div>`;
       caja.hidden = false;
       const b = td.getBoundingClientRect();
       const x = Math.min(b.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - 280);
@@ -1710,11 +1835,18 @@ function enganchaTip(raiz) {
 }
 
 function enganchaBarraRef() {
-  document.querySelectorAll(".segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
-    b.onclick = () => { FR[sg.dataset.g] = b.dataset.v; recordar(); pintar(); };
+  document.querySelectorAll(".barraRef .segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      FR[sg.dataset.g] = b.dataset.v;
+      // Cambiar de tipo de sesión invalida una selección a mano hecha sobre otra lista.
+      if (sg.dataset.g === "tipo") FR.eventos = [];
+      recordar(); pintar();
+    };
   }));
   const rue = $("#btnCriterios");
   if (rue) rue.onclick = () => { FR.abierto = !FR.abierto; recordar(); pintar(); };
+  const limpia = $("#btnLimpiaEv");
+  if (limpia) limpia.onclick = () => { FR.eventos = []; recordar(); pintar(); };
   const obj = $("#fObjetivo");
   if (obj) obj.onchange = e => { FR.objetivo = Math.max(0, num(e.target.value) || 70); recordar(); pintar(); };
   const esce = $("#fEscenario");
@@ -1726,14 +1858,29 @@ function enganchaBarraRef() {
       recordar(); pintar();
     };
   };
-  liga("crVentana", "ventana", 2, 20);
+  liga("fVentana", "ventana", 2, 20);
   liga("crMinObs", "minObs", 1, 20);
   liga("crMinZ", "minZ", 3, 40);
-  const tipo = $("#crTipo");
-  if (tipo) tipo.onchange = e => { FR.soloPartidos = e.target.value === "1"; recordar(); pintar(); };
   document.querySelectorAll(".minPuesto").forEach(inp => inp.onchange = e => {
     if (!FR.minutos) FR.minutos = Object.assign({}, C.minutosPartido || {});
     FR.minutos[e.target.dataset.p] = Math.max(0, num(e.target.value));
+    recordar(); pintar();
+  });
+  const colSel = $("#crColor");
+  if (colSel) colSel.onchange = e => { FR.color = e.target.value; recordar(); pintar(); };
+  document.querySelectorAll(".umbral").forEach(inp => inp.onchange = e => {
+    FR.umbrales[+e.target.dataset.i] = Math.max(1, num(e.target.value));
+    // Se mantienen en orden decreciente para que las bandas no se crucen.
+    FR.umbrales = FR.umbrales.slice(0, 3).sort((a, b) => b - a);
+    recordar(); pintar();
+  });
+  document.querySelectorAll(".margen").forEach(inp => inp.onchange = e => {
+    FR.margenes[+e.target.dataset.i] = Math.min(99, Math.max(5, num(e.target.value)));
+    if (FR.margenes[1] >= FR.margenes[0]) FR.margenes[1] = Math.max(5, FR.margenes[0] - 20);
+    recordar(); pintar();
+  });
+  document.querySelectorAll(".chkEv").forEach(chk => chk.onchange = () => {
+    FR.eventos = [...document.querySelectorAll(".chkEv")].filter(c => c.checked).map(c => c.value);
     recordar(); pintar();
   });
 }
@@ -1749,7 +1896,7 @@ function vistaCarga() {
 }
 
 /* ---------- carga aguda:crónica ---------- */
-const FA = { metrica:"Distance (metres)", semanas:6, vista:"equipo", quien:"" };
+const FA = { metrica:"Distance (metres)", semanas:6, vista:"equipo", quien:"", col:"" };
 const METRICAS_ACWR = [
   { id:"Distance (metres)", lbl:"Distancia", dec:0 },
   { id:HMLD,                lbl:"HMLD",      dec:0 },
@@ -1834,8 +1981,10 @@ function nfEje(v) {
 
 const DIAS_SEM = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
+const METRICAS_SEMANA = ["Distance (metres)", HMLD, "Sprint Distance (m)", ACC3, "Player Load"];
 function colSemana() {
   const hay = todasMetricas();
+  if (FA.col && hay.includes(FA.col)) return FA.col;
   for (const c of [HMLD, "Distance (metres)", "Player Load"]) if (hay.includes(c)) return c;
   return hay[0];
 }
@@ -1868,6 +2017,9 @@ function selectorSemana() {
       <div class="segR" data-g="vista">${seg.map(([v, t]) =>
         `<button data-v="${v}" class="${v === FA.vista ? "on" : ""}">${esc(t)}</button>`).join("")}</div></div>
     ${lista ? `<div class="campoR"><label>Cuál</label>${lista}</div>` : ""}
+    <div class="campoR"><label>Métrica</label>
+      <div class="segR" data-g="col">${METRICAS_SEMANA.filter(c => todasMetricas().includes(c)).map(c =>
+        `<button data-v="${esc(c)}" class="${c === colSemana() ? "on" : ""}">${esc(nombreCorto(c))}</button>`).join("")}</div></div>
     <div class="campoR"><label>Semanas en la tendencia</label>
       <div class="objR"><input id="semCuantas" type="number" min="4" max="20" value="${FA.semanas}"><span>sem</span></div></div>
   </div></section>`;
@@ -1998,6 +2150,7 @@ function agudaCronica(ref) {
 function enganchaSemana() {
   document.querySelectorAll(".barraRef .segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
     b.onclick = () => {
+      if (sg.dataset.g === "col") { FA.col = b.dataset.v; recordar(); pintar(); return; }
       FA.vista = b.dataset.v;
       FA.quien = "";
       if (FA.vista === "grupo") FA.quien = gruposDe(DATOS.filter(r => r.squad === F.squad))[0] || "";
@@ -2224,12 +2377,14 @@ function ritmoPartido(col, grupo) {
   const base = DATOS.filter(r => r.squad === F.squad && r.esPartido
     && r.minutos >= minutosMin(r.posicion)
     && (!grupo || grupoDe(r.posicion) === grupo));
-  const ult = ultimasSesiones(base, FR.ventana);
+  // Aquí siempre son partidos, pase lo que pase en la barra de Análisis.
+  const ids = [...new Set(base.map(idSesion))].slice(-FR.ventana);
+  const ult = base.filter(x => ids.includes(idSesion(x)));
   if (!ult.length) return null;
   return porMinuto(ult)[col];
 }
 
-function barrasTareas(bloques, grupo) {
+function barrasTareas(bloques, grupo, todos) {
   let m = METRICAS_DRILL.find(x => x.id === FD.met) || METRICAS_DRILL[2];
   // Si la métrica elegida viene a cero en todos los bloques (datos sin esa
   // columna), se pasa a la primera que sí traiga números en vez de pintar
@@ -2269,7 +2424,7 @@ function barrasTareas(bloques, grupo) {
   s += `</svg>`;
 
   const llegan = part ? lista.filter(b => b.vals[m.id] >= part).length : 0;
-  const grupos = gruposDe(DATOS.filter(r => r.squad === F.squad));
+  const grupos = gruposDe(todos);
   return `<section class="panel ancho">
     <h3>¿Qué tarea llega a la intensidad del partido?</h3>
     <p class="sub">Todo por minuto, que es la única forma de comparar un bloque de seis minutos con un
@@ -2292,13 +2447,18 @@ function barrasTareas(bloques, grupo) {
 }
 
 function drillAnalysis() {
-  const grupo = FD.grupo;
-  const filas = BLOQUES.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0
-    && (!grupo || grupoDe(r.posicion) === grupo));
-  if (!filas.length) {
+  const todos = BLOQUES.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0);
+  if (!todos.length) {
     return `<div class="empty"><p>Esta sesión no tiene bloques parciales guardados.</p>
       <p style="font-size:12px">Solo aparecen aquí los splits que no son la sesión o el partido completo.</p></div>`;
   }
+  // El filtro de puesto se guarda entre sesiones. Si el grupo elegido no está
+  // en esta, se ignora en vez de dejar la pestaña vacía y sin barra con la que
+  // volver atrás, que es como se quedaba atascada.
+  const presentes = gruposDe(todos);
+  if (FD.grupo && !presentes.includes(FD.grupo)) FD.grupo = "";
+  const grupo = FD.grupo;
+  const filas = grupo ? todos.filter(r => grupoDe(r.posicion) === grupo) : todos;
 
   // Un bloque = un split. Se promedia entre los jugadores que lo hicieron.
   const bloques = [...new Set(filas.map(r => r.split))].map(nombre => {
@@ -2362,7 +2522,7 @@ function drillAnalysis() {
     </tr>` : ""}
   </tfoot>`;
 
-  return `${barrasTareas(bloques, grupo)}
+  return `${barrasTareas(bloques, grupo, todos)}
   <section class="panel">
     <h3>Bloques de la sesión</h3>
     <div class="scroll"><table class="datos drills">
