@@ -22,12 +22,23 @@
 html,body{margin:0;padding:0}
 body{background:var(--ink-900);color:var(--text);font-family:Sora,system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:Sora,sans-serif;font-weight:600;margin:0;letter-spacing:-.01em}
-.app{display:grid;grid-template-columns:170px 1fr;min-height:100vh}
-aside{background:var(--ink-850);border-right:1px solid var(--ink-700);padding:16px 11px;
-  display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh}
-aside .brand{display:flex;align-items:center;gap:9px;padding:0 5px;margin-bottom:16px}
-aside .brand b{font-family:Sora;font-weight:600;font-size:15px}
-aside nav{display:flex;flex-direction:column;gap:3px;border:none;padding:0;margin:0;overflow:visible}
+.app{display:grid;grid-template-columns:208px 1fr;min-height:100vh}
+aside{background:var(--ink-850);border-right:1px solid var(--ink-700);padding:18px 12px 14px;
+  display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+aside .brand{display:flex;align-items:center;gap:10px;padding:0 4px 16px;margin-bottom:10px;
+  border-bottom:1px solid var(--ink-700)}
+aside .brand .mark{width:34px;height:34px;border-radius:10px;font-size:11.5px;letter-spacing:.04em;flex:none}
+aside .bnom{min-width:0;line-height:1.25}
+aside .bnom b{display:block;font-family:Sora;font-weight:600;font-size:13.5px;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+aside .bnom s{display:block;text-decoration:none;font-size:10.5px;color:var(--text-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grupoNav{font-size:11px;color:var(--text-3);margin:16px 0 5px;padding:0 10px;font-weight:500}
+.grupoNav:first-of-type{margin-top:0}
+/* El bloque de datos se va abajo del todo, rótulo incluido. */
+.grupoNav.fin{margin-top:auto;padding-top:14px}
+aside nav{display:flex;flex-direction:column;gap:3px;border:none;padding:0;margin:0;
+  overflow:visible;flex:1;min-height:0}
 main{min-width:0}
 .wrap{max-width:none;margin:0;padding:18px 22px 64px;display:flex;flex-direction:column}
 /* El orden de lectura: resumen, ranking, cuadrante, tabla y gráficas. */
@@ -48,15 +59,24 @@ select:focus-visible,button:focus-visible,.tab:focus-visible{outline:2px solid v
 .field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--sand);flex:none}
 .dot.live{background:var(--teal)}
-#estado{font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:7px;
-  padding:11px 5px 0;margin-top:10px;border-top:1px solid var(--ink-700);line-height:1.35}
+#estado{font-size:11px;color:var(--text-3);display:flex;align-items:flex-start;gap:7px;
+  padding:12px 6px 0;margin-top:14px;border-top:1px solid var(--ink-700);line-height:1.4}
+#estado .dot{margin-top:4px}
 
 nav{display:flex;gap:4px;padding:12px 0 0;border-bottom:1px solid var(--ink-700);margin-bottom:22px}
-.tab{background:none;border:none;border-radius:8px;height:auto;padding:9px 12px;color:var(--text-2);
-  font-size:13.5px;text-align:left;width:100%}
-.tab:hover{background:var(--ink-800);border-color:transparent}
-.tab[aria-selected=true]{background:var(--ink-700);color:var(--text);font-weight:500}
-.tab.abajo{margin-top:auto}
+.tab{position:relative;display:flex;align-items:center;gap:10px;background:none;border:none;
+  border-radius:9px;height:auto;padding:9px 10px;color:var(--text-2);font-size:13.5px;
+  text-align:left;width:100%;transition:background .12s,color .12s}
+.tab .ic{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.8}
+.tab .et{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab:hover{background:var(--ink-800);border-color:transparent;color:var(--text)}
+.tab[aria-selected=true]{background:rgba(31,94,92,.10);color:var(--teal);font-weight:600}
+.tab[aria-selected=true] .ic{opacity:1}
+/* El filete de la izquierda marca dónde estás sin cargar más el fondo. */
+.tab[aria-selected=true]::before{content:"";position:absolute;left:-12px;top:7px;bottom:7px;
+  width:3px;border-radius:0 3px 3px 0;background:var(--teal)}
+@media (prefers-reduced-motion:reduce){.tab{transition:none}}
 
 .cab{display:block;margin:0}
 .cab h2{font-size:22px;display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -484,6 +504,19 @@ table.datos.ref td[data-tip]{cursor:help}
 .evR s{text-decoration:none;color:var(--text-3);font-size:10.5px;flex:none}
 .campoR .bot{height:38px}
 
+.ref100{font-size:11.5px;color:var(--text-2);margin:2px 0 14px;display:flex;flex-wrap:wrap;
+  gap:4px 16px;align-items:baseline}
+.ref100 span{display:inline-flex;align-items:baseline;gap:5px}
+.ref100 i{width:8px;height:8px;border-radius:2px;display:inline-block;align-self:center}
+.ref100 b{color:var(--text);font-weight:600}
+
+.leyCuad{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));
+  gap:16px;margin:16px 0 0}
+.leyCuad>div{padding-top:9px}
+.leyCuad b{display:block;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-bottom:5px}
+.leyCuad span{display:block;font-size:11.5px;color:var(--text-2);line-height:1.5}
+.leyCuad i{display:block;font-style:normal;font-size:11.5px;color:var(--text);font-weight:600;margin-top:4px}
+
 /* ---------- panel de temporada de balón en juego ---------- */
 .chipsP{display:flex;flex-wrap:wrap;gap:6px}
 .chipP{border:1px solid var(--ink-700);background:var(--ink-850);color:var(--text);
@@ -702,10 +735,12 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
   svg.cols rect[fill="#fff"]{fill:none}
   /* La nota de los paneles se iba sola a una página en blanco al final. */
   .leyPaneles{display:none}
+  .leyCuad{gap:8px;margin-top:8px}
+  .leyCuad b,.leyCuad span,.leyCuad i{font-size:8.5px}
   .chipsMet,.ejes{display:none}
   .medalla li .bar{background:#E8EAF0}
   .medalla li .val,.medalla li .qui{color:#14161C}
-  .cajas100{gap:5px;margin-bottom:7px;break-inside:avoid}
+  .ref100{font-size:8.5px;margin:0 0 6px;gap:2px 10px}
   .t100{color:#6B7384;font-size:7px}
   .c100{background:#F4F6FA !important;border:1px solid #E2E6EE;border-left:3px solid #C9CED8;padding:4px 9px;min-width:104px}
   .c100>span{color:#6B7384;font-size:7px}
@@ -726,15 +761,21 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
 <body>
 <div class="app">
   <aside>
-    <div class="brand"><span class="mark">CAU</span><b>Cargas</b></div>
+    <div class="brand">
+      <span class="mark">CAU</span>
+      <span class="bnom"><b id="bTitulo">Control de carga</b><s id="bSub">Rugby · temporada 25/26</s></span>
+    </div>
     <nav role="tablist">
-      <button class="tab" role="tab" id="tab-reporte" aria-selected="true">Session Analysis</button>
-      <button class="tab" role="tab" id="tab-drill" aria-selected="false">Drill Analysis</button>
-      <button class="tab" role="tab" id="tab-jugador" aria-selected="false">Jugador</button>
-      <button class="tab" role="tab" id="tab-carga" aria-selected="false">Análisis</button>
-      <button class="tab" role="tab" id="tab-semana" aria-selected="false">Semana</button>
-      <button class="tab" role="tab" id="tab-bip" aria-selected="false">BiP</button>
-      <button class="tab abajo" role="tab" id="tab-cargar" aria-selected="false">Load Data</button>
+      <p class="grupoNav">La sesión</p>
+      <button class="tab" role="tab" id="tab-reporte" aria-selected="true"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><rect x="2.5" y="9" width="3" height="5.5" rx="1"/><rect x="7" y="5" width="3" height="9.5" rx="1"/><rect x="11.5" y="2.5" width="3" height="12" rx="1"/></svg><span class="et">Reporte de sesión</span></button>
+      <button class="tab" role="tab" id="tab-drill" aria-selected="false"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><circle cx="8.5" cy="9" r="5.8"/><path d="M8.5 6v3.2l2.1 1.4"/><path d="M6.4 1.8h4.2"/></svg><span class="et">Tareas y drills</span></button>
+      <button class="tab" role="tab" id="tab-bip" aria-selected="false"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><ellipse cx="8.5" cy="8.5" rx="6.6" ry="4.6" transform="rotate(-30 8.5 8.5)"/><path d="M6.2 10.8 10.8 6.2"/></svg><span class="et">Balón en juego</span></button>
+      <p class="grupoNav">La carga</p>
+      <button class="tab" role="tab" id="tab-carga" aria-selected="false"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6.3"/><circle cx="8.5" cy="8.5" r="2.4"/><path d="M8.5 .9v2.4M8.5 13.7v2.4M.9 8.5h2.4M13.7 8.5h2.4"/></svg><span class="et">Análisis</span></button>
+      <button class="tab" role="tab" id="tab-semana" aria-selected="false"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><rect x="1.8" y="3.2" width="13.4" height="12" rx="2"/><path d="M1.8 7h13.4M5.5 1.6v3M11.5 1.6v3"/></svg><span class="et">Semana</span></button>
+      <button class="tab" role="tab" id="tab-jugador" aria-selected="false"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><circle cx="8.5" cy="5.6" r="3"/><path d="M2.8 15.2c0-3.2 2.6-5 5.7-5s5.7 1.8 5.7 5"/></svg><span class="et">Jugadora</span></button>
+      <p class="grupoNav fin">Los datos</p>
+      <button class="tab" role="tab" id="tab-cargar" aria-selected="false"><svg class="ic" viewBox="0 0 17 17" aria-hidden="true"><path d="M8.5 11.5V2.4M4.9 6l3.6-3.6L12.1 6"/><path d="M2.4 11.8v2.1a1.6 1.6 0 0 0 1.6 1.6h9a1.6 1.6 0 0 0 1.6-1.6v-2.1"/></svg><span class="et">Cargar datos</span></button>
     </nav>
     <div id="estado"><span class="dot"></span><span id="estadoTxt">Cargando…</span></div>
   </aside>
