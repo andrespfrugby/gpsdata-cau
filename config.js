@@ -57,6 +57,20 @@ window.CAU_CONFIG = {
   titulo: "Control de carga",
   subtitulo: "Rugby · temporada 25/26",
 
+  /* Los cuatro estados del partido en el cuadrante de balón en juego. Cambia
+     "tit" por el lenguaje que uséis en el club; "que" es la explicación de
+     debajo. Lo que no pongas aquí se queda como está.
+       mucho    = muchas fases y largas
+       continuo = pocas fases pero largas
+       cortado  = muchas fases y cortas
+       poco     = pocas fases y cortas                                        */
+  zonasBip: {
+    mucho:    { tit: "LONG BURN" },
+    continuo: { tit: "SLOW BURN" },
+    cortado:  { tit: "PLAY FAST, FOR LONG" },
+    poco:     { tit: "FAST BURN" }
+  },
+
   generoEquipo: { "DHb": "m", "Femenino": "f" },
 
   umbralImpacto: {
