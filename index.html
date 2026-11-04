@@ -484,6 +484,32 @@ table.datos.ref td[data-tip]{cursor:help}
 .evR s{text-decoration:none;color:var(--text-3);font-size:10.5px;flex:none}
 .campoR .bot{height:38px}
 
+/* ---------- panel de temporada de balón en juego ---------- */
+.chipsP{display:flex;flex-wrap:wrap;gap:6px}
+.chipP{border:1px solid var(--ink-700);background:var(--ink-850);color:var(--text);
+  border-radius:999px;padding:7px 12px;height:auto;font-size:12.5px;display:flex;align-items:center;gap:5px}
+.chipP b{font-weight:700;color:var(--text-3);font-size:12px}
+.chipP.on{background:var(--pink);border-color:var(--pink);color:#fff}
+.chipP.on b{color:rgba(255,255,255,.75)}
+.dosBip{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px;margin-top:14px}
+.dosBip>.panel{margin:0}
+table.semBip{width:100%;border-collapse:separate;border-spacing:5px;font-variant-numeric:tabular-nums}
+table.semBip th{font-size:11.5px;color:var(--text-2);font-weight:500;padding:0 0 2px}
+table.semBip td{text-align:center;border-radius:7px;padding:6px 2px;line-height:1.05}
+table.semBip td b{display:block;font-size:19px;font-weight:600}
+table.semBip td span{font-size:11px;font-weight:600;color:var(--text-2)}
+table.semBip td.nm{text-align:left;font-weight:600;white-space:nowrap;padding-left:2px;font-size:12.5px;background:none}
+table.semBip td.nm small{display:block;color:var(--text-3);font-weight:400;font-size:10.5px}
+table.semBip tr.tot td:not(.nm){box-shadow:inset 0 0 0 2px var(--text)}
+table.semBip tr.dim td{opacity:.35}
+table.semBip tr.sel td.nm{color:var(--pink)}
+.seqsBip{display:grid;gap:7px;margin-top:4px}
+.sqBip{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:end}
+.sqBip .nq{font-weight:600;font-size:12.5px;padding-bottom:4px}
+.sqBip .nq small{display:block;color:var(--text-3);font-weight:400;font-size:10.5px}
+.sqBip .gq{min-width:0}
+@media (max-width:760px){.sqBip{grid-template-columns:1fr}.sqBip .nq{padding:0}}
+
 @media print{
   @page{margin:9mm;size:landscape}
   *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
