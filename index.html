@@ -518,6 +518,43 @@ table.datos.ref td[data-tip]{cursor:help}
 .leyCuad span{display:block;font-size:11.5px;color:var(--text-2);line-height:1.5}
 .leyCuad i{display:block;font-style:normal;font-size:11.5px;color:var(--text);font-weight:600;margin-top:4px}
 
+/* ---------- reporte de un partido ---------- */
+.repBip{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:14px;align-items:start}
+.repCol{display:grid;gap:12px;min-width:0}
+.repLat{display:grid;gap:12px;min-width:0}
+.repLat .panel{margin:0;padding:12px 14px}
+.repLat .panel h3{font-size:12.5px;margin-bottom:6px}
+@media (max-width:1100px){.repBip{grid-template-columns:1fr}
+  .repLat{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}}
+
+.blq{background:var(--ink-850);border:1px solid var(--ink-700);border-radius:12px;overflow:hidden}
+.blq>h4{margin:0;padding:9px 14px;font-size:12px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:#fff}
+.blq>h4.cab1{background:#343C8A}
+.blq>h4.cab2{background:#2F615C}
+.blq>h4.cab3{background:#A8323F}
+.blq .scroll{padding:0 12px 12px}
+.blq table.datos{margin-top:2px}
+
+.cifras{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,118px),1fr));
+  gap:1px;background:var(--ink-700);border-bottom:1px solid var(--ink-700)}
+.cifras>div{background:var(--ink-850);padding:9px 12px 10px;min-width:0}
+.cifras span{display:block;font-size:10px;color:var(--text-2);line-height:1.25;
+  margin-bottom:3px;min-height:2.5em}
+.cifras b{font-size:20px;font-weight:600;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.cifras .dest{background:rgba(47,97,92,.07)}
+.cifras .dest b{color:var(--teal)}
+
+table.tramos{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
+table.tramos th{font-size:10.5px;font-weight:600;color:#fff;padding:5px 2px;border-radius:5px;
+  text-align:center;white-space:nowrap}
+table.tramos td{text-align:center;border-radius:5px;padding:7px 2px;font-variant-numeric:tabular-nums}
+table.tramos td.cnt{font-size:20px;font-weight:600}
+table.tramos td.pct{font-size:11.5px;font-weight:600}
+table.datos.bip td.nm{text-align:left;white-space:nowrap}
+table.datos.bip td.nm i{font-style:normal;color:var(--text-3);font-size:11px}
+table.datos.bip td.fuerte{font-weight:700}
+
 /* ---------- panel de temporada de balón en juego ---------- */
 .chipsP{display:flex;flex-wrap:wrap;gap:6px}
 .chipP{border:1px solid var(--ink-700);background:var(--ink-850);color:var(--text);
@@ -808,7 +845,7 @@ table.datos td.n.verde{background:#dceceb;color:#2f5f60;font-weight:600}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261104b"></script>
-<script src="app.js?v=20261104b"></script>
+<script src="config.js?v=20261104h"></script>
+<script src="app.js?v=20261104h"></script>
 </body>
 </html>
