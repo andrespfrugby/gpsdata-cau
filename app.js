@@ -638,7 +638,7 @@ function bloqueBipReporte() {
         <span>una cada ${nf(reloj / r.n, 1)} min</span></div>
       <div class="c"><span>Duración media</span><b>${nf(r.media, 0)} s</b>
         <span>la más larga, ${mmss(larga.duracion)} en el minuto ${nf(minLarga, 0)}</span></div>
-      <div class="c"><span>Ratio juego : parada</span><b>${nf(r.media / (r.mediaDescanso || 1), 2)}</b>
+      <div class="c"><span>Ratio juego : parada</span><b>1:${nf(r.mediaDescanso / (r.media || 1), 2)}</b>
         <span>${nf(r.mediaDescanso, 0)} s de parada de media</span></div>
     </div>
     ${s}
@@ -2572,7 +2572,7 @@ const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloq
              ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
 const FB = { partido:"", vista:"panel", sesionGps:"", metrica:"Distance (metres)",
-             parte:"all", sel:"" };   // panel de temporada
+             parte:"all", sel:"", temp:"" };   // panel de temporada
 const PAREJAS = {};   // partido de BiP -> sesión de GPS que le corresponde
 
 const mmss = seg => {
@@ -2940,13 +2940,29 @@ function agregaBip(fases) {
   const post = fases.map(f => f.post).filter(v => v > 0);
   const rest = post.length ? post.reduce((a, b) => a + b, 0) / post.length : 0;
   const media = bip / fases.length;
+  // La media de todas las fases la hunden los saques y las melés. La de las
+  // que pasan de 30 s describe las que de verdad fatigan, que es la que
+  // mirabas en el Excel como "Avg BiP (>30 s)".
+  const largas = dur.filter(d => d > 30);
+  const m30 = largas.length ? largas.reduce((a, b) => a + b, 0) / largas.length : 0;
   return {
-    bip, raw, pct: raw ? bip / raw : 0, n: fases.length, media, rest,
+    bip, raw, pct: raw ? bip / raw : 0, n: fases.length, media, rest, m30, n30: largas.length,
     wr: media ? rest / media : 0, mx: Math.max(...dur), p5: picoBip(fases, 300),
     dist: TRAMOS.map(([lo, hi]) => dur.filter(d => d > lo - 1 && d <= hi).length),
     rk: fases.reduce((t, f) => t + (f.rucks || 0), 0),
     mxrk: Math.max(...fases.map(f => f.rucks || 0))
   };
+}
+
+/**
+ * La temporada de una fecha. Arranca en julio salvo que lo cambies en config
+ * con mesInicioTemporada. Hace falta para que la evolución no mezcle los
+ * partidos del año pasado con los de este.
+ */
+function temporadaDe(f) {
+  const m0 = (C.mesInicioTemporada || 7) - 1;
+  const a = f.getMonth() >= m0 ? f.getFullYear() : f.getFullYear() - 1;
+  return String(a % 100).padStart(2, "0") + "/" + String((a + 1) % 100).padStart(2, "0");
 }
 
 /** Los partidos cargados, en orden, con sus dos partes y sus fases. */
@@ -2967,7 +2983,8 @@ function datosBip() {
       todo.p5 = Math.max(h1.p5, h2.p5);
       todo.wr = (h1.wr + h2.wr) / 2;
     }
-    return { id:nom, nom, fecha:fases[0].fecha, all:todo, h1:h1 || todo, h2:h2 || todo,
+    return { id:nom, nom, fecha:fases[0].fecha, temp:temporadaDe(fases[0].fecha),
+             all:todo, h1:h1 || todo, h2:h2 || todo,
              fases:fases.map(f => [parteDe(f), f.duracion, f.rucks || 0]) };
   }).filter(Boolean);
   filas.sort((a, b) => a.fecha - b.fecha);
@@ -2991,13 +3008,21 @@ const etPartido = r => r.corto;
 const Sb = r => r[FB.parte] || r.all;
 
 function panelBip() {
-  const D = datosBip();
-  if (!D.length) return `<p class="empty">Los CSV cargados no traen fases de balón en juego.</p>`;
+  const TODO = datosBip();
+  if (!TODO.length) return `<p class="empty">Los CSV cargados no traen fases de balón en juego.</p>`;
+  const temps = [...new Set(TODO.map(r => r.temp))].sort().reverse();
+  if (temps.length > 1 && !temps.includes(FB.temp) && FB.temp !== "todas") FB.temp = temps[0];
+  const D = (temps.length > 1 && FB.temp !== "todas") ? TODO.filter(r => r.temp === FB.temp) : TODO;
+  if (!D.length) return `<p class="empty">No hay partidos en esa temporada.</p>`;
   if (FB.sel && !D.some(r => r.id === FB.sel)) FB.sel = "";
   const sel = D.find(r => r.id === FB.sel) || null;
 
   return `
   <section class="barraRef noPdf"><div class="filaRef">
+    ${temps.length > 1 ? `<div class="campoR"><label>Temporada</label>
+      <div class="segR" data-g="temp">${temps.map(t =>
+        `<button data-v="${esc(t)}" class="${FB.temp === t ? "on" : ""}">${esc(t)}</button>`).join("")}
+        <button data-v="todas" class="${FB.temp === "todas" ? "on" : ""}">Todas</button></div></div>` : ""}
     <div class="campoR"><label>Parte del partido</label>
       <div class="segR" data-g="parte">${PARTE_BIP.map(([v, t]) =>
         `<button data-v="${v}" class="${FB.parte === v ? "on" : ""}">${t}</button>`).join("")}</div></div>
@@ -3032,6 +3057,10 @@ function kpisBip(D, sel) {
     ["Duración media de fase", r => Sb(r).media, v => nf(v, 0) + " s"],
     ["Fase más larga", r => Sb(r).mx, v => mmss(v)]
   ];
+  const extra = {
+    "Duración media de fase": r => `${nf(Sb(r).m30, 0)} s contando solo las de más de 30 s`,
+    "Balón en juego": r => `ratio juego:parada 1:${nf(Sb(r).rest / (Sb(r).media || 1), 2)}`
+  };
   return `<div class="celdas cuatro">${defs.map(([lbl, f, fmt]) => {
     const m = media(f);
     if (sel) {
@@ -3039,11 +3068,17 @@ function kpisBip(D, sel) {
       return `<div class="c dest"><span>${esc(lbl)} · ${esc(sel.corto)}</span><b>${fmt(f(sel))}</b>
         <span><em class="${d >= 0 ? "sube" : "baja"}">${d >= 0 ? "▲" : "▼"} ${
           lbl.startsWith("%") ? nf(Math.abs(d) * 100, 1) + " pts" : fmt(Math.abs(d))
-        }</em> frente a la media (${fmt(m)})</span></div>`;
+        }</em> frente a la media (${fmt(m)})</span>${
+          extra[lbl] ? `<span>${esc(extra[lbl](sel))}</span>` : ""}</div>`;
     }
     const hi = D.reduce((p, r) => f(r) > f(p) ? r : p), lo = D.reduce((p, r) => f(r) < f(p) ? r : p);
+    const med30 = D.reduce((t, r) => t + Sb(r).m30, 0) / D.length;
+    const medWR = D.reduce((t, r) => t + Sb(r).rest / (Sb(r).media || 1), 0) / D.length;
+    const pie = lbl === "Duración media de fase" ? `${nf(med30, 0)} s contando solo las de más de 30 s`
+              : lbl === "Balón en juego" ? `ratio juego:parada 1:${nf(medWR, 2)}` : "";
     return `<div class="c"><span>${esc(lbl)} · media</span><b>${fmt(m)}</b>
-      <span>de ${fmt(f(lo))} (${esc(lo.corto)}) a ${fmt(f(hi))} (${esc(hi.corto)})</span></div>`;
+      <span>de ${fmt(f(lo))} (${esc(lo.corto)}) a ${fmt(f(hi))} (${esc(hi.corto)})</span>
+      ${pie ? `<span>${esc(pie)}</span>` : ""}</div>`;
   }).join("")}</div>`;
 }
 
@@ -3273,6 +3308,9 @@ function vistaBip() {
   document.querySelectorAll(".conmuta .mini").forEach(b => b.onclick = () => { FB.vista = b.dataset.v; pintar(); });
   document.querySelectorAll(".barraRef .segR[data-g=parte] button").forEach(b => b.onclick = () => {
     FB.parte = b.dataset.v; recordar(); pintar();
+  });
+  document.querySelectorAll(".barraRef .segR[data-g=temp] button").forEach(b => b.onclick = () => {
+    FB.temp = b.dataset.v; FB.sel = ""; recordar(); pintar();
   });
   document.querySelectorAll(".chipP").forEach(b => b.onclick = () => {
     FB.sel = FB.sel === b.dataset.p ? "" : b.dataset.p;
@@ -4201,7 +4239,7 @@ function recordar() {
       squad:F.squad, fecha:F.fecha, metricas:F.metricas, matriz:F.matriz, sc:F.sc,
       pestana:F.pestana, escenario:FR.escenario, referencia:FR,
       metricaAcwr:FA.metrica, semana:FA, jugador:FJ,
-      parejas:PAREJAS, bip:{ vista:FB.vista, parte:FB.parte, sel:FB.sel }, ordenDrill:FD.orden, drill:{ met:FD.met, grupo:FD.grupo }
+      parejas:PAREJAS, bip:{ vista:FB.vista, parte:FB.parte, sel:FB.sel, temp:FB.temp }, ordenDrill:FD.orden, drill:{ met:FD.met, grupo:FD.grupo }
     }));
   } catch (e) { /* navegador sin almacenamiento, no pasa nada */ }
 }
