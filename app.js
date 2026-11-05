@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261104h";   // se muestra abajo en el lateral
+const VERSION = "20261105a";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -3131,6 +3131,8 @@ function panelBip() {
   <div class="dosBip">
     ${evolucionPanelBip(D, sel)}
     ${cuadranteBip(D, sel)}
+    ${partesPanelBip(D, sel)}
+    ${rucksPanelBip(D, sel)}
     ${distribucionBip(D, sel)}
     ${peorCasoBip(D, sel)}
   </div>
@@ -3372,6 +3374,90 @@ function peorCasoBip(D, sel) {
     <div class="leyenda"><span><i class="sw" style="background:#A8323F"></i>Juego en los 5 min más duros</span>
       <span><i class="sw" style="background:#454C92"></i>Fase más larga</span>
       <span>Lo exigente es ${mmss(Sb(hp).p5)} en 5 min (${esc(hp.corto)}) y ${mmss(Sb(hm).mx)} seguidos (${esc(hm.corto)})</span></div></section>`;
+}
+
+/**
+ * El contacto por partido. Los rucks son la otra mitad de la carga del
+ * partido y no salían por ningún lado en la temporada: la barra es el total
+ * y el número de arriba, cuántos caen por minuto de balón en juego, que es
+ * lo que de verdad compara partidos de duración distinta.
+ */
+function rucksPanelBip(D, sel) {
+  const W = 580, H = 290, L = 52, R = 16, T = 34, B = 34, ih = H - T - B;
+  const tot = D.map(r => Sb(r).rk), porMin = D.map(r => Sb(r).bip ? r.rk60 = Sb(r).rk / (Sb(r).bip / 60) : 0);
+  const top = Math.max(...tot, 1) * 1.22;
+  const paso = pasoEje(top, 5), y = v => T + ih - v / top * ih;
+  const gw = (W - L - R) / D.length, bw = Math.min(64, gw * .5);
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  for (let v = 0; v <= top; v += paso) {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#EDF0EF"/>`;
+    s += `<text x="${L - 8}" y="${(y(v) + 4).toFixed(1)}" font-size="10" fill="#8A9290" text-anchor="end">${nf(v, 0)}</text>`;
+  }
+  const med = tot.reduce((a, b) => a + b, 0) / tot.length;
+  s += `<line x1="${L}" x2="${W - R}" y1="${y(med).toFixed(1)}" y2="${y(med).toFixed(1)}"
+          stroke="#8A9290" stroke-width="1.4" stroke-dasharray="6 4"/>`;
+  D.forEach((r, i) => {
+    const cx = L + i * gw + gw / 2, v = tot[i], op = sel && sel.id !== r.id ? .32 : 1;
+    s += `<g opacity="${op}"><rect x="${(cx - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}"
+            height="${(y(0) - y(v)).toFixed(1)}" rx="5" fill="${sel && sel.id === r.id ? "#A8323F" : "#9C4B52"}"/>
+          <text x="${cx.toFixed(1)}" y="${(y(v) - 20).toFixed(1)}" font-size="13" font-weight="700"
+            text-anchor="middle" paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5">${nf(v, 0)}</text>
+          <text x="${cx.toFixed(1)}" y="${(y(v) - 7).toFixed(1)}" font-size="10.5" fill="#5C6462"
+            text-anchor="middle" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">${nf(porMin[i], 2)} / min</text>
+          <text x="${cx.toFixed(1)}" y="${H - 8}" font-size="11" font-weight="600" text-anchor="middle">${esc(r.corto)}</text></g>`;
+  });
+  s += `</svg>`;
+  const porFase = D.map(r => Sb(r).n ? Sb(r).rk / Sb(r).n : 0);
+  const hi = D.reduce((p, r, i) => porMin[i] > porMin[D.indexOf(p)] ? r : p, D[0]);
+  return `<section class="panel"><h3>Contacto <span class="uni">rucks por partido</span></h3>
+    <p class="sub">La barra es el total. Debajo del número, cuántos rucks por minuto de balón en juego:
+      eso es lo que compara partidos que han durado cosas distintas.</p>${s}
+    <div class="leyenda">
+      <span>Media de ${nf(porFase.reduce((a, b) => a + b, 0) / D.length, 2)} rucks por fase</span>
+      <span>El de más densidad: ${esc(etPartido(hi))} (${nf(Math.max(...porMin), 2)} por minuto)</span></div></section>`;
+}
+
+/**
+ * Si el balón en juego cae en la segunda parte, el partido se cierra o el
+ * equipo se cae. Comparadas en la misma escala se ve de un vistazo.
+ */
+function partesPanelBip(D, sel) {
+  const W = 580, H = 290, L = 52, R = 16, T = 30, B = 46, ih = H - T - B;
+  const vals = D.flatMap(r => [r.h1.bip / 60, r.h2.bip / 60]);
+  const top = Math.max(...vals, 1) * 1.2;
+  const paso = pasoEje(top, 5), y = v => T + ih - v / top * ih;
+  const gw = (W - L - R) / D.length, bw = Math.min(28, gw * .26);
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  for (let v = 0; v <= top; v += paso) {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#EDF0EF"/>`;
+    s += `<text x="${L - 8}" y="${(y(v) + 4).toFixed(1)}" font-size="10" fill="#8A9290" text-anchor="end">${nf(v, 0)}'</text>`;
+  }
+  D.forEach((r, i) => {
+    const cx = L + i * gw + gw / 2, op = sel && sel.id !== r.id ? .32 : 1;
+    const v1 = r.h1.bip / 60, v2 = r.h2.bip / 60;
+    const cae = v1 ? (v2 / v1 - 1) * 100 : 0;
+    s += `<g opacity="${op}">`;
+    [[v1, cx - bw - 3, "#9FBEBB"], [v2, cx + 3, "#2F615C"]].forEach(([v, x, col]) => {
+      s += `<rect x="${x.toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw}" height="${(y(0) - y(v)).toFixed(1)}"
+              rx="4" fill="${col}"/>
+            <text x="${(x + bw / 2).toFixed(1)}" y="${(y(v) - 6).toFixed(1)}" font-size="11" font-weight="700"
+              text-anchor="middle">${mmss(v * 60)}</text>`;
+    });
+    s += `<text x="${cx.toFixed(1)}" y="${H - 22}" font-size="11" font-weight="600" text-anchor="middle">${esc(r.corto)}</text>
+          <text x="${cx.toFixed(1)}" y="${H - 8}" font-size="10.5" font-weight="600" text-anchor="middle"
+            fill="${Math.abs(cae) < 8 ? "#8A9290" : cae < 0 ? "#A8323F" : "#2F615C"}">${
+            cae > 0 ? "+" : ""}${nf(cae, 0)}%</text></g>`;
+  });
+  s += `</svg>`;
+  const caidas = D.map(r => r.h1.bip ? (r.h2.bip / r.h1.bip - 1) * 100 : 0);
+  const media = caidas.reduce((a, b) => a + b, 0) / caidas.length;
+  return `<section class="panel"><h3>Primera frente a segunda parte <span class="uni">minutos de balón en juego</span></h3>
+    <p class="sub">El porcentaje de debajo es cuánto cambia la segunda respecto a la primera. Se pinta
+      en color solo cuando pasa del 8%, que por debajo de eso es ruido.</p>${s}
+    <div class="leyenda">
+      <span><i class="sw" style="background:#9FBEBB"></i>1ª parte</span>
+      <span><i class="sw" style="background:#2F615C"></i>2ª parte</span>
+      <span>De media, la segunda parte ${media < 0 ? "cae" : "sube"} un ${nf(Math.abs(media), 0)}%</span></div></section>`;
 }
 
 function secuenciasBip(D, sel) {
