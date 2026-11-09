@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109g";   // se muestra abajo en el lateral
+const VERSION = "20261109i";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -109,7 +109,7 @@ const TOP3 = [
   { col:HMLD,                       ico:"🔥",  titulo:"Distancia explosiva (HMLD)  ·  > 25 w/kg", corto:"HMLD 25 w/kg" },
   { col:"Top Speed (m/s)",          ico:"⚡",  titulo:"Velocidad máxima (m/s)",       corto:"Vel. máx m/s" },
   { col:ACC3,                       ico:"🏎️", titulo:"Aceleraciones > 3 m/s²",       corto:"ACC > 3 m/s²" },
-  { col:ACC3MIN,                    ico:"🌶️", titulo:() => `${esFem() ? "La más intensa" : "El más intenso"} · aceleraciones por minuto`, corto:"ACC / min" },
+  { col:ACC3MIN,                    ico:"💥", titulo:() => `${esFem() ? "La más intensa" : "El más intenso"} · aceleraciones por minuto`, corto:"ACC / min" },
   { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" }
 ];
 
@@ -815,9 +815,9 @@ function medallas(filas) {
       : d.pct >= 100
         ? `Mejor marca suya en partido${comoSeMide}: supera en un ${nf(d.pct - 100, 0)}% su techo anterior, sacado de ${d.nRef} partidos`
         : `${nf(d.pct, 0)}% de su mejor partido${comoSeMide}, sacado de ${d.nRef} partidos suyos`;
-    // El % de su máximo se puede apagar desde config: hay semanas en que el
-    // ranking se lee mejor con el puesto y el dato a secas.
-    const conMax = C.mostrarMaximo !== false;
+    // El % de su máximo viene apagado. Se enciende poniendo mostrarMaximo:true
+    // en config, y no al revés: así no depende de que config esté actualizado.
+    const conMax = C.mostrarMaximo === true;
     const podio = orden.slice(0, 3).map((d, i) => `<div class="pod ${METAL[i]}" title="${esc(d.pos)}">
       <span class="insig">${MEDALLA[i]}</span>
       ${avatar(d.nom, d.pos)}
@@ -1214,6 +1214,71 @@ function bloqueMatriz(filas, cols, ordenPor) {
  * Los dos ejes van en % de la media de SU puesto, no en valor bruto: así un
  * primera línea no se queda siempre abajo a la izquierda solo por ser primera.
  */
+/**
+ * Radio del punto del cuadrante. Con fotoCuadrante en config se pone el
+ * diámetro en píxeles y el punto pasa a ser la cara; sin él, la bolita de
+ * siempre. Por encima de unos 34 px de diámetro las caras empiezan a taparse
+ * entre ellas con quince jugadores, así que se queda ahí el tope.
+ */
+function radioPunto() {
+  const v = C.fotoCuadrante;
+  if (!v) return 5.5;
+  const d = v === true ? 30 : Number(v);
+  return isFinite(d) && d >= 14 ? Math.min(d, 44) / 2 : 5.5;
+}
+
+/**
+ * Aparta las caras lo justo para que no se pisen.
+ *
+ * Es una relajación: en cada vuelta, cada par que se solapa se empuja por la
+ * línea que une sus centros, mitad cada uno; luego se tira de todas hacia su
+ * sitio real para que no se vayan de paseo, y se las saca de debajo de los
+ * carteles de las esquinas. Lo que se mueve está limitado a poco más de un
+ * radio: si para no pisarse hiciera falta más, se aceptan unos milímetros de
+ * roce, porque mover una cara media pulgada ya sería mentir sobre el dato.
+ * El que se aparta deja un punto y un hilo en su posición de verdad.
+ */
+function separaCaras(reales, r, carteles, lim) {
+  const d = reales.map(p => ({ x:p.x, y:p.y }));
+  const min = r * 2 + 2.5;   // distancia mínima entre centros
+  const tope = r * 1.5;      // lo máximo que se le consiente moverse
+  for (let vuelta = 0; vuelta < 150; vuelta++) {
+    let tocado = false;
+    for (let i = 0; i < d.length; i++) {
+      for (let j = i + 1; j < d.length; j++) {
+        let dx = d[j].x - d[i].x, dy = d[j].y - d[i].y;
+        let dist = Math.hypot(dx, dy);
+        if (dist >= min) continue;
+        // Dos puntos exactamente encima: se separan en una dirección fija
+        // según el índice, que si no el gráfico saldría distinto cada vez.
+        if (dist < .01) { dx = (i % 2 ? 1 : -1) * .3; dy = (j % 2 ? 1 : -1) * .3; dist = Math.hypot(dx, dy); }
+        const empuje = (min - dist) / 2 / dist;
+        d[i].x -= dx * empuje; d[i].y -= dy * empuje;
+        d[j].x += dx * empuje; d[j].y += dy * empuje;
+        tocado = true;
+      }
+    }
+    for (let i = 0; i < d.length; i++) {
+      let ox = d[i].x - reales[i].x, oy = d[i].y - reales[i].y;
+      const m = Math.hypot(ox, oy);
+      if (m > tope) { ox = ox / m * tope; oy = oy / m * tope; }
+      d[i].x = Math.max(lim.x0 + r, Math.min(lim.x1 - r, reales[i].x + ox));
+      d[i].y = Math.max(lim.y0 + r, Math.min(lim.y1 - r, reales[i].y + oy));
+      // Los carteles de las esquinas mandan: una cara debajo de uno no se lee.
+      for (const c of carteles) {
+        const a0 = c.x - r, a1 = c.x + c.w + r, b0 = c.y - r, b1 = c.y + c.h + r;
+        if (d[i].x <= a0 || d[i].x >= a1 || d[i].y <= b0 || d[i].y >= b1) continue;
+        const salidas = [d[i].x - a0, a1 - d[i].x, d[i].y - b0, b1 - d[i].y];
+        const k = salidas.indexOf(Math.min(...salidas));
+        if (k === 0) d[i].x = a0; else if (k === 1) d[i].x = a1;
+        else if (k === 2) d[i].y = b0; else d[i].y = b1;
+      }
+    }
+    if (!tocado) break;
+  }
+  return d;
+}
+
 function scatter(filas) {
   const puestos = gruposDe(filas);
   const hayX = filas.some(r => F.sc.x in r.crudo), hayY = filas.some(r => F.sc.y in r.crudo);
@@ -1273,6 +1338,7 @@ function scatter(filas) {
     ["nara",  "#B4602A", cx, cy, W - R - cx, T + ih - cy, "der", "aba"],
     ["rojo",  "#C0392B", L, cy, cx - L, T + ih - cy, "izq", "aba"]
   ];
+  const carteles = [];
   for (const [k, col, qx, qy, qw, qh, ax, ay] of quads) {
     const t = TX[k];
     const rot = t.fle;
@@ -1280,6 +1346,7 @@ function scatter(filas) {
     if (an < 70) continue;
     const px0 = ax === "izq" ? qx + 6 : qx + qw - an - 6;
     const py0 = ay === "arr" ? qy + 6 : qy + qh - al - 6;
+    carteles.push({ x:px0, y:py0, w:an, h:al });
     g += `<g class="cartel" data-qx="${px0.toFixed(1)}" data-qy="${py0.toFixed(1)}">
       <rect class="fondo" x="${px0.toFixed(1)}" y="${py0.toFixed(1)}" width="${an.toFixed(1)}"
         height="${al}" rx="10" fill="#FFFFFF" opacity=".94" stroke="#D4D8D6"/>
@@ -1290,14 +1357,60 @@ function scatter(filas) {
   // Los nombres se pintan en su sitio de siempre y se recolocan después, ya
   // medidos, en colocaNombres(): contando letras no se sabe lo que ocupa una
   // palabra y con veinte jugadoras se pisan unas a otras.
-  for (const p of pts) {
-    g += `<circle cx="${x(p.a).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="5.5" fill="${p.c}" stroke="#FFFFFF" stroke-width="1.4"><title>${esc(p.nom)} · ${esc(p.pos)}</title></circle>`;
-  }
+  // El punto puede ser la cara en vez de una bolita. El aro lleva el color de
+  // su línea, que es lo que se pierde al poner foto, y debajo va un halo
+  // blanco para que dos caras que se tocan no se fundan en una mancha.
+  const rp = radioPunto();
+  const conFoto = rp > 6;
+  const reales = pts.map(p => ({ x:x(p.a), y:y(p.b) }));
+  // Con bolita no hace falta separar nada: el nombre va al lado y se recoloca
+  // después. Con cara sí, porque una cara encima de otra no es legible.
+  const sitio = conFoto
+    ? separaCaras(reales, rp, carteles, { x0:L, x1:W - R, y0:T, y1:T + ih })
+    : reales;
+
+  pts.forEach((p, i) => {
+    const vx = sitio[i].x, vy = sitio[i].y;
+    const cx = vx.toFixed(1), cy = vy.toFixed(1);
+    const tit = `<title>${esc(p.nom)} · ${esc(p.pos)}</title>`;
+    if (!conFoto) {
+      g += `<circle cx="${cx}" cy="${cy}" r="5.5" fill="${p.c}" stroke="#FFFFFF" stroke-width="1.4">${tit}</circle>`;
+      return;
+    }
+    // Si la cara se ha tenido que apartar, se deja un punto en el sitio exacto
+    // y un hilo hasta él: la posición es el dato y no se puede falsear.
+    const dx = vx - reales[i].x, dy = vy - reales[i].y;
+    if (Math.hypot(dx, dy) > 2.5) {
+      g += `<line x1="${reales[i].x.toFixed(1)}" y1="${reales[i].y.toFixed(1)}" x2="${cx}" y2="${cy}"
+              stroke="${p.c}" stroke-width="1" opacity=".55"/>
+            <circle cx="${reales[i].x.toFixed(1)}" cy="${reales[i].y.toFixed(1)}" r="2" fill="${p.c}"/>`;
+    }
+    const f = fotoDe(p.nom), id = `fc${i}`;
+    g += `<g class="ptFoto">${tit}
+      <circle cx="${cx}" cy="${cy}" r="${(rp + 2.2).toFixed(1)}" fill="#FFFFFF"/>`;
+    if (f) {
+      g += `<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rp}"/></clipPath>
+        <image href="${f}" x="${(vx - rp).toFixed(1)}" y="${(vy - rp).toFixed(1)}"
+          width="${(rp * 2).toFixed(1)}" height="${(rp * 2).toFixed(1)}"
+          preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
+    } else {
+      g += `<circle cx="${cx}" cy="${cy}" r="${rp}" fill="${p.c}1F"/>
+        <text x="${cx}" y="${(vy + rp * .26).toFixed(1)}" text-anchor="middle"
+          font-size="${(rp * .78).toFixed(1)}" font-weight="700" fill="${p.c}">${esc(iniciales(p.nom))}</text>`;
+    }
+    g += `<circle cx="${cx}" cy="${cy}" r="${(rp + 1.1).toFixed(1)}" fill="none"
+        stroke="${p.c}" stroke-width="2"/></g>`;
+  });
   g += `<g class="guias" stroke="#B9C0BE" stroke-width="1"></g>`;
-  for (const p of pts) {
-    g += `<text class="nomPt" data-px="${x(p.a).toFixed(1)}" data-py="${y(p.b).toFixed(1)}"
-            x="${x(p.a).toFixed(1)}" y="${(y(p.b) - 10).toFixed(1)}" fill="#131715"
-            font-size="9.2" font-weight="600" text-anchor="middle">${esc(p.nom)}</text>`;
+  // Con cara no se escribe el nombre: la cara ya dice quién es, y catorce
+  // etiquetas sobre catorce retratos tapan el gráfico entero.
+  if (!conFoto) {
+    for (const p of pts) {
+      g += `<text class="nomPt" data-px="${x(p.a).toFixed(1)}" data-py="${y(p.b).toFixed(1)}"
+              data-r="${rp.toFixed(1)}"
+              x="${x(p.a).toFixed(1)}" y="${(y(p.b) - rp - 4).toFixed(1)}" fill="#131715"
+              font-size="9.2" font-weight="600" text-anchor="middle">${esc(p.nom)}</text>`;
+    }
   }
   g += `<text x="${(L + iw / 2).toFixed(0)}" y="${H - 4}" fill="#3F4846" font-size="11" text-anchor="middle">${esc(nombreMetrica(F.sc.x))}</text>
         <text x="13" y="${(T + ih / 2).toFixed(0)}" fill="#3F4846" font-size="11" text-anchor="middle"
@@ -1435,15 +1548,18 @@ function colocaNombres(svg, ocupadas, limites) {
   const nombres = [...svg.querySelectorAll("text.nomPt")];
   const pisa = b => ocupadas.some(o =>
     b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
+  // Lo que ocupa cada punto depende de si es bolita o cara.
   for (const t of nombres) {
-    ocupadas.push({ x:+t.dataset.px - 6, y:+t.dataset.py - 6, w:12, h:12 });
+    const r = (+t.dataset.r || 5.5) + 2.5;
+    ocupadas.push({ x:+t.dataset.px - r, y:+t.dataset.py - r, w:r * 2, h:r * 2 });
   }
   // De fuera hacia dentro: a las de los extremos se les da sitio primero.
   nombres.sort((a, b) => (+b.dataset.px + +b.dataset.py) - (+a.dataset.px + +a.dataset.py));
   for (const t of nombres) {
     const px = +t.dataset.px, py = +t.dataset.py;
+    const r = (+t.dataset.r || 5.5) + 3.5;
     const m = t.getBBox(), an = m.width + 2, al = m.height * .78;
-    const sitios = [[0, -9], [0, 16], [an / 2 + 9, 3.5], [-an / 2 - 9, 3.5]];
+    const sitios = [[0, -r], [0, r + 7], [an / 2 + r, 3.5], [-an / 2 - r, 3.5]];
     let puesto = null;
     for (const [dx, dy] of sitios) {
       const c = { x:px + dx - an / 2, y:py + dy - al + 1, w:an, h:al };
@@ -1452,7 +1568,7 @@ function colocaNombres(svg, ocupadas, limites) {
     }
     if (!puesto) {
       for (let k = 1; k <= 7 && !puesto; k++) {
-        const dy = -9 - k * (al + 1.5);
+        const dy = -r - k * (al + 1.5);
         const c = { x:px - an / 2, y:py + dy - al + 1, w:an, h:al };
         if (c.y > limites.y && !pisa(c)) puesto = [0, dy, c];
       }
@@ -1460,12 +1576,12 @@ function colocaNombres(svg, ocupadas, limites) {
     // Último recurso: se coloca encima aunque roce. Antes se borraba el
     // nombre y quedaba una bolita anónima, que es peor que un roce.
     if (!puesto) {
-      puesto = [0, -9, { x:px - an / 2, y:py - 9 - al + 1, w:an, h:al }];
+      puesto = [0, -r, { x:px - an / 2, y:py - r - al + 1, w:an, h:al }];
     }
     ocupadas.push(puesto[2]);
     t.setAttribute("x", (px + puesto[0]).toFixed(1));
     t.setAttribute("y", (py + puesto[1]).toFixed(1));
-    if (Math.abs(puesto[1]) > 14 && guias) {
+    if (Math.abs(puesto[1]) > r + 5 && guias) {
       const fin = py + puesto[1] + (puesto[1] < 0 ? 4 : -9);
       guias.insertAdjacentHTML("beforeend",
         `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${fin.toFixed(1)}"/>`);
@@ -4030,13 +4146,15 @@ function recordsSesion(filas) {
       const mejor = Math.max(...antes);
       // Medio punto porcentual de margen: mejorar 8,96 a 8,97 es ruido del
       // chaleco, no una marca nueva.
-      if (v > mejor * 1.005) suyos.push({ jugador:r.jugador, v, mejor });
+      if (v > mejor * 1.005) suyos.push({ jugador:r.jugador, pos:r.posicion, v, mejor });
     }
     if (!suyos.length) return "";
     suyos.sort((a, b) => b.v - a.v);
+    // La cara primero: es lo que se busca al leer "alguien ha batido su marca".
+    // El emoji y el aro se apilan a su izquierda en una columna estrecha.
     return suyos.map(h => `<div class="med">
-      <span class="ico">${m.ico}</span>
-      ${rosco(100, 100)}
+      <div class="marca"><span class="ico">${m.ico}</span>${rosco(100, 100)}</div>
+      ${avatar(h.jugador, h.pos)}
       <div class="txt">
         <s>${m.tit}</s>
         <b>${esc(h.jugador)}</b>
