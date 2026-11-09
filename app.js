@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109i";   // se muestra abajo en el lateral
+const VERSION = "20261109k";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -1234,14 +1234,14 @@ function radioPunto() {
  * línea que une sus centros, mitad cada uno; luego se tira de todas hacia su
  * sitio real para que no se vayan de paseo, y se las saca de debajo de los
  * carteles de las esquinas. Lo que se mueve está limitado a poco más de un
- * radio: si para no pisarse hiciera falta más, se aceptan unos milímetros de
- * roce, porque mover una cara media pulgada ya sería mentir sobre el dato.
+ * par de diámetros: si para no pisarse hiciera falta más, se aceptan unos
+ * milímetros de roce, porque mover una cara media pulgada sería mentir.
  * El que se aparta deja un punto y un hilo en su posición de verdad.
  */
 function separaCaras(reales, r, carteles, lim) {
   const d = reales.map(p => ({ x:p.x, y:p.y }));
   const min = r * 2 + 2.5;   // distancia mínima entre centros
-  const tope = r * 1.5;      // lo máximo que se le consiente moverse
+  const tope = r * 2.4;      // lo máximo que se le consiente moverse
   for (let vuelta = 0; vuelta < 150; vuelta++) {
     let tocado = false;
     for (let i = 0; i < d.length; i++) {
@@ -1263,7 +1263,7 @@ function separaCaras(reales, r, carteles, lim) {
       const m = Math.hypot(ox, oy);
       if (m > tope) { ox = ox / m * tope; oy = oy / m * tope; }
       d[i].x = Math.max(lim.x0 + r, Math.min(lim.x1 - r, reales[i].x + ox));
-      d[i].y = Math.max(lim.y0 + r, Math.min(lim.y1 - r, reales[i].y + oy));
+      d[i].y = Math.max(lim.y0 + r, Math.min(lim.y1 - r - 5, reales[i].y + oy));
       // Los carteles de las esquinas mandan: una cara debajo de uno no se lee.
       for (const c of carteles) {
         const a0 = c.x - r, a1 = c.x + c.w + r, b0 = c.y - r, b1 = c.y + c.h + r;
@@ -1385,7 +1385,7 @@ function scatter(filas) {
               stroke="${p.c}" stroke-width="1" opacity=".55"/>
             <circle cx="${reales[i].x.toFixed(1)}" cy="${reales[i].y.toFixed(1)}" r="2" fill="${p.c}"/>`;
     }
-    const f = fotoDe(p.nom), id = `fc${i}`;
+    const f = fotoDe(p.nom), id = `fc${i}`, ini = iniciales(p.nom);
     g += `<g class="ptFoto">${tit}
       <circle cx="${cx}" cy="${cy}" r="${(rp + 2.2).toFixed(1)}" fill="#FFFFFF"/>`;
     if (f) {
@@ -1396,10 +1396,23 @@ function scatter(filas) {
     } else {
       g += `<circle cx="${cx}" cy="${cy}" r="${rp}" fill="${p.c}1F"/>
         <text x="${cx}" y="${(vy + rp * .26).toFixed(1)}" text-anchor="middle"
-          font-size="${(rp * .78).toFixed(1)}" font-weight="700" fill="${p.c}">${esc(iniciales(p.nom))}</text>`;
+          font-size="${(rp * .78).toFixed(1)}" font-weight="700" fill="${p.c}">${esc(ini)}</text>`;
     }
     g += `<circle cx="${cx}" cy="${cy}" r="${(rp + 1.1).toFixed(1)}" fill="none"
-        stroke="${p.c}" stroke-width="2"/></g>`;
+        stroke="${p.c}" stroke-width="2"/>`;
+    // Las iniciales en una chapa sobre el borde de abajo. Solo cuando hay
+    // foto: sin ella, las iniciales grandes del centro ya dicen quién es.
+    // Va pegada a la cara y no suelta, así nunca choca con la de al lado.
+    if (f) {
+      const fs = Math.max(8, rp * .42), an = ini.length * fs * .68 + 7, al = fs * 1.5;
+      g += `<rect x="${(vx - an / 2).toFixed(1)}" y="${(vy + rp - al * .55).toFixed(1)}"
+          width="${an.toFixed(1)}" height="${al.toFixed(1)}" rx="${(al / 2).toFixed(1)}"
+          fill="#FFFFFF" stroke="${p.c}" stroke-width="1.1"/>
+        <text x="${cx}" y="${(vy + rp - al * .55 + al * .72).toFixed(1)}" text-anchor="middle"
+          font-size="${fs.toFixed(1)}" font-weight="700" fill="${p.c}"
+          letter-spacing="-.02em">${esc(ini)}</text>`;
+    }
+    g += `</g>`;
   });
   g += `<g class="guias" stroke="#B9C0BE" stroke-width="1"></g>`;
   // Con cara no se escribe el nombre: la cara ya dice quién es, y catorce
