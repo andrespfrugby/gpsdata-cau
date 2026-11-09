@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109l";   // se muestra abajo en el lateral
+const VERSION = "20261109n";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -137,6 +137,15 @@ const umbralDe = col => {
   return u ?? (col === PCTVEL ? 90 : 85);
 };
 const impactoDe = () => porEquipo(C.umbralImpacto, F.squad);
+
+/** Rellena la cabecera que solo se ve en el PDF. */
+function cabeceraPdf(titulo, bajada) {
+  const h = $("#hojaPdf");
+  if (!h) return;
+  h.innerHTML = `<span class="esc"></span>
+    <div><b>${esc(titulo)}</b><span>${esc(bajada)}</span></div>
+    <span class="club">${esc(C.titulo || "Control de carga")}</span>`;
+}
 
 /**
  * El umbral de alta velocidad, rotulado en km/h, que es como se habla de él.
@@ -819,7 +828,7 @@ function medallas(filas) {
     // en config, y no al revés: así no depende de que config esté actualizado.
     const conMax = C.mostrarMaximo === true;
     const podio = orden.slice(0, 3).map((d, i) => `<div class="pod ${METAL[i]}" title="${esc(d.pos)}">
-      <span class="insig">${MEDALLA[i]}</span>
+      <span class="insig">${i + 1}</span>
       ${avatar(d.nom, d.pos)}
       <span class="n">${esc(d.nom)}</span>
       <span class="v">${fmt(t.col, d.v, dec)}</span>
@@ -858,6 +867,9 @@ function cabecera(conResumen) {
   $("#cab").innerHTML = `
     <h2>${esc(titulos.join(" · ") || "Sesión")}${md ? `<span class="md${filas[0].esPartido ? " partido" : ""}">${md}</span>` : ""}</h2>
     <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
+  // La misma cabecera, pero para el papel: al imprimir se oculta la de arriba.
+  cabeceraPdf(titulos.join(" · ") || "Sesión",
+    `${fechaLarga(filas[0].fecha)} · ${F.squad} · ${filas.length} ${jugs()} · ${nf(mins)} min de media`);
   // El podio solo tiene sentido en partido: en un entreno el que más corre
   // suele ser el que más rondos le han tocado, no una referencia.
   // Primero el resumen de la sesión y después el ranking, que es el orden en
@@ -1465,11 +1477,6 @@ function leyendaCuadrantes() {
   }).join("")}</div>`;
 }
 
-/** Una línea, no un párrafo: lo demás lo cuentan los cuadrantes. */
-function explicaScatter() {
-  return `<p class="sub">Comparación con el promedio de tu posición.</p>`;
-}
-
 /* Cómo se llama cada métrica cuando se habla con las jugadoras, y qué hay que
    hacer para subirla. Es lo que se escribe dentro de los cuadrantes. */
 const CLARO = {
@@ -1624,8 +1631,11 @@ function selectorEje(eje, filas) {
   const act = F.sc[eje];
   const op = cat.map(([g, cols]) => `<optgroup label="${esc(g)}">` + cols.map(c =>
     `<option value="${esc(c)}"${c === act ? " selected" : ""}>${esc(nombreMetrica(c))}</option>`).join("") + `</optgroup>`).join("");
-  return `<label class="ejeSel"><span>Eje ${eje.toUpperCase()}</span>
-    <select class="selEje" data-e="${eje}">${op}</select></label>`;
+  // El <select> va invisible encima del texto. Si se dejara a la vista, el
+  // navegador lo dimensiona a su opción más larga y el subrayado se quedaba
+  // colgando un palmo por detrás de la palabra elegida.
+  return `<span class="ejeSel"><b>${esc(nombreMetrica(act))}</b>
+    <select class="selEje" data-e="${eje}" aria-label="Eje ${eje.toUpperCase()}">${op}</select></span>`;
 }
 
 /* ---------- % de carga sobre las demandas de juego ---------- */
@@ -4431,6 +4441,8 @@ function vistaJugador() {
     <h2>${esc(FJ.jugador)}<span class="md">${esc(ultima.posicion)}</span></h2>
     <span class="meta">${todas.length} ${todas.length === 1 ? "sesión" : "sesiones"} en el histórico ·
       de ${esc(fechaLarga(todas[0].fecha))} a ${esc(fechaLarga(ultima.fecha))}</span>`;
+  cabeceraPdf(FJ.jugador, `${esc(ultima.posicion)} · ${todas.length} ${
+    todas.length === 1 ? "sesión" : "sesiones"} · de ${fechaLarga(todas[0].fecha)} a ${fechaLarga(ultima.fecha)}`);
 
   const grupos = catalogoJugador().map(([g, cols]) => `<optgroup label="${esc(g)}">` +
     cols.map(c => `<option value="${esc(c)}"${c === col ? " selected" : ""}>${esc(nombreMetrica(c))}</option>`).join("") +
@@ -4657,10 +4669,11 @@ function pintar() {
   // El cuadrante va en su propio hueco, entre el ranking y la tabla.
   $("#cuadrante").innerHTML = `
     <section class="panel disp">
-      <h3>Cuadrante de acciones de alta intensidad
-        <span class="uni">${esc(nombreCorto(F.sc.x))} frente a ${esc(nombreCorto(F.sc.y))} · % de la media de tu puesto</span></h3>
-      <div class="ejes noPdf">${selectorEje("x", filas)}${selectorEje("y", filas)}</div>
-      ${explicaScatter()}
+      <h3>Cuadrante de acciones de alta intensidad</h3>
+      <!-- Los selectores SON el subtítulo: antes el título decía "Distancia
+           frente a Power plays" y debajo dos desplegables repetían lo mismo. -->
+      <p class="ejes noPdf">${selectorEje("x", filas)}<i>frente a</i>${selectorEje("y", filas)}</p>
+      <p class="ejes soloPdf">${esc(nombreCorto(F.sc.x))} frente a ${esc(nombreCorto(F.sc.y))}</p>
       ${cajas100(filas)}
       ${scatter(filas)}
       ${leyendaCuadrantes()}
