@@ -109,8 +109,10 @@ window.CAU_CONFIG = {
   // foto no se escribe el nombre al lado: la cara ya dice quién es, y catorce
   // etiquetas sobre catorce retratos tapan el gráfico. Quien no tenga foto
   // sale con sus iniciales dentro del mismo aro de color de su línea.
+  // Sobre el borde de abajo lleva una chapa con sus iniciales, para saber
+  // quién es cada uno también en el PDF, donde no se puede pasar el ratón.
   // Ponlo en 0 para volver a la bolita de color con el nombre al lado.
-  fotoCuadrante: 30,
+  fotoCuadrante: 42,
 
   // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
   // Se pueden poner por equipo: el femenino lleva bandas distintas.
