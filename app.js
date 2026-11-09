@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109f";   // se muestra abajo en el lateral
+const VERSION = "20261109g";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -815,21 +815,24 @@ function medallas(filas) {
       : d.pct >= 100
         ? `Mejor marca suya en partido${comoSeMide}: supera en un ${nf(d.pct - 100, 0)}% su techo anterior, sacado de ${d.nRef} partidos`
         : `${nf(d.pct, 0)}% de su mejor partido${comoSeMide}, sacado de ${d.nRef} partidos suyos`;
+    // El % de su máximo se puede apagar desde config: hay semanas en que el
+    // ranking se lee mejor con el puesto y el dato a secas.
+    const conMax = C.mostrarMaximo !== false;
     const podio = orden.slice(0, 3).map((d, i) => `<div class="pod ${METAL[i]}" title="${esc(d.pos)}">
       <span class="insig">${MEDALLA[i]}</span>
       ${avatar(d.nom, d.pos)}
       <span class="n">${esc(d.nom)}</span>
       <span class="v">${fmt(t.col, d.v, dec)}</span>
-      <span class="p ${clasePct(d.pct)}" title="${esc(tituloPct(d))}">${
-        d.pct == null ? "sin referencia" : nf(d.pct, 0) + "% de su máx."}</span>
+      ${conMax ? `<span class="p ${clasePct(d.pct)}" title="${esc(tituloPct(d))}">${
+        d.pct == null ? "sin referencia" : nf(d.pct, 0) + "% de su máx."}</span>` : ""}
     </div>`).join("");
     const resto = orden.slice(3).map((d, i) => `<li title="${esc(d.pos)}">
       <span class="pos"><em>${i + 4}</em></span>
       <span class="qui">${esc(d.nom)}</span>
       <span class="val">${fmt(t.col, d.v, dec)}</span>
-      <span class="suyo ${clasePct(d.pct)}" title="${esc(tituloPct(d))}">${
-        d.pct == null ? "–" : nf(d.pct, 0) + "%"}</span></li>`).join("");
-    return `<div class="medalla">
+      ${conMax ? `<span class="suyo ${clasePct(d.pct)}" title="${esc(tituloPct(d))}">${
+        d.pct == null ? "–" : nf(d.pct, 0) + "%"}</span>` : ""}</li>`).join("");
+    return `<div class="medalla${conMax ? "" : " sinMax"}">
       <div class="top"><span class="ico">${t.ico}</span>
         <span class="tit" title="${esc(titulo)}">
           <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(corto)}</span></b></span>
