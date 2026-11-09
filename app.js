@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109k";   // se muestra abajo en el lateral
+const VERSION = "20261109l";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -3356,6 +3356,7 @@ function panelBip() {
   ${kpisBip(D, sel)}
   <div class="dosBip">
     ${evolucionPanelBip(D, sel)}
+    ${mediaPanelBip(D, sel)}
     ${cuadranteBip(D, sel)}
     ${partesPanelBip(D, sel)}
     ${rucksPanelBip(D, sel)}
@@ -3433,6 +3434,62 @@ function evolucionPanelBip(D, sel) {
     <p class="sub">La línea de puntos es la media de los partidos cargados.</p>${s}
     <div class="leyenda"><span>Más juego: ${esc(etPartido(hi))} (${mmss(Sb(hi).bip)}, ${nf(Sb(hi).pct * 100, 1)}%)</span>
       <span>Menos: ${esc(etPartido(lo))} (${mmss(Sb(lo).bip)}, ${nf(Sb(lo).pct * 100, 1)}%)</span></div></section>`;
+}
+
+/**
+ * Cómo evoluciona lo que dura una secuencia. El total de balón en juego no
+ * distingue entre un partido de 60 fases cortas y uno de 30 largas, y para
+ * preparar la semana no es lo mismo: son las dos barras de aquí.
+ *
+ * Van las dos medias que ya mirabas en el Excel, porque dicen cosas distintas:
+ * la de todas las fases la hunden los saques y las melés, y la de las que
+ * pasan de 30 s describe las que de verdad fatigan.
+ */
+function mediaPanelBip(D, sel) {
+  // B alto: debajo de cada partido caben tres renglones sin que el recuento
+  // de fases de uno se pise con el del de al lado.
+  const W = 580, H = 300, L = 52, R = 16, T = 30, B = 62, ih = H - T - B;
+  const vals = D.flatMap(r => [Sb(r).media, Sb(r).m30]);
+  const top = Math.max(...vals, 1) * 1.2;
+  const paso = pasoEje(top, 5), y = v => T + ih - v / top * ih;
+  const gw = (W - L - R) / D.length, bw = Math.min(28, gw * .26);
+  let s = `<svg class="cols" width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  for (let v = 0; v <= top; v += paso) {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="#EDF0EF"/>`;
+    s += `<text x="${L - 8}" y="${(y(v) + 4).toFixed(1)}" font-size="10" fill="#8A9290" text-anchor="end">${mmss(v)}</text>`;
+  }
+  const medias = D.map(r => Sb(r).media);
+  const med = medias.reduce((a, b) => a + b, 0) / medias.length;
+  s += `<line x1="${L}" x2="${W - R}" y1="${y(med).toFixed(1)}" y2="${y(med).toFixed(1)}"
+          stroke="#8A9290" stroke-width="1.4" stroke-dasharray="6 4"/>`;
+  D.forEach((r, i) => {
+    const cx = L + i * gw + gw / 2, op = sel && sel.id !== r.id ? .32 : 1;
+    s += `<g opacity="${op}">`;
+    [[Sb(r).media, cx - bw - 3, "#2F615C"], [Sb(r).m30, cx + 3, "#9A6B12"]].forEach(([v, x, col]) => {
+      s += `<rect x="${x.toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw}" height="${(y(0) - y(v)).toFixed(1)}"
+              rx="4" fill="${col}"/>
+            <text x="${(x + bw / 2).toFixed(1)}" y="${(y(v) - 6).toFixed(1)}" font-size="11" font-weight="700"
+              text-anchor="middle" paint-order="stroke" stroke="#FFFFFF" stroke-width="3">${mmss(v)}</text>`;
+    });
+    // Debajo del nombre, cuántas fases hubo: una media alta con pocas fases
+    // no es el mismo partido que una media alta con muchas.
+    s += `<text x="${cx.toFixed(1)}" y="${H - 38}" font-size="11" font-weight="600" text-anchor="middle">${esc(r.corto)}</text>
+          <text x="${cx.toFixed(1)}" y="${H - 24}" font-size="9.5" fill="#5C6462" text-anchor="middle">${
+            Sb(r).n} fases</text>
+          <text x="${cx.toFixed(1)}" y="${H - 10}" font-size="9.5" fill="#9A6B12" text-anchor="middle">${
+            Sb(r).n30} de +30 s</text></g>`;
+  });
+  s += `</svg>`;
+  const hi = D.reduce((p, r) => Sb(r).media > Sb(p).media ? r : p);
+  const nmed = D.reduce((t, r) => t + Sb(r).n, 0) / D.length;
+  return `<section class="panel"><h3>Evolución de la secuencia <span class="uni">duración media de fase</span></h3>
+    <p class="sub">La línea de puntos es la media de todas las fases en los partidos cargados.
+      Debajo de cada partido, cuántas fases hubo: la misma media con 30 fases o con 60 es otro partido.</p>${s}
+    <div class="leyenda">
+      <span><i class="sw" style="background:#2F615C"></i>Todas las fases</span>
+      <span><i class="sw" style="background:#9A6B12"></i>Solo las de más de 30 s</span>
+      <span>Donde más duraban las fases: ${esc(etPartido(hi))} (${mmss(Sb(hi).media)} de media)</span>
+      <span>${nf(nmed, 0)} fases por partido de media</span></div></section>`;
 }
 
 /**
