@@ -88,6 +88,17 @@ window.CAU_CONFIG = {
   // Si lo escribes ya en km/h ("> 18 km/h") se respeta tal cual.
   umbralSprint: { _defecto: "> 5 m/s", "Femenino": "> 5 m/s" },
 
+  // Minutos mínimos para que un partido cuente en el "% de su máximo" del
+  // ranking, tanto para medirlo como para formar parte de su techo. Con menos
+  // de esto el dato por minuto se dispara: quien entra 6 minutos al final
+  // acumula a un ritmo que no aguantaría 80.
+  //
+  // 40 es media parte: solo entran los que han jugado de verdad. Es exigente,
+  // y los que salen del banquillo un rato corto saldrán como "sin referencia"
+  // hasta que acumulen dos partidos largos. Bájalo si quieres más porcentajes
+  // a cambio de que sean menos fiables.
+  minMinutosTecho: 40,
+
   // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
   // Se pueden poner por equipo: el femenino lleva bandas distintas.
   zonasVelocidad: {
