@@ -401,6 +401,8 @@ table.datos.jug input{accent-color:#1F5E5C;width:15px;height:15px;cursor:pointer
 .medalla li .suyo.medio{color:var(--text-2)}
 .medalla li .suyo.alto{color:var(--sand);font-weight:600}
 .medalla li .suyo.tope{color:var(--teal);font-weight:700}
+/* Sin la columna del %, la fila recupera ese hueco en vez de dejarlo vacío. */
+.medalla.sinMax li{grid-template-columns:16px minmax(20px,1fr) auto}
 .larga{display:inline}.corta{display:none}
 @media(max-width:1280px){.larga{display:none}.corta{display:inline}}
 
@@ -680,6 +682,7 @@ table.semBip tr.sel td.nm{color:var(--pink)}
   .medalla li .qui{color:#3B414E}
   .medalla li .val{color:#14161C;font-size:9px}
   .medalla li .suyo{font-size:8px}
+  .medalla.sinMax li{grid-template-columns:13px minmax(18px,1fr) auto}
   .medalla .uniR{font-size:7.5px;color:#6B7384}
   .resumen.cinco{grid-template-columns:repeat(5,1fr);gap:6px;background:#fff !important;
     border:none;padding:0;margin-bottom:7px;break-inside:avoid}
@@ -1001,7 +1004,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261109f"></script>
-<script src="app.js?v=20261109f"></script>
+<script src="config.js?v=20261109g"></script>
+<script src="app.js?v=20261109g"></script>
 </body>
 </html>
