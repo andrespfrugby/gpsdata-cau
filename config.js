@@ -81,6 +81,11 @@ window.CAU_CONFIG = {
   // Umbral de la distancia a alta velocidad de Catapult, para que en el título
   // del gráfico se vea qué está midiendo. Admite un valor por equipo, igual
   // que las zonas. Déjalo vacío si no quieres que salga.
+  //
+  // Ponlo en m/s, tal como lo tengas en Catapult: la app lo rotula en km/h.
+  //   "> 5 m/s"   ->  > 18 km/h
+  //   "> 5,5 m/s" ->  > 19,8 km/h
+  // Si lo escribes ya en km/h ("> 18 km/h") se respeta tal cual.
   umbralSprint: { _defecto: "> 5 m/s", "Femenino": "> 5 m/s" },
 
   // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
