@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261105a";   // se muestra abajo en el lateral
+const VERSION = "20261109c";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -103,11 +103,13 @@ const RESUMEN = [
  * ganar a una de ochenta, que es justo lo que los demás rankings esconden.
  */
 const TOP3 = [
-  { col:"Sprint Distance (m)",      ico:"🚀",  titulo:"HSR · distancia a alta velocidad", corto:"HSR" },
-  { col:HMLD,                       ico:"🔥",  titulo:"Distancia explosiva (HMLD)",   corto:"HMLD" },
+  { col:"Sprint Distance (m)",      ico:"🚀",
+    titulo:() => "HSR · distancia a alta velocidad" + conUmbral(umbralSprintTxt()),
+    corto:() => "HSR" + (umbralSprintTxt() ? " " + umbralSprintTxt() : "") },
+  { col:HMLD,                       ico:"🔥",  titulo:"Distancia explosiva (HMLD)  ·  > 25 w/kg", corto:"HMLD 25 w/kg" },
   { col:"Top Speed (m/s)",          ico:"⚡",  titulo:"Velocidad máxima (m/s)",       corto:"Vel. máx m/s" },
   { col:ACC3,                       ico:"🏎️", titulo:"Aceleraciones > 3 m/s²",       corto:"ACC > 3 m/s²" },
-  { col:ACDC3MIN,                   ico:"🌶️", titulo:() => `${esFem() ? "La más intensa" : "El más intenso"} · ACC+DECC por minuto`, corto:"ACC+DECC / min" },
+  { col:ACC3MIN,                    ico:"🌶️", titulo:() => `${esFem() ? "La más intensa" : "El más intenso"} · aceleraciones por minuto`, corto:"ACC / min" },
   { col:"Impacts",                  ico:"🥊",  titulo:"Contactos",                    corto:"Contactos" }
 ];
 
@@ -136,6 +138,29 @@ const umbralDe = col => {
 };
 const impactoDe = () => porEquipo(C.umbralImpacto, F.squad);
 
+/**
+ * El umbral de alta velocidad, rotulado en km/h, que es como se habla de él.
+ * En config se pone tal como lo tengas en Catapult ("> 5 m/s"); aquí se
+ * convierte. La cifra sale de multiplicar por 3,6 y no se redondea a ojo:
+ * 5 m/s son 18 km/h justos, pero 5,5 son 19,8, y el rótulo no puede decir
+ * un número que la métrica no mide.
+ */
+function umbralSprintTxt() {
+  const u = porEquipo(C.umbralSprint, F.squad);
+  if (u == null || u === "") return "";
+  const txt = String(u).trim();
+  if (/km\s*\/?\s*h/i.test(txt)) return txt;        // ya viene en km/h, se deja
+  const m = txt.match(/-?[\d.,]+/);
+  if (!m) return txt;
+  const v = parseFloat(m[0].replace(",", "."));
+  // Si no son m/s ni un número suelto, es un rótulo suyo: no se toca.
+  if (!isFinite(v) || !(/m\s*\/?\s*s/i.test(txt) || typeof u === "number")) return txt;
+  const kmh = v * 3.6;
+  const signo = (txt.match(/^[<>≥≤]/) || [">"])[0];
+  return `${signo} ${nf(kmh, Math.abs(kmh - Math.round(kmh)) < .05 ? 0 : 1)} km/h`;
+}
+const conUmbral = u => u ? "  ·  " + u : "";
+
 const nombreMetrica = c => {
   const RANGOS_ZONA = zonasDe();
   if (c === HMLD) return "HMLD (m)  ·  > 25 w/kg";
@@ -143,10 +168,7 @@ const nombreMetrica = c => {
   if (z && RANGOS_ZONA[z[1]]) return c + "  ·  " + RANGOS_ZONA[z[1]];
   const g = impactoDe();
   if (c === "Impacts" && g) return "Impacts  ·  > " + g + " G";
-  if (c === "Sprint Distance (m)") {
-    const u = porEquipo(C.umbralSprint, F.squad);
-    return "HSR (m)" + (u ? "  ·  " + u : "");
-  }
+  if (c === "Sprint Distance (m)") return "HSR (m)" + conUmbral(umbralSprintTxt());
   return c;
 };
 /* Versión corta para las cabeceras de la tabla. */
@@ -380,6 +402,35 @@ function normaliza(brutas) {
 }
 
 /**
+ * El techo de una lista de registros suyos. Un pico aislado del sensor no
+ * debería marcar la referencia de todo el año, así que en modo "auto" la
+ * mejor marca se descarta cuando hay histórico suficiente y se despega más
+ * de un 10% de la siguiente: ese es el patrón de un fallo, no de capacidad.
+ */
+function techoDe(lista, minimo) {
+  const min = minimo ?? C.minSesionesTecho ?? 1;
+  if (lista.length < min) return 0;
+  const modo = C.techo || "auto";
+  const orden = lista.slice().sort((a, b) => b - a);
+  if (modo === "max") return orden[0];
+  if (modo === "p95") return orden[Math.floor(orden.length * 0.05)];
+  if (modo === "segundo") return orden[1] || orden[0];
+  return (orden.length >= 8 && orden[0] > orden[1] * 1.10) ? orden[1] : orden[0];
+}
+
+/**
+ * Su mejor marca en esa métrica, contando solo sesiones del mismo tipo: un
+ * entreno se compara con sus entrenos y un partido con sus partidos, que si
+ * no un MD-4 sale siempre al 40% de su techo y parece una alarma.
+ */
+function techoJugadora(jugador, col, esPartido, squad) {
+  const suyas = DATOS.filter(r => r.jugador === jugador && r.squad === squad
+    && r.esPartido === esPartido && Math.abs(r.crudo[col] || 0) > 0);
+  if (suyas.length < 2) return 0;
+  return techoDe(suyas.map(r => Math.abs(r.crudo[col])), 2);
+}
+
+/**
  * Exposición: qué porcentaje de su propio techo alcanzó cada jugador ese día.
  * El techo es el mejor registro suyo en todo el histórico cargado, así que
  * cuanto más histórico tengas, más fiable es la referencia.
@@ -393,24 +444,6 @@ function recalcularExposicion() {
     if (v) t.vel.push(v);
     if (a) t.acc.push(a);
   }
-
-  // Un pico aislado del sensor no debería marcar el techo de todo el año.
-  // Con "segundo" se usa el segundo mejor registro, que ya es repetible.
-  const modo = C.techo || "auto";
-  // El techo se actualiza solo conforme entran sesiones. Con una sola, ese
-  // registro es a la vez su marca y su techo, así que saldrá al 100%.
-  const minimo = C.minSesionesTecho ?? 1;
-  const techoDe = lista => {
-    if (lista.length < minimo) return 0;
-    const orden = lista.slice().sort((a, b) => b - a);
-    if (modo === "max") return orden[0];
-    if (modo === "p95") return orden[Math.floor(orden.length * 0.05)];
-    if (modo === "segundo") return orden[1];
-    // "auto": manda su mejor marca. Solo se descarta cuando hay histórico
-    // suficiente y esa marca se despega más de un 10% de la siguiente, que es
-    // el patrón de un pico del sensor y no de una capacidad real.
-    return (orden.length >= 8 && orden[0] > orden[1] * 1.10) ? orden[1] : orden[0];
-  };
 
   for (const r of DATOS) {
     const t = registros[r.jugador];
@@ -474,6 +507,7 @@ async function cargar() {
       const j = await cargarPorScript(fuente);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      sincronizaFotos(j.fotosSello);
       AVISO_BIP = j.bipAviso || "";
       if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
         j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
@@ -503,6 +537,7 @@ async function cargar() {
       const j = JSON.parse(txt);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
+      sincronizaFotos(j.fotosSello);
       AVISO_BIP = j.bipAviso || "";
       if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
         j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
@@ -720,28 +755,51 @@ function chispa(vals, tipo) {
   </svg>`;
 }
 
-/** Rankings de la sesión: barra, medalla y emoji de la métrica. */
+/**
+ * Rankings de la sesión. El 1-2-3 va en podio, con la cara y el fondo del
+ * metal que le toca, y del cuarto para abajo en fila fina: el podio cuenta la
+ * historia de un vistazo y la lista deja ver que hay más gente detrás.
+ */
 const MEDALLA = ["🥇", "🥈", "🥉"];
+const METAL = ["oro", "plata", "bronce"];
 function medallas(filas) {
   const tarjetas = TOP3.filter(t => filas.some(r => t.col in r.crudo)).map(t => {
-    const orden = filas.map(r => ({ nom:r.jugador, pos:r.posicion, v:Math.abs(r.crudo[t.col] || 0) }))
-      .sort((a, b) => b.v - a.v).slice(0, 5);
+    const orden = filas.map(r => {
+      const v = Math.abs(r.crudo[t.col] || 0);
+      const techo = techoJugadora(r.jugador, t.col, r.esPartido, r.squad);
+      return { nom:r.jugador, pos:r.posicion, v, pct: techo ? Math.min(999, v / techo * 100) : null };
+    }).sort((a, b) => b.v - a.v).slice(0, 5);
     const dec = decimales(filas.map(r => Math.abs(r.crudo[t.col] || 0)));
-    const tope = orden[0] ? orden[0].v : 0;
     const g = impactoDe();
     const base = typeof t.titulo === "function" ? t.titulo() : t.titulo;
     const titulo = (t.col === "Impacts" && g) ? `Contactos  ·  > ${g} G` : (base || nombreMetrica(t.col));
-    const puestos = [...new Set(filas.map(r => r.posicion))].sort();
+    const cortoBase = typeof t.corto === "function" ? t.corto() : t.corto;
+    const corto = (t.col === "Impacts" && g) ? `Contactos ${g}G` : cortoBase;
+    const clasePct = p => p == null ? "" : p >= 95 ? "tope" : p >= 80 ? "alto" : "medio";
+    const tituloPct = p => p == null
+      ? "Todavía no tiene bastantes sesiones de este tipo como para saber su máximo"
+      : `${nf(p, 0)}% de su mejor marca en sesiones de este tipo`;
+    const podio = orden.slice(0, 3).map((d, i) => `<div class="pod ${METAL[i]}" title="${esc(d.pos)}">
+      <span class="med">${MEDALLA[i]}</span>
+      ${avatar(d.nom, i === 0 ? 50 : 42, d.pos)}
+      <span class="n">${esc(d.nom)}</span>
+      <span class="v">${fmt(t.col, d.v, dec)}</span>
+      <span class="p ${clasePct(d.pct)}" title="${esc(tituloPct(d.pct))}">${
+        d.pct == null ? "–" : nf(d.pct, 0) + "% de su máx."}</span>
+    </div>`).join("");
+    const resto = orden.slice(3).map((d, i) => `<li title="${esc(d.pos)}">
+      <span class="pos"><em>${i + 4}</em></span>
+      <span class="qui">${esc(d.nom)}</span>
+      <span class="val">${fmt(t.col, d.v, dec)}</span>
+      <span class="suyo ${clasePct(d.pct)}" title="${esc(tituloPct(d.pct))}">${
+        d.pct == null ? "–" : nf(d.pct, 0) + "%"}</span></li>`).join("");
     return `<div class="medalla">
       <div class="top"><span class="ico">${t.ico}</span>
         <span class="tit" title="${esc(titulo)}">
-          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(t.col === "Impacts" && g ? `Contactos ${g}G` : t.corto)}</span></b></span>
+          <b><span class="larga">${esc(titulo)}</span><span class="corta">${esc(corto)}</span></b></span>
         <span class="uniR">${esc(unidad(t.col) || "")}</span></div>
-      <ol>${orden.map((d, i) => `<li>
-        <span class="pos">${i < 3 ? MEDALLA[i] : `<em>${i + 1}</em>`}</span>
-        <span class="qui" title="${esc(d.pos)}">${esc(d.nom)}</span>
-        <span class="bar"><i style="width:${tope ? (d.v / tope * 100).toFixed(1) : 0}%;background:${colorPuesto(d.pos, puestos)}"></i></span>
-        <span class="val">${fmt(t.col, d.v, dec)}</span></li>`).join("")}</ol>
+      <div class="podio">${podio}</div>
+      ${resto ? `<ol class="resto">${resto}</ol>` : ""}
     </div>`;
   }).join("");
   return tarjetas ? `<div class="medallas">${tarjetas}</div>` : "";
@@ -3660,7 +3718,11 @@ function normalizaBip(objetos, partido) {
 let ULTIMO = null;   // resultado del último fichero leído
 
 function vistaCargar() {
+  // Esta pestaña no es la sesión: se limpia todo lo que dejó la anterior, que
+  // si no el reporte entero se queda colgando encima del área de carga.
   $("#cab").innerHTML = "";
+  $("#resumen").innerHTML = "";
+  $("#cuadrante").innerHTML = "";
   $("#notas").innerHTML = "";
   $("#selectores").innerHTML = "";
   $("#tabla").innerHTML = "";
@@ -3677,7 +3739,8 @@ function vistaCargar() {
     </div>
     <div id="salida"></div>
     ${(C.endpoint || /\/exec/.test(C.fuente || "")) ? "" : `<p class="pasos">Para que lo que cargues quede guardado, pon la URL <code>/exec</code> en <code>endpoint</code> dentro de <code>config.js</code>. Sin eso, los datos se ven pero se pierden al cerrar.</p>`}
-  </div>`;
+  </div>
+  ${bloqueFotos()}`;
 
   // El CSV de Catapult no trae columna Squad, así que hay que decirlo aquí.
   const squads = [...new Set([...DATOS.map(r => r.squad), "DHb", "Femenino", "S18", "S16"])];
@@ -3691,6 +3754,7 @@ function vistaCargar() {
   ["dragenter","dragover"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.add("encima"); }));
   ["dragleave","drop"].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.remove("encima"); }));
   zona.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) leerFichero(f); });
+  eventosFotos();
   if (ULTIMO) mostrarResumen(ULTIMO);
 }
 
@@ -4495,6 +4559,489 @@ function cajaComentarios() {
   </section>`;
 }
 
+/* ---------- fotos de jugadores ----------
+   Viven en el navegador y, si hay endpoint, también en la pestaña "Fotos" del
+   Sheets, para que estén igual en el portátil y en la tablet. No se suben al
+   repo: GitHub Pages es público y las caras no lo son. */
+const FOTOS_LS = "cau_fotos_v1";
+let FOTOS = {};        // clave del nombre -> dataURL (JPEG cuadrado de 192 px)
+let FOTOS_PEND = {};   // las que todavía no han llegado al Sheets
+let FOTOS_EST = "";    // texto del estado de sincronización
+
+function cargarFotosLocal() {
+  try { FOTOS = JSON.parse(localStorage.getItem(FOTOS_LS) || "{}"); } catch (e) { FOTOS = {}; }
+  try { FOTOS_PEND = JSON.parse(localStorage.getItem(FOTOS_LS + "_pend") || "{}"); } catch (e) { FOTOS_PEND = {}; }
+}
+function guardarFotosLocal() {
+  try {
+    localStorage.setItem(FOTOS_LS, JSON.stringify(FOTOS));
+    localStorage.setItem(FOTOS_LS + "_pend", JSON.stringify(FOTOS_PEND));
+    return true;
+  } catch (e) {
+    // El cupo del navegador son unos 5 MB. Mejor decirlo que fallar en silencio.
+    console.warn("No cabe la foto en el navegador:", e);
+    FOTOS_EST = "El navegador no admite más fotos: quita alguna antes de añadir otra.";
+    return false;
+  }
+}
+
+const fotoDe = nom => FOTOS[nombreClave(nom)] || "";
+/** Iniciales para cuando todavía no hay foto: nunca un hueco vacío. */
+const iniciales = nom => {
+  const p = String(nom || "").trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "?";
+  const a = p[0][0] || "", b = p.length > 1 ? (p[p.length - 1][0] || "") : (p[0][1] || "");
+  return (a + b).toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Z0-9]/g, "") || "?";
+};
+/** La cara, o las iniciales sobre el color de su línea si todavía no hay cara. */
+function avatar(nom, px, pos) {
+  const f = fotoDe(nom), lado = `width:${px}px;height:${px}px`;
+  if (f) return `<img class="av" style="${lado}" src="${f}" alt="" loading="lazy">`;
+  const col = (pos && COLOR_PUESTO[pos]) || "";
+  return `<span class="av ini" style="${lado};font-size:${Math.round(px * .34)}px${
+    col ? `;background:${col}18;color:${col}` : ""}">${esc(iniciales(nom))}</span>`;
+}
+
+const hayEndpoint = () => {
+  const d = C.endpoint || C.fuente || "";
+  return /\/exec/.test(d) ? d : "";
+};
+
+/**
+ * El Sheets manda en cada carga solo el sello: qué jugador tiene foto y
+ * cuánto ocupa. Si cuadra con lo que ya hay guardado aquí no se baja nada,
+ * que serían cientos de kB en cada recarga. Si no cuadra, se piden y punto.
+ */
+async function sincronizaFotos(sello) {
+  subirFotosPendientes();
+  if (!sello || typeof sello !== "object") return;
+  const claves = new Set([...Object.keys(sello), ...Object.keys(FOTOS)]);
+  const difiere = [...claves].some(k =>
+    !FOTOS_PEND[k] && (sello[k] || 0) !== (FOTOS[k] || "").length);
+  if (!difiere) return;
+  const destino = hayEndpoint();
+  if (!destino) return;
+  try {
+    const j = await cargarPorScript(destino + (destino.includes("?") ? "&" : "?") + "fotos=1");
+    fusionaFotos(j && j.fotos);
+  } catch (e) {
+    console.warn("No se pudieron bajar las fotos:", e.message);
+  }
+}
+
+/** Las que llegan del Sheets ganan, salvo que aquí haya un cambio sin subir. */
+function fusionaFotos(remotas) {
+  if (!remotas || typeof remotas !== "object") return;
+  let cambio = false;
+  const vistas = new Set();
+  Object.keys(remotas).forEach(k => {
+    vistas.add(k);
+    if (FOTOS_PEND[k]) return;
+    const v = remotas[k] || "";
+    if (FOTOS[k] !== v) { cambio = true; if (v) FOTOS[k] = v; else delete FOTOS[k]; }
+  });
+  // Si una foto ya no está en el Sheets, es que la quitaron desde otro sitio.
+  Object.keys(FOTOS).forEach(k => {
+    if (!vistas.has(k) && !FOTOS_PEND[k]) { delete FOTOS[k]; cambio = true; }
+  });
+  if (cambio) {
+    guardarFotosLocal();
+    if (F.pestana === "cargar") pintaFotos(); else pintar();
+  }
+}
+
+/**
+ * Sube de una en una. Si una falla, el resto espera al próximo intento.
+ * El cerrojo importa: al soltar 25 fotos de golpe se llama 25 veces, y sin
+ * él se mandaría cada foto varias veces a la vez.
+ */
+let SUBIENDO = false;
+async function subirFotosPendientes() {
+  const destino = hayEndpoint();
+  if (!destino || SUBIENDO) return;
+  const pend = Object.keys(FOTOS_PEND);
+  if (!pend.length) { FOTOS_EST = ""; return pintaEstadoFotos(); }
+  SUBIENDO = true;
+  let bien = false;
+  try { bien = await mandaFotos(destino); } finally { SUBIENDO = false; }
+  // Mientras subía pueden haber entrado más: se recoge la cola nueva. Solo si
+  // la tanda fue bien, que si no sería reintentar en bucle contra un Sheets caído.
+  if (bien && Object.keys(FOTOS_PEND).length) return subirFotosPendientes();
+}
+
+async function mandaFotos(destino) {
+  const pend = Object.keys(FOTOS_PEND);
+  FOTOS_EST = `Guardando ${pend.length} ${pend.length === 1 ? "foto" : "fotos"} en el Sheets…`;
+  pintaEstadoFotos();
+  for (const k of pend) {
+    try {
+      const res = await fetch(destino, {
+        method:"POST", redirect:"follow",
+        headers:{ "Content-Type":"text/plain;charset=utf-8" },
+        body: JSON.stringify({ clave: C.clave || "", accion:"foto",
+          jugadorClave: k, jugador: FOTOS_PEND[k].nombre || "", foto: FOTOS[k] || "" })
+      });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || "respuesta inesperada");
+      delete FOTOS_PEND[k];
+      guardarFotosLocal();
+    } catch (e) {
+      console.warn("Foto sin subir:", k, e.message);
+      FOTOS_EST = "Guardadas aquí, pero el Sheets no responde. Se reintenta al recargar.";
+      pintaEstadoFotos();
+      return false;
+    }
+  }
+  FOTOS_EST = "Al día con el Sheets.";
+  pintaEstadoFotos();
+  return true;
+}
+
+function pintaEstadoFotos() {
+  const e = $("#estFotos");
+  if (e) e.textContent = FOTOS_EST;
+}
+
+/** Guarda una foto ya recortada y la deja en cola para el Sheets. */
+function ponFoto(nombre, dataURL) {
+  const k = nombreClave(nombre);
+  if (dataURL) FOTOS[k] = dataURL; else delete FOTOS[k];
+  FOTOS_PEND[k] = { nombre };
+  guardarFotosLocal();
+  subirFotosPendientes();
+}
+
+/* ---------- recorte ----------
+   Un cuadrado que luego se ve redondo. Se puede arrastrar y hacer zoom, y hay
+   un botón que busca la cabeza solo para no tener que encuadrar 30 fotos. */
+const FOTO_PX = 192;        // lo que se guarda
+const LIENZO = 288;         // lo que se ve mientras encuadras
+
+function cargaImagen(file) {
+  // createImageBitmap respeta el giro que trae la foto del móvil; si el
+  // navegador no lo soporta, se cae al <img> de toda la vida.
+  if (window.createImageBitmap) {
+    return createImageBitmap(file, { imageOrientation:"from-image" }).catch(() => cargaImagenImg(file));
+  }
+  return cargaImagenImg(file);
+}
+function cargaImagenImg(file) {
+  return new Promise((ok, mal) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); ok(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); mal(new Error("no se pudo leer la imagen")); };
+    im.src = url;
+  });
+}
+
+/**
+ * Busca la cabeza por tono de piel. No es reconocimiento facial: mira qué
+ * píxeles caen en el rango de piel en YCbCr, se queda con la banda de filas
+ * más alta que tiene bastantes (la cara va arriba; las manos, más abajo) y
+ * devuelve el cuadrado que la encuadra. Si no encuentra nada, el tercio
+ * superior centrado, que es donde está la cara en casi cualquier retrato.
+ */
+function buscaCabeza(im) {
+  const W = im.width, H = im.height;
+  const ancho = 96, alto = Math.max(8, Math.round(ancho * H / W));
+  const lienzo = document.createElement("canvas");
+  lienzo.width = ancho; lienzo.height = alto;
+  const cx2 = lienzo.getContext("2d", { willReadFrequently:true });
+  cx2.drawImage(im, 0, 0, ancho, alto);
+  let d;
+  try { d = cx2.getImageData(0, 0, ancho, alto).data; } catch (e) { return porDefecto(W, H); }
+
+  const mascara = new Uint8Array(ancho * alto), porFila = new Int32Array(alto);
+  for (let i = 0, p = 0; i < mascara.length; i++, p += 4) {
+    const r = d[p], g = d[p + 1], b = d[p + 2];
+    const y = .299 * r + .587 * g + .114 * b;
+    const cb = 128 - .168736 * r - .331264 * g + .5 * b;
+    const cr = 128 + .5 * r - .418688 * g - .081312 * b;
+    if (y > 55 && cb >= 75 && cb <= 136 && cr >= 132 && cr <= 182 && r > g && r > b) {
+      mascara[i] = 1; porFila[(i / ancho) | 0]++;
+    }
+  }
+  const total = mascara.reduce((a, b) => a + b, 0);
+  if (total < mascara.length * .004) return porDefecto(W, H);
+
+  const pico = Math.max(...porFila), minimo = Math.max(2, pico * .3);
+  let ini = porFila.findIndex(c => c >= minimo);
+  if (ini < 0) return porDefecto(W, H);
+  let fin = ini;
+  while (fin + 1 < alto && porFila[fin + 1] >= minimo) fin++;
+  // Una banda de una o dos filas es ruido, no una cabeza.
+  if (fin - ini < 2) return porDefecto(W, H);
+
+  let sx = 0, n = 0;
+  for (let f = ini; f <= fin; f++) {
+    for (let c = 0; c < ancho; c++) if (mascara[f * ancho + c]) { sx += c; n++; }
+  }
+  if (!n) return porDefecto(W, H);
+  const escala = W / ancho;
+  const centroX = (sx / n) * escala;
+  const altoCabeza = (fin - ini + 1) * escala;
+  // Que la cabeza ocupe algo más de un tercio del círculo: así entra pelo y hombros.
+  const lado = Math.min(Math.min(W, H), Math.max(altoCabeza * 2.5, Math.min(W, H) * .35));
+  const centroY = (ini + (fin - ini) / 2) * escala + altoCabeza * .12;
+  return recorta(W, H, centroX, centroY, lado);
+}
+function porDefecto(W, H) {
+  const lado = Math.min(W, H) * .82;
+  return recorta(W, H, W / 2, H * .40, lado);
+}
+/** Mete el cuadrado dentro de la imagen pase lo que pase. */
+function recorta(W, H, cx, cy, lado) {
+  lado = Math.max(24, Math.min(lado, Math.min(W, H)));
+  return {
+    lado,
+    cx: Math.max(lado / 2, Math.min(W - lado / 2, cx)),
+    cy: Math.max(lado / 2, Math.min(H - lado / 2, cy))
+  };
+}
+
+let RECORTE = null;   // { im, cx, cy, lado, nombre }
+
+function abreRecorte(nombre, im) {
+  RECORTE = Object.assign({ im, nombre }, buscaCabeza(im));
+  const c = $("#capaRecorte");
+  c.hidden = false;
+  c.querySelector("h3").textContent = nombre;
+  dibujaRecorte();
+}
+function cierraRecorte() {
+  RECORTE = null;
+  const c = $("#capaRecorte");
+  if (c) c.hidden = true;
+}
+function dibujaRecorte() {
+  if (!RECORTE) return;
+  const { im, cx, cy, lado } = RECORTE;
+  const cv = $("#lienzoRecorte"), g = cv.getContext("2d");
+  g.clearRect(0, 0, LIENZO, LIENZO);
+  g.drawImage(im, cx - lado / 2, cy - lado / 2, lado, lado, 0, 0, LIENZO, LIENZO);
+  const z = $("#zoomRecorte");
+  if (z) z.value = String(Math.round(Math.min(RECORTE.im.width, RECORTE.im.height) / lado * 100));
+}
+/** Mueve el encuadre en píxeles de pantalla. */
+function mueveRecorte(dx, dy) {
+  if (!RECORTE) return;
+  const f = RECORTE.lado / LIENZO;
+  Object.assign(RECORTE, recorta(RECORTE.im.width, RECORTE.im.height,
+    RECORTE.cx - dx * f, RECORTE.cy - dy * f, RECORTE.lado));
+  dibujaRecorte();
+}
+function zoomRecorte(pct) {
+  if (!RECORTE) return;
+  const menor = Math.min(RECORTE.im.width, RECORTE.im.height);
+  Object.assign(RECORTE, recorta(RECORTE.im.width, RECORTE.im.height,
+    RECORTE.cx, RECORTE.cy, menor / Math.max(1, pct / 100)));
+  dibujaRecorte();
+}
+/**
+ * Pasa el cuadrado elegido a un JPEG de 192 px. Una celda de Sheets admite
+ * 50.000 caracteres, así que si una foto muy detallada se pasa, se baja la
+ * calidad hasta que entre, en vez de fallar al guardarla.
+ */
+const TOPE_CELDA = 44000;
+function recorteA(im, cx, cy, lado) {
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = FOTO_PX;
+  const g = cv.getContext("2d");
+  g.imageSmoothingQuality = "high";
+  g.drawImage(im, cx - lado / 2, cy - lado / 2, lado, lado, 0, 0, FOTO_PX, FOTO_PX);
+  let q = .82, d = cv.toDataURL("image/jpeg", q);
+  while (d.length > TOPE_CELDA && q > .35) { q -= .12; d = cv.toDataURL("image/jpeg", q); }
+  return d;
+}
+
+function guardaRecorte() {
+  if (!RECORTE) return;
+  const { im, cx, cy, lado, nombre } = RECORTE;
+  ponFoto(nombre, recorteA(im, cx, cy, lado));
+  cierraRecorte();
+  if (F.pestana === "cargar") pintaFotos(); else pintar();
+}
+
+/** Recorte automático sin abrir nada: para cuando se sueltan 20 fotos de golpe. */
+function recorteAuto(im) {
+  const { cx, cy, lado } = buscaCabeza(im);
+  return recorteA(im, cx, cy, lado);
+}
+
+/* ---------- la pantalla de fotos, dentro de Cargar datos ---------- */
+let FOTO_SQUAD = "";
+
+const jugadoresDe = squad => [...new Set(DATOS.filter(r => r.squad === squad).map(r => r.jugador))]
+  .sort((a, b) => a.localeCompare(b, "es"));
+
+function bloqueFotos() {
+  return `<section class="fotos" id="bloqueFotos">
+    <div class="fcab">
+      <div>
+        <h3>Fotos de ${jugs()}</h3>
+        <p>Salen en el podio de cada ranking. Se guardan en tu Sheets, no en la web:
+          la web es pública y las caras no.</p>
+      </div>
+      <select id="fSquadFoto" aria-label="Equipo"></select>
+    </div>
+    <div class="suelta" id="sueltaFotos">
+      <b>Arrastra aquí varias fotos a la vez</b>
+      <span>Si el archivo se llama como ${esFem() ? "la jugadora" : "el jugador"} (<code>sellau.jpg</code>), se reparten solas y se encuadra la cara.
+        Las que no cuadren te las dejo para asignar a mano.</span>
+      <button id="btnFotos" class="sec">Elegir fotos</button>
+      <input type="file" id="inpFotos" accept="image/*" multiple hidden>
+    </div>
+    <div id="sinAsignar"></div>
+    <div class="rejFotos" id="rejFotos"></div>
+    <p class="estFotos" id="estFotos">${esc(FOTOS_EST)}</p>
+  </section>`;
+}
+
+function pintaFotos() {
+  const rej = $("#rejFotos");
+  if (!rej) return;
+  const lista = jugadoresDe(FOTO_SQUAD);
+  rej.innerHTML = lista.length ? lista.map(n => {
+    const pos = (DATOS.find(r => r.jugador === n && r.squad === FOTO_SQUAD) || {}).posicion || "";
+    return `<div class="fjug${fotoDe(n) ? " tiene" : ""}" data-nom="${esc(n)}">
+      ${avatar(n, 46, pos)}
+      <div class="fnom"><b>${esc(n)}</b><span>${esc(pos)}</span></div>
+      <button class="fbtn" data-acc="poner" title="${fotoDe(n) ? "Cambiar la foto" : "Poner foto"}">${fotoDe(n) ? "Cambiar" : "Poner"}</button>
+      ${fotoDe(n) ? `<button class="fbtn x" data-acc="quitar" title="Quitar la foto">×</button>` : ""}
+    </div>`;
+  }).join("") : `<p class="vacio">No hay ${jugs()} de ${esc(FOTO_SQUAD)} en los datos todavía.</p>`;
+  const con = lista.filter(n => fotoDe(n)).length;
+  const cab = $("#bloqueFotos .fcab h3");
+  if (cab) cab.textContent = `Fotos de ${jugs()} · ${con} de ${lista.length}`;
+  pintaEstadoFotos();
+}
+
+/** Empareja el nombre del archivo con un jugador. Solo si no hay dudas. */
+function jugadorDeArchivo(nombreArchivo, lista) {
+  const k = nombreClave(nombreArchivo.replace(/\.[a-z0-9]+$/i, ""));
+  if (k.length < 4) return null;
+  const exactos = lista.filter(n => nombreClave(n) === k);
+  if (exactos.length === 1) return exactos[0];
+  const casi = lista.filter(n => { const j = nombreClave(n); return j.includes(k) || k.includes(j); });
+  return casi.length === 1 ? casi[0] : null;
+}
+
+async function sueltaFotos(files) {
+  const lista = jugadoresDe(FOTO_SQUAD), sueltas = [];
+  let puestas = 0;
+  for (const f of files) {
+    if (!/^image\//.test(f.type)) continue;
+    let im;
+    try { im = await cargaImagen(f); } catch (e) { continue; }
+    const quien = jugadorDeArchivo(f.name, lista);
+    if (quien) { ponFoto(quien, recorteAuto(im)); puestas++; }
+    else sueltas.push({ nombre:f.name, im });
+  }
+  pintaFotos();
+  const caja = $("#sinAsignar");
+  if (!caja) return;
+  if (!sueltas.length) {
+    caja.innerHTML = puestas ? `<p class="ok">${puestas === 1
+      ? "Una foto colocada y encuadrada"
+      : `${puestas} fotos colocadas y encuadradas`}. Si alguna no ha quedado bien, pincha en Cambiar.</p>` : "";
+    return;
+  }
+  SUELTAS = sueltas;
+  caja.innerHTML = `<div class="pend"><b>${sueltas.length} sin asignar</b>
+    <span>No he sabido de quién son. Elige a quién va cada una.</span>
+    <div class="pendRej">${sueltas.map((s, i) => `<div class="pfoto">
+      <canvas class="mini" data-i="${i}" width="56" height="56"></canvas>
+      <select class="asig" data-i="${i}"><option value="">${esc(s.nombre)}</option>
+        ${lista.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</select>
+    </div>`).join("")}</div></div>`;
+  sueltas.forEach((s, i) => {
+    const cv = caja.querySelector(`canvas[data-i="${i}"]`);
+    const { cx, cy, lado } = buscaCabeza(s.im);
+    cv.getContext("2d").drawImage(s.im, cx - lado / 2, cy - lado / 2, lado, lado, 0, 0, 56, 56);
+  });
+  caja.querySelectorAll(".asig").forEach(sel => sel.onchange = e => {
+    const quien = e.target.value;
+    if (!quien) return;
+    abreRecorte(quien, SUELTAS[+e.target.dataset.i].im);
+  });
+}
+let SUELTAS = [];
+
+/** Pide un archivo para un jugador concreto y abre el encuadre. */
+function pideFoto(nombre) {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = async () => {
+    const f = inp.files[0];
+    if (!f) return;
+    try { abreRecorte(nombre, await cargaImagen(f)); }
+    catch (e) { alert("No se pudo leer esa imagen."); }
+  };
+  inp.click();
+}
+
+function eventosFotos() {
+  const squads = [...new Set(DATOS.map(r => r.squad))].filter(Boolean);
+  if (!squads.includes(FOTO_SQUAD)) FOTO_SQUAD = squads.includes(F.squad) ? F.squad : squads[0] || "";
+  const sel = $("#fSquadFoto");
+  sel.innerHTML = squads.map(s => `<option${s === FOTO_SQUAD ? " selected" : ""}>${esc(s)}</option>`).join("");
+  sel.onchange = e => { FOTO_SQUAD = e.target.value; $("#sinAsignar").innerHTML = ""; pintaFotos(); };
+
+  $("#btnFotos").onclick = () => $("#inpFotos").click();
+  $("#inpFotos").onchange = e => { if (e.target.files.length) sueltaFotos([...e.target.files]); e.target.value = ""; };
+  const z = $("#sueltaFotos");
+  ["dragenter","dragover"].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); z.classList.add("encima"); }));
+  ["dragleave","drop"].forEach(ev => z.addEventListener(ev, e => { e.preventDefault(); z.classList.remove("encima"); }));
+  z.addEventListener("drop", e => { if (e.dataTransfer.files.length) sueltaFotos([...e.dataTransfer.files]); });
+
+  $("#rejFotos").onclick = e => {
+    const b = e.target.closest(".fbtn"), caja = e.target.closest(".fjug");
+    if (!caja) return;
+    const nom = caja.dataset.nom;
+    if (b && b.dataset.acc === "quitar") { ponFoto(nom, ""); return pintaFotos(); }
+    pideFoto(nom);
+  };
+  pintaFotos();
+}
+
+/** El encuadre: arrastrar con el ratón o el dedo, rueda para el zoom. */
+function eventosRecorte() {
+  const capa = $("#capaRecorte");
+  if (!capa) return;
+  const cv = $("#lienzoRecorte");
+  let arrastrando = false, px = 0, py = 0;
+  cv.addEventListener("pointerdown", e => {
+    arrastrando = true; px = e.clientX; py = e.clientY;
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", e => {
+    if (!arrastrando) return;
+    mueveRecorte(e.clientX - px, e.clientY - py);
+    px = e.clientX; py = e.clientY;
+  });
+  ["pointerup","pointercancel"].forEach(ev => cv.addEventListener(ev, () => { arrastrando = false; }));
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    if (!RECORTE) return;
+    const menor = Math.min(RECORTE.im.width, RECORTE.im.height);
+    zoomRecorte(Math.max(100, Math.min(400, menor / RECORTE.lado * 100 * (e.deltaY > 0 ? .92 : 1.08))));
+  }, { passive:false });
+  $("#zoomRecorte").oninput = e => zoomRecorte(+e.target.value);
+  $("#recCara").onclick = () => {
+    if (!RECORTE) return;
+    Object.assign(RECORTE, buscaCabeza(RECORTE.im));
+    dibujaRecorte();
+  };
+  $("#recGuardar").onclick = guardaRecorte;
+  $("#recCancelar").onclick = cierraRecorte;
+  capa.addEventListener("click", e => { if (e.target === capa) cierraRecorte(); });
+  document.addEventListener("keydown", e => {
+    if (capa.hidden) return;
+    if (e.key === "Escape") cierraRecorte();
+    if (e.key === "Enter") guardaRecorte();
+  });
+}
+
 const GUARDA = "cau_gps_prefs";
 function recordar() {
   try {
@@ -4531,7 +5078,9 @@ function recuperar() {
 /* ---------- arranque ---------- */
 (async function init() {
   eventos();
+  eventosRecorte();
   recuperar();
+  cargarFotosLocal();
   await cargar();
   poblarFiltros();
   pintar();
