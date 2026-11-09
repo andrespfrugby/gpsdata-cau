@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109c";   // se muestra abajo en el lateral
+const VERSION = "20261109f";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -418,16 +418,49 @@ function techoDe(lista, minimo) {
   return (orden.length >= 8 && orden[0] > orden[1] * 1.10) ? orden[1] : orden[0];
 }
 
+/* Métricas que ya son una tasa o un máximo. Estas no se dividen por minutos:
+   la velocidad punta de un jugador es la misma juegue 20 minutos u 80. */
+const YA_ES_TASA = new Set(["Top Speed (m/s)", "Distance Per Min (m/min)",
+  "Max Acceleration (m/s/s)", "Max Deceleration (m/s/s)", "Power Score (w/kg)",
+  "Work Ratio", ACC3MIN, DEC3MIN, ACDC3MIN, PCTVEL, PCTACC]);
+const esAcumulada = col => !YA_ES_TASA.has(col) && !/\/\s*min|per min|%/i.test(col);
+
+/** Minutos por debajo de los cuales un partido no sirve ni de dato ni de referencia. */
+const MIN_TECHO = () => C.minMinutosTecho ?? 20;
+
+/** Lo que se compara: por minuto si la métrica se acumula, en crudo si no. */
+function tasa(r, col) {
+  const v = Math.abs(r.crudo[col] || 0);
+  if (!esAcumulada(col)) return v;
+  return r.minutos > 0 ? v / r.minutos : 0;
+}
+
 /**
- * Su mejor marca en esa métrica, contando solo sesiones del mismo tipo: un
- * entreno se compara con sus entrenos y un partido con sus partidos, que si
- * no un MD-4 sale siempre al 40% de su techo y parece una alarma.
+ * Su propia referencia en esa métrica, para comparar contra ella el dato de hoy.
+ *
+ * Tres decisiones que no se ven y que cambian el número:
+ *  - La sesión de hoy NO entra en el techo. Así un 105% quiere decir "mejor
+ *    que nunca", que es lo que uno espera leer; si entrase, el primero del
+ *    ranking daría siempre 100% y la columna no diría nada.
+ *  - Solo sesiones del mismo tipo: sus partidos contra sus partidos. Comparar
+ *    un MD-4 con partidos deja todo al 40% y parece una alarma que no existe.
+ *  - En las métricas de volumen se compara por minuto. El techo de metros de
+ *    un partido de 80' no es referencia para quien entra 20': saldría al 25%
+ *    y eso estaría midiendo minutos, no al jugador.
  */
-function techoJugadora(jugador, col, esPartido, squad) {
-  const suyas = DATOS.filter(r => r.jugador === jugador && r.squad === squad
-    && r.esPartido === esPartido && Math.abs(r.crudo[col] || 0) > 0);
-  if (suyas.length < 2) return 0;
-  return techoDe(suyas.map(r => Math.abs(r.crudo[col])), 2);
+function refPropia(r, col) {
+  const piso = MIN_TECHO();
+  if (r.minutos < piso) {
+    return { techo:0, motivo:`Jugó ${nf(r.minutos)} min. Por debajo de ${piso} no se compara: el dato por minuto se dispara y no diría nada.` };
+  }
+  const hoy = idSesion(r);
+  const suyas = DATOS.filter(o => o.jugador === r.jugador && o.squad === r.squad
+    && o.esPartido === r.esPartido && idSesion(o) !== hoy
+    && o.minutos >= piso && tasa(o, col) > 0);
+  if (suyas.length < 2) {
+    return { techo:0, motivo:`Le faltan partidos suyos de ${piso} min o más para tener una referencia.` };
+  }
+  return { techo: techoDe(suyas.map(o => tasa(o, col)), 2), motivo:"", n: suyas.length };
 }
 
 /**
@@ -766,8 +799,9 @@ function medallas(filas) {
   const tarjetas = TOP3.filter(t => filas.some(r => t.col in r.crudo)).map(t => {
     const orden = filas.map(r => {
       const v = Math.abs(r.crudo[t.col] || 0);
-      const techo = techoJugadora(r.jugador, t.col, r.esPartido, r.squad);
-      return { nom:r.jugador, pos:r.posicion, v, pct: techo ? Math.min(999, v / techo * 100) : null };
+      const ref = refPropia(r, t.col);
+      return { nom:r.jugador, pos:r.posicion, v, min:r.minutos, motivo:ref.motivo, nRef:ref.n,
+        pct: ref.techo ? Math.min(999, tasa(r, t.col) / ref.techo * 100) : null };
     }).sort((a, b) => b.v - a.v).slice(0, 5);
     const dec = decimales(filas.map(r => Math.abs(r.crudo[t.col] || 0)));
     const g = impactoDe();
@@ -775,23 +809,25 @@ function medallas(filas) {
     const titulo = (t.col === "Impacts" && g) ? `Contactos  ·  > ${g} G` : (base || nombreMetrica(t.col));
     const cortoBase = typeof t.corto === "function" ? t.corto() : t.corto;
     const corto = (t.col === "Impacts" && g) ? `Contactos ${g}G` : cortoBase;
-    const clasePct = p => p == null ? "" : p >= 95 ? "tope" : p >= 80 ? "alto" : "medio";
-    const tituloPct = p => p == null
-      ? "Todavía no tiene bastantes sesiones de este tipo como para saber su máximo"
-      : `${nf(p, 0)}% de su mejor marca en sesiones de este tipo`;
+    const clasePct = p => p == null ? "" : p >= 100 ? "record" : p >= 90 ? "tope" : p >= 75 ? "alto" : "medio";
+    const comoSeMide = esAcumulada(t.col) ? " por minuto jugado" : "";
+    const tituloPct = d => d.motivo ? d.motivo
+      : d.pct >= 100
+        ? `Mejor marca suya en partido${comoSeMide}: supera en un ${nf(d.pct - 100, 0)}% su techo anterior, sacado de ${d.nRef} partidos`
+        : `${nf(d.pct, 0)}% de su mejor partido${comoSeMide}, sacado de ${d.nRef} partidos suyos`;
     const podio = orden.slice(0, 3).map((d, i) => `<div class="pod ${METAL[i]}" title="${esc(d.pos)}">
-      <span class="med">${MEDALLA[i]}</span>
-      ${avatar(d.nom, i === 0 ? 50 : 42, d.pos)}
+      <span class="insig">${MEDALLA[i]}</span>
+      ${avatar(d.nom, d.pos)}
       <span class="n">${esc(d.nom)}</span>
       <span class="v">${fmt(t.col, d.v, dec)}</span>
-      <span class="p ${clasePct(d.pct)}" title="${esc(tituloPct(d.pct))}">${
-        d.pct == null ? "–" : nf(d.pct, 0) + "% de su máx."}</span>
+      <span class="p ${clasePct(d.pct)}" title="${esc(tituloPct(d))}">${
+        d.pct == null ? "sin referencia" : nf(d.pct, 0) + "% de su máx."}</span>
     </div>`).join("");
     const resto = orden.slice(3).map((d, i) => `<li title="${esc(d.pos)}">
       <span class="pos"><em>${i + 4}</em></span>
       <span class="qui">${esc(d.nom)}</span>
       <span class="val">${fmt(t.col, d.v, dec)}</span>
-      <span class="suyo ${clasePct(d.pct)}" title="${esc(tituloPct(d.pct))}">${
+      <span class="suyo ${clasePct(d.pct)}" title="${esc(tituloPct(d))}">${
         d.pct == null ? "–" : nf(d.pct, 0) + "%"}</span></li>`).join("");
     return `<div class="medalla">
       <div class="top"><span class="ico">${t.ico}</span>
@@ -4593,13 +4629,18 @@ const iniciales = nom => {
   const a = p[0][0] || "", b = p.length > 1 ? (p[p.length - 1][0] || "") : (p[0][1] || "");
   return (a + b).toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Z0-9]/g, "") || "?";
 };
-/** La cara, o las iniciales sobre el color de su línea si todavía no hay cara. */
-function avatar(nom, px, pos) {
-  const f = fotoDe(nom), lado = `width:${px}px;height:${px}px`;
-  if (f) return `<img class="av" style="${lado}" src="${f}" alt="" loading="lazy">`;
+/**
+ * La cara, o las iniciales sobre el color de su línea si todavía no hay cara.
+ * El tamaño no se pone aquí: lo decide la hoja de estilos con --av según
+ * dónde esté el avatar. Si se pusiera en línea ganaría siempre, y ni el PDF
+ * ni las pantallas estrechas podrían encogerlo.
+ */
+function avatar(nom, pos) {
+  const f = fotoDe(nom);
+  if (f) return `<img class="av" src="${f}" alt="" loading="lazy">`;
   const col = (pos && COLOR_PUESTO[pos]) || "";
-  return `<span class="av ini" style="${lado};font-size:${Math.round(px * .34)}px${
-    col ? `;background:${col}18;color:${col}` : ""}">${esc(iniciales(nom))}</span>`;
+  return `<span class="av ini"${col ? ` style="background:${col}18;color:${col}"` : ""}>${
+    esc(iniciales(nom))}</span>`;
 }
 
 const hayEndpoint = () => {
@@ -4904,7 +4945,7 @@ function pintaFotos() {
   rej.innerHTML = lista.length ? lista.map(n => {
     const pos = (DATOS.find(r => r.jugador === n && r.squad === FOTO_SQUAD) || {}).posicion || "";
     return `<div class="fjug${fotoDe(n) ? " tiene" : ""}" data-nom="${esc(n)}">
-      ${avatar(n, 46, pos)}
+      ${avatar(n, pos)}
       <div class="fnom"><b>${esc(n)}</b><span>${esc(pos)}</span></div>
       <button class="fbtn" data-acc="poner" title="${fotoDe(n) ? "Cambiar la foto" : "Poner foto"}">${fotoDe(n) ? "Cambiar" : "Poner"}</button>
       ${fotoDe(n) ? `<button class="fbtn x" data-acc="quitar" title="Quitar la foto">×</button>` : ""}
