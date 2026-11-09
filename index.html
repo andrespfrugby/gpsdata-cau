@@ -426,8 +426,12 @@ table.datos th.n{text-align:center}
 /* Marca personal batida: rayo, aro lleno y el salto respecto a su registro. */
 .med{display:flex;align-items:center;gap:11px;background:rgba(240,225,153,.09);
   border:1px solid rgba(240,225,153,.32);border-radius:11px;padding:8px 15px 8px 12px}
-.med .ico{font-size:21px;line-height:1}
-.med .rosco{width:40px;height:40px;flex:none}
+/* El emoji y el aro, apilados en su columna; la cara al lado, que es lo que
+   se mira primero. */
+.med .marca{display:flex;flex-direction:column;align-items:center;gap:3px;flex:none}
+.med .ico{font-size:19px;line-height:1}
+.med .rosco{width:30px;height:30px;flex:none}
+.med .av{--av:46px}
 .med .txt s{display:block;text-decoration:none;font-size:9px;letter-spacing:.09em;
   text-transform:uppercase;color:var(--sand,#F0E199);font-weight:600}
 .med .txt b{display:block;font-size:13px;line-height:1.3}
@@ -714,7 +718,8 @@ table.semBip tr.sel td.nm{color:var(--pink)}
   .records{gap:5px;margin-bottom:7px;break-inside:avoid}
   .med{background:#FDF8E6 !important;border:1px solid #E6DBA8;padding:4px 10px;gap:7px}
   .med .ico{font-size:14px}
-  .med .rosco{width:28px;height:28px}
+  .med .rosco{width:22px;height:22px}
+  .med .av{--av:34px}
   .med .txt s{color:#8A6D1F;font-size:7px}
   .med .txt b{font-size:9.5px;color:#14161C}
   .med .txt u{font-size:11px;color:#14161C}
@@ -1004,7 +1009,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261109g"></script>
-<script src="app.js?v=20261109g"></script>
+<script src="config.js?v=20261109i"></script>
+<script src="app.js?v=20261109i"></script>
 </body>
 </html>
