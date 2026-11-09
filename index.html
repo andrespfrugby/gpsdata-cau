@@ -334,13 +334,14 @@ table.datos.jug input{accent-color:#1F5E5C;width:15px;height:15px;cursor:pointer
 .medalla ol{list-style:none;margin:auto 0 0;padding:0}
 /* Cada puesto es una fila: medalla, nombre, barra recta con el color de su
    línea y el dato. La barra es la que deja comparar de un vistazo. */
-.medalla .podio{display:grid;grid-template-columns:1.12fr 1fr 1fr;gap:5px;align-items:stretch}
+/* Las tres columnas miden lo mismo: entre oro, plata y bronce cambian la
+   medalla y el color, nada más. La cara es igual de grande para los tres. */
+.medalla .podio{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;align-items:stretch}
 /* El texto se alinea abajo en las tres: el oro tiene la foto más grande y si
    no, su nombre caería un dedo por debajo del de plata y bronce. */
-.medalla .pod{--av:68px;position:relative;text-align:center;border-radius:9px;padding:9px 4px 7px;
+.medalla .pod{--av:80px;position:relative;text-align:center;border-radius:9px;padding:9px 4px 7px;
   border:1px solid transparent;min-width:0;display:flex;flex-direction:column}
 .medalla .pod .n{margin-top:auto}
-.medalla .pod.oro{--av:86px}
 /* Oro, plata y bronce. El metal es lo único que cambia entre las tres, así que
    lleva el peso de distinguirlas: fondo, borde y el color del número. */
 .medalla .pod.oro{background:#FBF5E3;border-color:#E6D099}
@@ -379,8 +380,8 @@ table.datos.jug input{accent-color:#1F5E5C;width:15px;height:15px;cursor:pointer
   font-size:calc(var(--av, 44px) * .34)}
 /* La foto manda en el podio, así que se le da sitio de verdad. En pantallas
    estrechas encoge sola, que si no se come la tarjeta entera. */
-@media(max-width:1340px){.medalla .pod{--av:58px}.medalla .pod.oro{--av:72px}}
-@media(max-width:1120px){.medalla .pod{--av:46px}.medalla .pod.oro{--av:56px}
+@media(max-width:1340px){.medalla .pod{--av:64px}}
+@media(max-width:1120px){.medalla .pod{--av:52px}
   .medalla .pod .insig{width:17px;height:17px;font-size:11px}}
 .fjug .av{--av:46px}
 /* Del cuarto para abajo: fila fina, sin barra. Quien gana ya está arriba. */
@@ -675,8 +676,7 @@ table.semBip tr.sel td.nm{color:var(--pink)}
   .medalla .pod .p{font-size:7.5px}
   /* En papel la foto baja de tamaño: lo que manda aquí es que entren los seis
      rankings en la hoja, no el retrato. */
-  .medalla .pod{--av:40px;padding-top:5px}
-  .medalla .pod.oro{--av:48px}
+  .medalla .pod{--av:46px;padding-top:5px}
   .medalla .pod .av{border-width:1.5px;box-shadow:none}
   .medalla ol.resto{margin-top:4px}
   .medalla li{font-size:9px;padding:1px 0;gap:4px;
@@ -1009,7 +1009,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261109i"></script>
-<script src="app.js?v=20261109i"></script>
+<script src="config.js?v=20261109k"></script>
+<script src="app.js?v=20261109k"></script>
 </body>
 </html>
