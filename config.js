@@ -100,9 +100,17 @@ window.CAU_CONFIG = {
   minMinutosTecho: 40,
 
   // Enseñar debajo de cada dato el "% de su máximo" (y el ▲ cuando bate su
-  // mejor marca). En false el ranking queda a puesto y dato, que es como se
-  // lee más rápido. Todo el cálculo sigue ahí: es solo encenderlo.
+  // mejor marca). Viene apagado: el ranking queda a puesto, cara y dato, que
+  // es como se lee más rápido. Ponlo en true para encenderlo; el cálculo
+  // entero sigue ahí, solo está oculto.
   mostrarMaximo: false,
+
+  // Diámetro en píxeles de la cara en el cuadrante de alta intensidad. Con
+  // foto no se escribe el nombre al lado: la cara ya dice quién es, y catorce
+  // etiquetas sobre catorce retratos tapan el gráfico. Quien no tenga foto
+  // sale con sus iniciales dentro del mismo aro de color de su línea.
+  // Ponlo en 0 para volver a la bolita de color con el nombre al lado.
+  fotoCuadrante: 30,
 
   // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
   // Se pueden poner por equipo: el femenino lleva bandas distintas.
