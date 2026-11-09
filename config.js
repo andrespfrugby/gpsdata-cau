@@ -99,6 +99,11 @@ window.CAU_CONFIG = {
   // a cambio de que sean menos fiables.
   minMinutosTecho: 40,
 
+  // Enseñar debajo de cada dato el "% de su máximo" (y el ▲ cuando bate su
+  // mejor marca). En false el ranking queda a puesto y dato, que es como se
+  // lee más rápido. Todo el cálculo sigue ahí: es solo encenderlo.
+  mostrarMaximo: false,
+
   // Rangos de tus zonas de velocidad, tal como los tienes en Catapult.
   // Se pueden poner por equipo: el femenino lleva bandas distintas.
   zonasVelocidad: {
