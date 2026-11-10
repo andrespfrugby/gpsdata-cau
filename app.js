@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261110e";   // se muestra abajo en el lateral
+const VERSION = "20261110i";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -344,13 +344,45 @@ const SINONIMOS = {
 };
 
 /** El MD viene escrito en el título: "INS MD-3 Sitges" -> -3. Un partido es MD 0. */
+/**
+ * El día del microciclo a partir del nombre de la sesión.
+ *
+ * Los nombres vienen con guiones bajos (INS_W7_MD_Andorra) y el \b de toda la
+ * vida no corta en "_": para el motor de expresiones "_MD_" es una sola
+ * palabra, así que el MD de los partidos no se encontraba nunca y todos los
+ * partidos acababan contados como entreno. Por eso se cambian los guiones
+ * bajos por espacios antes de mirar.
+ */
 function leerMD(titulo) {
-  const t = String(titulo || "");
+  const t = String(titulo || "").replace(/_/g, " ");
   const m = t.match(/MD\s*([+-])\s*(\d+)/i);
   if (m) return parseInt(m[1] + m[2], 10);
   return /\bMD\b/i.test(t) ? 0 : null;
 }
 const etiquetaMD = md => md == null ? null : (md === 0 ? "MD" : "MD" + (md > 0 ? "+" : "") + md);
+
+/**
+ * El nombre del archivo no es un título. "INS_W7_MD-3_Andorra" se queda en
+ * "Andorra": el MD ya está en su cuadrado y la semana en la línea de debajo,
+ * así que repetirlos en el titular solo gasta sitio. Si al quitarlo todo no
+ * queda nada, se devuelve el original tal cual: mejor feo que vacío.
+ */
+function nombreSesionLimpio(bruto) {
+  const limpio = String(bruto || "")
+    .replace(/_/g, " ")
+    .replace(/\bINS\b|\bGPS\b|\bSES\b/gi, "")
+    .replace(/\bW\s*\d+\b/gi, "")
+    .replace(/\bMD\s*[+-]?\s*\d*\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s·\-–]+|[\s·\-–]+$/g, "")
+    .trim();
+  return limpio || String(bruto || "Sesión");
+}
+/** La semana del microciclo, si el nombre la trae (W7 -> Semana 7). */
+function semanaDe(bruto) {
+  const m = String(bruto || "").replace(/_/g, " ").match(/\bW\s*(\d+)\b/i);
+  return m ? `Semana ${parseInt(m[1], 10)}` : "";
+}
 
 function normaliza(brutas) {
   let salida = [];
@@ -374,13 +406,23 @@ function normaliza(brutas) {
     if (minutos <= 0 || minutos < (C.minutosMinimos ?? 0)) continue;
 
     const sesion = String(get("sesion") || "").trim();
-    const etiquetas = String(get("tags") || "").trim().toLowerCase();
-    // El split manda: en un triangular el tag pone "training" aunque sean partidos.
-    const esPartido = /match/i.test(split) || (etiquetas
-      ? /\bgame\b/.test(etiquetas) && etiquetas !== "training"
-      : (C.marcadoresPartido || []).some(t => (sesion + " " + split).toLowerCase().includes(t)));
+    // El MD manda: MD es partido y MD-1, MD-2, MD-4… son entrenos. Antes lo
+    // decidía el nombre o la etiqueta, y con eso se colaban partidos como
+    // entrenos. La columna MD, si existe, gana sobre el nombre.
     const mdCol = get("md");
-    const md = mdCol !== undefined && mdCol !== "" ? num(mdCol) : (esPartido ? 0 : leerMD(sesion));
+    let md = null;
+    if (mdCol !== undefined && String(mdCol).trim() !== "") {
+      const t = String(mdCol).trim();
+      md = /md/i.test(t) ? leerMD(t) : (isFinite(num(t)) ? num(t) : null);
+    } else {
+      md = leerMD(sesion + " " + split);
+    }
+    // Sin ningún MD por ningún lado se mira el nombre, que es lo único que
+    // queda: así las temporadas viejas sin MD no pierden sus partidos.
+    const etiquetas = String(get("tags") || "").trim().toLowerCase();
+    const esPartido = md === 0 || (md == null && (/match/i.test(split) || (etiquetas
+      ? /\bgame\b/.test(etiquetas) && etiquetas !== "training"
+      : (C.marcadoresPartido || []).some(t => (sesion + " " + split).toLowerCase().includes(t)))));
 
     // Guardamos las columnas del catálogo tal cual vienen, sin recalcular nada.
     const crudo = {};
@@ -733,57 +775,63 @@ function colocaMarca(seg) {
 }
 
 /* ---------- la tira de la semana ----------
-   Siete días a la vista, que es como se piensa un microciclo. Las flechas
-   mueven semana a semana y se apagan cuando ya no hay nada más que enseñar,
-   que es mejor que dejarte avanzar por meses vacíos. */
+   Los siete días siempre, de lunes a domingo, aunque solo haya cuatro con
+   datos: ver los huecos es parte de leer el microciclo. El filtro de arriba
+   no quita sesiones de aquí, solo apaga las que no son de ese tipo, que si
+   las borrara perderías de vista la forma de la semana. */
+const INI_SEM = ["L", "M", "X", "J", "V", "S", "D"];
+
 function pintaTira(todas, candidatas) {
   const caja = $("#tiraSemana");
   if (!caja) return;
-  if (!caja.firstChild) {
-    caja.innerHTML = `<button type="button" class="fl" id="semAnt" aria-label="Semana anterior">‹</button>
-      <div class="tiraVer"><div class="tira" id="tiraSes"></div></div>
-      <button type="button" class="fl" id="semSig" aria-label="Semana siguiente">›</button>
-      <button type="button" class="chip verTodas" id="verTodas" aria-expanded="false">Todas</button>`;
+  if (!caja.dataset.listo) {
+    caja.dataset.listo = "1";
     $("#semAnt").onclick = () => saltaSemana(-1);
     $("#semSig").onclick = () => saltaSemana(1);
-    $("#verTodas").onclick = () => { abreLista(!LISTA_ABIERTA); };
-    $("#tiraSes").onclick = e => {
+    $("#verTodas").onclick = () => abreLista(!LISTA_ABIERTA);
+    caja.onclick = e => {
       const bt = e.target.closest("[data-id]");
       if (!bt) return;
       F.fecha = bt.dataset.id; F.semanaFijada = false;
       poblarFechas(); recordar(); pintar();
     };
   }
-  const fin = masDias(F.semana, 6);
-  const dentro = candidatas.filter(r => r.fechaISO >= F.semana && r.fechaISO <= fin)
-    .sort((a, b) => a.fecha - b.fecha);
-  $("#tiraSes").innerHTML = dentro.length ? dentro.map(r => {
-    const id = idSesion(r), md = etiquetaMD(r.md), nom = r.sesion || r.split || "Sesión";
-    return `<button type="button" class="ses" data-id="${esc(id)}"
-        aria-pressed="${id === F.fecha}" title="${esc(nom)}">
-        <s>${esc(diaTira(r.fecha))}</s>
-        <b>${esc(nom)}</b>
-        ${md ? `<span class="md${r.esPartido ? " p" : ""}">${esc(md)}</span>` : ""}
-      </button>`;
-  }).join("") : `<p class="sinSes">Ninguna sesión${
-    F.tipo === "partido" ? " de partido" : F.tipo === "entreno" ? " de entreno" : ""} esta semana</p>`;
+  const quiere = F.tipo === "todo" ? null : F.tipo === "partido";
+  const dentro = todas.filter(r => r.fechaISO >= F.semana && r.fechaISO <= masDias(F.semana, 6));
+
+  caja.innerHTML = INI_SEM.map((ini, i) => {
+    const diaISO = masDias(F.semana, i);
+    const d = new Date(diaISO + "T12:00:00");
+    const suyas = dentro.filter(r => r.fechaISO === diaISO)
+      .sort((a, b) => (b.esPartido ? 1 : 0) - (a.esPartido ? 1 : 0));
+    const cab = `<span class="dCab"><i>${ini}</i>${d.getDate()}</span>`;
+    if (!suyas.length) return `<div class="dia vacio">${cab}<span class="hueco"></span></div>`;
+    return `<div class="dia">${cab}${suyas.map(r => {
+      const id = idSesion(r), md = etiquetaMD(r.md), nom = nombreSesionLimpio(r.sesion || r.split);
+      const apaga = quiere !== null && r.esPartido !== quiere;
+      return `<button type="button" class="ses${apaga ? " apagada" : ""}" data-id="${esc(id)}"
+          aria-pressed="${id === F.fecha}" title="${esc(r.sesion || r.split || "")}">
+          <b>${esc(nom)}</b>
+          ${md ? `<span class="md${r.esPartido ? " p" : ""}">${esc(md)}</span>` : ""}
+        </button>`;
+    }).join("")}</div>`;
+  }).join("");
 
   // Hasta dónde se puede pasear: el lunes de la primera y de la última semana.
-  const hay = candidatas.length ? candidatas : todas;
-  const topes = hay.length
-    ? [lunesDe(hay[hay.length - 1].fecha), lunesDe(hay[0].fecha)] : [F.semana, F.semana];
+  const topes = todas.length
+    ? [lunesDe(todas[todas.length - 1].fecha), lunesDe(todas[0].fecha)] : [F.semana, F.semana];
   $("#semAnt").disabled = F.semana <= topes[0];
   $("#semSig").disabled = F.semana >= topes[1];
   const et = $("#semEt");
   if (et) {
-    const d0 = new Date(F.semana + "T12:00:00"), d1 = new Date(fin + "T12:00:00");
-    const mismoMes = d0.getMonth() === d1.getMonth();
-    et.textContent = `${d0.getDate()}${mismoMes ? "" : " " + d0.toLocaleDateString("es-ES", { month:"short" }).replace(".", "")}`
-      + ` – ${d1.getDate()} ${d1.toLocaleDateString("es-ES", { month:"short" }).replace(".", "")}`;
+    const d0 = new Date(F.semana + "T12:00:00"), d1 = new Date(masDias(F.semana, 6) + "T12:00:00");
+    const mes = f => f.toLocaleDateString("es-ES", { month:"short" }).replace(".", "");
+    et.textContent = d0.getMonth() === d1.getMonth()
+      ? `${d0.getDate()} – ${d1.getDate()} ${mes(d1)}`
+      : `${d0.getDate()} ${mes(d0)} – ${d1.getDate()} ${mes(d1)}`;
   }
-  // La tira se desplaza sola hasta la sesión abierta si se ha ido de pantalla.
-  const act = $("#tiraSes [aria-pressed=true]");
-  if (act && act.scrollIntoView) act.scrollIntoView({ block:"nearest", inline:"nearest" });
+  const alc = $("#etAlcance");
+  if (alc) alc.textContent = F.historial ? "Todo el histórico" : "Últimas 4 semanas";
 }
 
 function saltaSemana(n) {
@@ -1097,9 +1145,19 @@ function cabecera(conResumen) {
   const titulos = [...new Set(filas.map(r => r.sesion).filter(Boolean))];
   const md = etiquetaMD(filas[0].md);
   const mins = filas.reduce((t, r) => t + r.minutos, 0) / filas.length;
+  // El cuadrado del MD delante: lo primero que se mira al abrir una sesión es
+  // en qué día del microciclo estás, y así se ve sin leer.
+  const bruto = titulos.join(" · ") || "Sesión";
+  const limpio = nombreSesionLimpio(bruto);
+  const sem = semanaDe(bruto);
   $("#cab").innerHTML = `
-    <h2>${esc(titulos.join(" · ") || "Sesión")}${md ? `<span class="md${filas[0].esPartido ? " partido" : ""}">${md}</span>` : ""}</h2>
-    <span class="meta">${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} jugadores · ${nf(mins)} min de media</span>`;
+    <div class="titSes">
+      ${md ? `<span class="cuaMD${filas[0].esPartido ? " p" : ""}"><b>${esc(md)}</b></span>` : ""}
+      <div>
+        <h2 title="${esc(bruto)}">${esc(limpio)}</h2>
+        <span class="meta">${sem ? esc(sem) + " · " : ""}${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} ${jugs()} · ${nf(mins)} min de media</span>
+      </div>
+    </div>`;
   // La misma cabecera, pero para el papel: al imprimir se oculta la de arriba.
   cabeceraPdf(titulos.join(" · ") || "Sesión",
     `${fechaLarga(filas[0].fecha)} · ${F.squad} · ${filas.length} ${jugs()} · ${nf(mins)} min de media`);
@@ -3601,8 +3659,16 @@ function datosBip() {
              all:todo, h1:h1 || todo, h2:h2 || todo,
              fases:fases.map(f => [parteDe(f), f.duracion, f.rucks || 0]) };
   }).filter(Boolean);
-  filas.sort((a, b) => a.fecha - b.fecha);
   filas.forEach(r => { r.corto = rivalDe(r.nom); });
+  // El export de BiP no siempre trae fecha. Cuando falta, se busca el partido
+  // de GPS del mismo rival y se le toma la suya: son el mismo partido, y sin
+  // fecha la tira de partidos no se puede ordenar ni leer.
+  filas.forEach(r => {
+    if (r.fecha && !isNaN(r.fecha) && r.fecha.getFullYear() > 2000) return;
+    const f = fechaDesdeGps(r.corto);
+    if (f) { r.fecha = f; r.temp = temporadaDe(f); r.fechaPrestada = true; }
+  });
+  filas.sort((a, b) => a.fecha - b.fecha);
   // Si el rival se repite (ida y vuelta), se le añade la fecha para distinguirlos.
   const cuenta = {};
   filas.forEach(r => { cuenta[r.corto] = (cuenta[r.corto] || 0) + 1; });
@@ -3613,12 +3679,25 @@ function datosBip() {
   return filas;
 }
 
+/** La fecha del partido de GPS contra ese mismo rival, si lo encuentra. */
+function fechaDesdeGps(rival) {
+  const k = nombreClave(rival);
+  if (k.length < 3) return null;
+  const cand = DATOS.filter(r => r.esPartido
+    && nombreClave((r.sesion || "") + " " + (r.split || "")).includes(k));
+  if (!cand.length) return null;
+  return cand.sort((a, b) => b.fecha - a.fecha)[0].fecha;
+}
+
 /** "DHB 1 vs Ponent" se queda en "Ponent": en los ejes cabe y se entiende. */
 function rivalDe(nom) {
   const partes = String(nom).split(/\s+(?:vs\.?|v\.?|contra|@)\s+/i);
   return (partes.length > 1 ? partes[partes.length - 1] : nom).trim() || String(nom);
 }
 const etPartido = r => r.corto;
+/** Día y mes para la tarjeta del partido; vacío si no hay fecha fiable. */
+const fechaChip = f => !f || isNaN(f) || f.getFullYear() < 2000 ? "sin fecha"
+  : f.toLocaleDateString("es-ES", { day:"numeric", month:"short" }).replace(".", "");
 const Sb = r => r[FB.parte] || r.all;
 
 function panelBip() {
@@ -3631,25 +3710,42 @@ function panelBip() {
   if (FB.sel && !D.some(r => r.id === FB.sel)) FB.sel = "";
   const sel = D.find(r => r.id === FB.sel) || null;
 
+  // La tira de partidos es el selector: cada tarjeta lleva la fecha, el rival
+  // y su % de balón en juego, así que elegir y comparar es el mismo gesto.
+  const tope = Math.max(...D.map(r => r.all.pct || 0), .01);
   return `
-  <section class="barraRef noPdf"><div class="filaRef">
-    ${temps.length > 1 ? `<div class="campoR"><label>Temporada</label>
-      <div class="segR" data-g="temp">${temps.map(t =>
-        `<button data-v="${esc(t)}" class="${FB.temp === t ? "on" : ""}">${esc(t)}</button>`).join("")}
-        <button data-v="todas" class="${FB.temp === "todas" ? "on" : ""}">Todas</button></div></div>` : ""}
-    <div class="campoR"><label>Parte del partido</label>
-      <div class="segR" data-g="parte">${PARTE_BIP.map(([v, t]) =>
-        `<button data-v="${v}" class="${FB.parte === v ? "on" : ""}">${t}</button>`).join("")}</div></div>
-    <div class="campoR"><label>Aislar un partido</label>
-      <div class="chipsP">${D.map(r =>
-        `<button class="chipP${FB.sel === r.id ? " on" : ""}" data-p="${esc(r.id)}"
-          title="${esc(r.nom)} · ${esc(fechaLarga(r.fecha))}">${esc(r.corto)}</button>`).join("")}</div></div>
-    ${sel ? `<div class="campoR"><label>De ${esc(sel.corto)}</label>
-      <div style="display:flex;gap:7px">
+  <section class="barraRef noPdf">
+    <div class="supBip">
+      <div class="segmento" id="segParte" aria-label="Parte del partido">
+        <span class="marca"></span>
+        ${PARTE_BIP.map(([v, t]) => `<button type="button" data-g="parte" data-v="${v}"
+          aria-pressed="${FB.parte === v}">${t}</button>`).join("")}
+      </div>
+      ${temps.length > 1 ? `<div class="segmento" id="segTemp" aria-label="Temporada">
+        <span class="marca"></span>
+        ${temps.map(t => `<button type="button" data-g="temp" data-v="${esc(t)}"
+          aria-pressed="${FB.temp === t}">${esc(t)}</button>`).join("")}
+        <button type="button" data-g="temp" data-v="todas"
+          aria-pressed="${FB.temp === "todas"}">Todas</button></div>` : ""}
+      ${sel ? `<div class="accBip">
         <button class="bot irBip" data-ir="partido">Reporte del partido</button>
-        <button class="bot irBip" data-ir="cruce">Cruce con GPS</button>
-      </div></div>` : ""}
-  </div></section>
+        <button class="bot irBip" data-ir="cruce">Cruce con GPS</button></div>` : ""}
+    </div>
+    <div class="tiraP">
+      <button type="button" class="pTodos${FB.sel ? "" : " on"}" data-p="">
+        <s>Todos</s><b>${D.length} partidos</b></button>
+      ${D.map(r => {
+        const pc = (r.all.pct || 0) * 100;
+        return `<button type="button" class="pCard${FB.sel === r.id ? " on" : ""}" data-p="${esc(r.id)}"
+          title="${esc(r.nom)}">
+          <s>${esc(fechaChip(r.fecha))}</s>
+          <b>${esc(r.corto)}</b>
+          <span class="bar"><i style="width:${(pc / (tope * 100) * 100).toFixed(0)}%"></i></span>
+          <span class="pc">${nf(pc, 1)}% BiP</span>
+        </button>`;
+      }).join("")}
+    </div>
+  </section>
   ${kpisBip(D, sel)}
   <div class="dosBip">
     ${evolucionPanelBip(D, sel)}
@@ -4136,16 +4232,20 @@ function vistaBip() {
   const selP = $("#fPartidoBip"); if (selP) selP.onchange = e => { FB.partido = e.target.value; pintar(); };
   const selS = $("#fSesionGps"); if (selS) selS.onchange = e => { FB.sesionGps = e.target.value; pintar(); };
   document.querySelectorAll(".conmuta .mini").forEach(b => b.onclick = () => { FB.vista = b.dataset.v; pintar(); });
-  document.querySelectorAll(".barraRef .segR[data-g=parte] button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".barraRef [data-g=parte]").forEach(b => b.onclick = () => {
     FB.parte = b.dataset.v; recordar(); pintar();
   });
-  document.querySelectorAll(".barraRef .segR[data-g=temp] button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".barraRef [data-g=temp]").forEach(b => b.onclick = () => {
     FB.temp = b.dataset.v; FB.sel = ""; recordar(); pintar();
   });
-  document.querySelectorAll(".chipP").forEach(b => b.onclick = () => {
-    FB.sel = FB.sel === b.dataset.p ? "" : b.dataset.p;
+  // Volver a pulsar el partido ya elegido lo suelta y se vuelve a ver todo.
+  document.querySelectorAll(".tiraP [data-p]").forEach(b => b.onclick = () => {
+    const v = b.dataset.p;
+    FB.sel = (!v || FB.sel === v) ? "" : v;
     recordar(); pintar();
   });
+  colocaMarca($("#segParte"));
+  colocaMarca($("#segTemp"));
   document.querySelectorAll(".irBip").forEach(b => b.onclick = () => {
     // Saltar al detalle llevándose el partido que estaba aislado.
     if (FB.sel) FB.partido = FB.sel;
@@ -4911,7 +5011,11 @@ function pintar() {
   // La pestaña se recuerda entre recargas: el resaltado tiene que ir con ella.
   document.querySelectorAll(".tab").forEach(t =>
     t.setAttribute("aria-selected", t.id === "tab-" + F.pestana));
-  document.body.classList.toggle("sinSesion", F.pestana === "jugador");
+  // La tira de sesiones solo vale donde se mira una sesión de GPS: en balón
+  // en juego, semana, jugador o carga de datos estorba y confunde, porque
+  // esas pestañas no dependen de la sesión elegida ahí arriba.
+  document.body.classList.toggle("sinSesion", !["reporte", "drill"].includes(F.pestana));
+  document.body.classList.toggle("conJugador", F.pestana === "jugador");
   if (F.pestana === "jugador") return vistaJugador();
   if (F.pestana === "semana") return vistaSemana();
   if (F.pestana === "carga") return vistaCarga();
