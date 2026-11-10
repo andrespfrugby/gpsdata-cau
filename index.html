@@ -209,6 +209,84 @@ aside .tab[aria-selected=true]::before{content:"";position:absolute;left:-12px;t
 .ejes{display:flex;align-items:center;gap:6px;margin:1px 0 15px;flex-wrap:wrap;
   font-size:13px;color:var(--text-2)}
 .ejes i{font-style:normal;color:var(--text-3)}
+/* Selector de sesión: arriba el tipo, debajo la semana a la vista. El
+   desplegable del navegador obligaba a abrirlo a ciegas para ver qué había;
+   la tira lo enseña sin tocar nada, y de paso se ve el microciclo. */
+#campoFecha{display:block}
+.filtroSesion{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+
+/* Control segmentado: los tres tipos son excluyentes, y un carril común lo
+   dice. El ancho del indicador lo pone el script sobre el botón activo. */
+.segmento{position:relative;display:inline-flex;background:var(--ink-800);border-radius:20px;
+  padding:3px;border:1px solid var(--ink-700)}
+.segmento .marca{position:absolute;top:3px;bottom:3px;left:3px;width:0;opacity:0;
+  background:var(--cau-rojo);border-radius:17px;
+  transition:transform .24s cubic-bezier(.4,0,.2,1),width .24s cubic-bezier(.4,0,.2,1)}
+.segmento button{position:relative;background:none;border:0;cursor:pointer;height:auto;
+  padding:4px 12px;border-radius:17px;font-size:11.5px;font-weight:600;color:var(--text-2);
+  white-space:nowrap;line-height:1.5}
+.segmento button:hover:not(:disabled):not([aria-pressed=true]){color:var(--text)}
+.segmento button[aria-pressed=true]{color:#fff}
+.segmento button:disabled{opacity:.38;cursor:default}
+.segmento button:focus-visible{outline:2px solid var(--cau-rojo);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.segmento .marca{transition:opacity .2s}}
+
+.semEnv{position:relative}
+.semEt{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--text-3);font-weight:600;margin:0 0 3px 36px}
+.semana{display:flex;align-items:center;gap:6px}
+.fl{width:28px;height:28px;flex:none;padding:0;border-radius:50%;border:1px solid var(--ink-700);
+  background:var(--ink-800);color:var(--text-2);font-size:15px;line-height:1;cursor:pointer}
+.fl:hover:not(:disabled){border-color:var(--cau-rojo);color:var(--cau-rojo)}
+.fl:disabled{opacity:.3;cursor:default}
+/* La tira se desplaza si la semana trae más de las que caben. */
+.tiraVer{overflow-x:auto;overflow-y:hidden;max-width:min(52vw,560px);scrollbar-width:thin}
+.tira{display:flex;gap:5px;padding:1px}
+.ses{flex:none;min-width:98px;max-width:150px;text-align:left;background:var(--ink-800);
+  border:1px solid var(--ink-700);border-radius:10px;padding:5px 9px 6px;height:auto;
+  line-height:1.25;cursor:pointer}
+.ses s{display:block;text-decoration:none;font-size:9.5px;color:var(--text-3)}
+.ses b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.ses:hover:not([aria-pressed=true]){border-color:var(--ink-600)}
+.ses[aria-pressed=true]{background:var(--cau-tinta);border-color:var(--cau-tinta)}
+.ses[aria-pressed=true] b{color:#fff}
+.ses[aria-pressed=true] s{color:rgba(255,255,255,.55)}
+.ses[aria-pressed=true] .md{background:rgba(255,255,255,.17);color:#fff}
+.ses:focus-visible{outline:2px solid var(--cau-rojo);outline-offset:2px}
+/* La etiqueta del microciclo. El partido en rojo porque es el ancla de la semana. */
+.md{display:inline-block;margin-top:3px;font-size:8.5px;font-weight:700;letter-spacing:.04em;
+  padding:1px 5px;border-radius:5px;background:rgba(31,94,92,.12);color:var(--teal)}
+.md.p{background:rgba(175,13,26,.11);color:var(--cau-rojo)}
+.sinSes{margin:0;padding:7px 2px;font-size:11.5px;color:var(--text-3);white-space:nowrap}
+.verTodas{flex:none}
+.chip{height:auto;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;
+  background:transparent;border:1px dashed var(--ink-600);color:var(--text-3);cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;line-height:1.5}
+.chip:hover{color:var(--cau-rojo);border-color:var(--cau-rojo)}
+.chip[aria-expanded=true]{background:rgba(175,13,26,.07);border-style:solid;
+  border-color:var(--cau-rojo);color:var(--cau-rojo)}
+
+/* La lista completa, sobre la tira. */
+.popSes{position:absolute;top:calc(100% + 7px);left:0;z-index:40;width:min(360px,88vw);
+  background:var(--ink-850);border-radius:13px;padding:7px;
+  box-shadow:0 14px 40px rgba(19,23,21,.16),0 0 0 1px rgba(19,23,21,.09)}
+.popSes[hidden]{display:none}
+.popCab{padding:2px 2px 7px;border-bottom:1px solid var(--ink-800);margin-bottom:5px}
+.popLista{max-height:min(54vh,380px);overflow-y:auto}
+.popLista .sem{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);
+  font-weight:600;padding:9px 9px 3px;position:sticky;top:0;background:var(--ink-850)}
+.popLista .fila{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;
+  height:auto;padding:6px 9px;border-radius:8px;text-align:left;font-size:12.5px;
+  color:var(--text);cursor:pointer}
+.popLista .fila:hover{background:var(--ink-800)}
+.popLista .fila[aria-selected=true]{background:rgba(175,13,26,.08);color:var(--cau-rojo);font-weight:600}
+.popLista .fila .d{font-family:'Chivo Mono';font-size:10.5px;color:var(--text-3);
+  width:52px;flex:none;letter-spacing:-.02em}
+.popLista .fila[aria-selected=true] .d{color:var(--cau-rojo)}
+.popLista .fila .n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.popLista .fila .md{margin-top:0;flex:none}
+
 .ejes.soloPdf{display:none}
 .ejeSel{position:relative;display:inline-flex;align-items:center}
 .ejeSel b{font-weight:600;font-size:13.5px;letter-spacing:-.01em;color:var(--text);
@@ -377,6 +455,15 @@ table.datos.jug input{accent-color:#1F5E5C;width:15px;height:15px;cursor:pointer
   padding:8px 11px;font-size:12px;opacity:0;transition:opacity .1s;z-index:50;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .tip b{font-family:'Chivo Mono';font-size:13px;display:block}
 .tip em{font-style:normal;color:var(--text-3)}
+/* Las dos métricas del cuadrante: el valor de verdad y, al lado, el % sobre
+   su puesto. El % solo no basta para hablar con el jugador. */
+.filasTip{margin:6px 0 4px;display:grid;gap:2px}
+.filasTip .fl{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:baseline}
+.filasTip em{font-size:11px}
+.filasTip .v{font-family:'Chivo Mono';font-size:12px;letter-spacing:-.02em}
+.filasTip .v i{font-style:normal;font-size:9.5px;color:var(--text-3)}
+.filasTip .pc{font-family:'Chivo Mono';font-size:11px;color:var(--text-3);min-width:34px;text-align:right}
+.tip em.pie{display:block;font-size:10px;opacity:.75;margin-top:2px}
 
 /* ---- Podio de la sesión y promedios en cinco ---- */
 .medallas{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:10px}
@@ -640,6 +727,8 @@ table.datos.ref td[data-tip]{cursor:help}
 .leyCuad>div{padding-top:9px}
 .leyCuad b{display:block;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-bottom:5px}
 .leyCuad span{display:block;font-size:11.5px;color:var(--text-2);line-height:1.5}
+/* La línea de flechas: dice la zona en dos golpes, sin leer una frase. */
+.leyCuad span.fle{font-weight:600;line-height:1.45;letter-spacing:.01em}
 .leyCuad i{display:block;font-style:normal;font-size:11.5px;color:var(--text);font-weight:600;margin-top:4px}
 
 /* ---------- reporte de un partido ---------- */
@@ -1045,7 +1134,16 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
         <div class="cab" id="cab"></div>
         <div class="ctrl">
           <div class="field"><label for="fSquad">Equipo</label><select id="fSquad"></select></div>
-          <div class="field" id="campoFecha"><label for="fFecha">Sesión</label><select id="fFecha"></select></div>
+          <div class="field" id="campoFecha">
+            <div class="filtroSesion" id="filtroSesion">
+              <div class="segmento" id="segTipo" aria-label="Tipo de sesión"></div>
+              <div class="semEnv">
+                <span class="semEt" id="semEt"></span>
+                <div class="semana" id="tiraSemana"></div>
+                <div class="popSes" id="popSes" hidden></div>
+              </div>
+            </div>
+          </div>
           <div class="field" id="campoJugador"><label for="fJugador">Jugador</label><select id="fJugador"></select></div>
           <button id="btnPdf">Exportar PDF</button>
         </div>
@@ -1084,7 +1182,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261109n"></script>
-<script src="app.js?v=20261109n"></script>
+<script src="config.js?v=20261110e"></script>
+<script src="app.js?v=20261110e"></script>
 </body>
 </html>
