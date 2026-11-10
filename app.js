@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261110i";   // se muestra abajo en el lateral
+const VERSION = "20261110m";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -781,6 +781,23 @@ function colocaMarca(seg) {
    las borrara perderías de vista la forma de la semana. */
 const INI_SEM = ["L", "M", "X", "J", "V", "S", "D"];
 
+/**
+ * El color del día del microciclo. No es decoración: dice de un vistazo qué
+ * tipo de día es sin leer el número.
+ *   MD        partido, rojo del club
+ *   MD-5/-4   rojo apagado, los días de carga lejos del partido
+ *   MD-3/-2   ámbar, la bajada
+ *   MD-1/MD+  verde, activación y recuperación
+ *   sin MD    azul, lo que no entra en el microciclo
+ */
+function colorMD(md, esPartido) {
+  if (esPartido || md === 0) return "#AF0D1A";
+  if (md == null) return "#5B4A86";   // morado: el azul se lo quedan los días off
+  if (md <= -4) return "#C0392B";
+  if (md <= -2) return "#B4802A";
+  return "#2F615C";
+}
+
 function pintaTira(todas, candidatas) {
   const caja = $("#tiraSemana");
   if (!caja) return;
@@ -805,14 +822,26 @@ function pintaTira(todas, candidatas) {
     const suyas = dentro.filter(r => r.fechaISO === diaISO)
       .sort((a, b) => (b.esPartido ? 1 : 0) - (a.esPartido ? 1 : 0));
     const cab = `<span class="dCab"><i>${ini}</i>${d.getDate()}</span>`;
-    if (!suyas.length) return `<div class="dia vacio">${cab}<span class="hueco"></span></div>`;
+    // El día sin sesión se dice con su palabra, no con un hueco en blanco:
+    // un día off es parte del microciclo, no un fallo de datos.
+    if (!suyas.length) return `<div class="dia vacio">${cab}<span class="hueco">OFF</span></div>`;
     return `<div class="dia">${cab}${suyas.map(r => {
-      const id = idSesion(r), md = etiquetaMD(r.md), nom = nombreSesionLimpio(r.sesion || r.split);
-      const apaga = quiere !== null && r.esPartido !== quiere;
-      return `<button type="button" class="ses${apaga ? " apagada" : ""}" data-id="${esc(id)}"
+      const id = idSesion(r), md = etiquetaMD(r.md);
+      // Al filtrar no se apaga nada: se enciende lo que buscas. Lo que no
+      // toca se queda como estaba, en su tono suave.
+      const destaca = quiere !== null && r.esPartido === quiere;
+      const difusa = quiere !== null && !destaca;
+      // En los entrenos manda el MD, no el rival: toda la semana se llama
+      // igual que el partido del domingo y leer "Andorra" cinco veces no
+      // dice nada. El rival solo en el partido, que es de quien es el nombre.
+      const rotulo = r.esPartido ? nombreSesionLimpio(r.sesion || r.split) : (md || "Sesión");
+      const sub = r.esPartido ? md : "";
+      return `<button type="button" class="ses${destaca ? " destaca" : ""}${
+          difusa ? " difusa" : ""}${r.esPartido ? " esP" : ""}"
+          style="--c:${colorMD(r.md, r.esPartido)}" data-id="${esc(id)}"
           aria-pressed="${id === F.fecha}" title="${esc(r.sesion || r.split || "")}">
-          <b>${esc(nom)}</b>
-          ${md ? `<span class="md${r.esPartido ? " p" : ""}">${esc(md)}</span>` : ""}
+          <b>${esc(rotulo)}</b>
+          ${sub ? `<span class="md p">${esc(sub)}</span>` : ""}
         </button>`;
     }).join("")}</div>`;
   }).join("");
@@ -1152,7 +1181,8 @@ function cabecera(conResumen) {
   const sem = semanaDe(bruto);
   $("#cab").innerHTML = `
     <div class="titSes">
-      ${md ? `<span class="cuaMD${filas[0].esPartido ? " p" : ""}"><b>${esc(md)}</b></span>` : ""}
+      ${md ? `<span class="cuaMD${filas[0].esPartido ? " p" : ""}"
+        style="--c:${colorMD(filas[0].md, filas[0].esPartido)}"><b>${esc(md)}</b></span>` : ""}
       <div>
         <h2 title="${esc(bruto)}">${esc(limpio)}</h2>
         <span class="meta">${sem ? esc(sem) + " · " : ""}${esc(fechaLarga(filas[0].fecha))} · ${esc(F.squad)} · ${filas.length} ${jugs()} · ${nf(mins)} min de media</span>
