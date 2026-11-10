@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261109n";   // se muestra abajo en el lateral
+const VERSION = "20261110e";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -244,7 +244,12 @@ const F = { squad:"", fecha:"", pestana:"reporte",
   // Las filas de la matriz: se marcan y desmarcan y el bloque crece o encoge.
   matriz:["Distance (metres)", HMLD, "Sprint Distance (m)", ACC3],
   // Los dos ejes del gráfico de dispersión.
-  sc:{ x:HMLD, y:"Power Plays" } };
+  sc:{ x:HMLD, y:"Power Plays" },
+  // Filtro del selector de sesión: qué tipo se lista y cuánto hacia atrás.
+  tipo:"todo",        // todo | partido | entreno
+  historial:false,    // en la lista: false = últimas 4 semanas, true = todo
+  semana:"",          // lunes ISO de la semana que enseña la tira
+  semanaFijada:false }; // true mientras paseas con las flechas
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -622,22 +627,250 @@ function poblarFiltros() {
 /** Cada opción es una sesión concreta: un mismo día puede tener dos eventos. */
 const idSesion = r => r.fechaISO + "|" + r.sesion;
 
-function poblarFechas() {
-  if (!$("#fFecha")) return;
+const SEMANAS_RECIENTE = 4;
+
+/** Una entrada por sesión del equipo, de la más nueva a la más vieja. */
+function sesionesDe(squad) {
   const vistas = new Map();
-  for (const r of DATOS.filter(x => x.squad === F.squad)) {
+  for (const r of DATOS.filter(x => x.squad === squad)) {
     if (!vistas.has(idSesion(r))) vistas.set(idSesion(r), r);
   }
-  // De la sesión más reciente a la más antigua, por fecha real y no por texto.
-  const claves = [...vistas.keys()].sort((a, b) => vistas.get(b).fecha - vistas.get(a).fecha
-    || vistas.get(a).sesion.localeCompare(vistas.get(b).sesion));
-  if (!claves.includes(F.fecha)) F.fecha = claves[0] || "";
-  $("#fFecha").innerHTML = claves.map(id => {
-    const r = vistas.get(id);
-    const mdTxt = etiquetaMD(r.md);
-    return `<option value="${esc(id)}"${id === F.fecha ? " selected" : ""}>${esc(fechaLarga(r.fecha))}${mdTxt ? " · " + mdTxt : ""} · ${esc(r.sesion || r.split)}</option>`;
-  }).join("");
+  return [...vistas.values()].sort((a, b) => b.fecha - a.fecha
+    || a.sesion.localeCompare(b.sesion));
 }
+
+/** El lunes de esa semana, en ISO. La semana es de lunes a domingo. */
+function lunesDe(fecha) {
+  const d = new Date(fecha);
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return iso(d);
+}
+const masDias = (isoF, n) => {
+  const d = new Date(isoF + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return iso(d);
+};
+const diaTira = f => f.toLocaleDateString("es-ES", { weekday:"short", day:"numeric", month:"short" })
+  .replace(/\./g, "");
+const mesLargo = f => {
+  const t = f.toLocaleDateString("es-ES", { month:"long", year:"numeric" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+/** El filtro de tipo, con el apaño de no dejar la lista vacía. */
+function porTipo(lista, todas) {
+  if (F.tipo === "todo") return lista;
+  const quiere = F.tipo === "partido";
+  const f = lista.filter(r => r.esPartido === quiere);
+  if (f.length || !todas) return f;
+  // Si en el tramo elegido no hay de ese tipo, se mira todo el histórico antes
+  // de dejarlo en blanco: más vale enseñar algo viejo que nada.
+  return todas.filter(r => r.esPartido === quiere);
+}
+
+function poblarFechas() {
+  if (!$("#filtroSesion")) return;
+  const todas = sesionesDe(F.squad);
+  const candidatas = porTipo(todas, todas);
+  // La sesión elegida tiene que seguir existiendo tras cambiar de equipo o
+  // de tipo; si no, se cae a la más reciente que sí encaje.
+  if (!candidatas.some(r => idSesion(r) === F.fecha)) {
+    F.fecha = candidatas.length ? idSesion(candidatas[0]) : "";
+  }
+  const elegida = candidatas.find(r => idSesion(r) === F.fecha);
+  // La tira siempre enseña la semana de la sesión abierta, salvo que estés
+  // paseando por otras semanas con las flechas.
+  if (!F.semana || (elegida && !F.semanaFijada)) {
+    F.semana = elegida ? lunesDe(elegida.fecha) : (todas[0] ? lunesDe(todas[0].fecha) : "");
+  }
+  pintaTipos(todas);
+  pintaTira(todas, candidatas);
+  pintaLista(todas, candidatas);
+}
+
+/* ---------- el grupo de tipo ---------- */
+const SEGMENTOS = [["partido", "Partidos"], ["entreno", "Entrenos"], ["todo", "Todo"]];
+
+function pintaTipos(todas) {
+  const seg = $("#segTipo");
+  if (!seg) return;
+  if (!seg.firstChild) {
+    seg.innerHTML = `<span class="marca"></span>` + SEGMENTOS.map(([k, txt]) =>
+      `<button type="button" data-tipo="${k}" aria-pressed="false">${txt}</button>`).join("");
+    seg.querySelectorAll("[data-tipo]").forEach(bt => bt.onclick = () => {
+      if (bt.disabled) return;
+      F.tipo = bt.dataset.tipo; F.semanaFijada = false;
+      poblarFechas(); recordar(); pintar();
+    });
+  }
+  SEGMENTOS.forEach(([k]) => {
+    const bt = seg.querySelector(`[data-tipo="${k}"]`);
+    bt.disabled = k !== "todo" && !todas.some(r => r.esPartido === (k === "partido"));
+    bt.setAttribute("aria-pressed", String(F.tipo === k));
+  });
+  colocaMarca(seg);
+}
+
+/**
+ * El indicador se mide sobre el botón activo en vez de ir a una fracción fija
+ * del carril: los rótulos no miden lo mismo y con una fracción fija se
+ * quedaba a caballo entre dos.
+ */
+function colocaMarca(seg) {
+  const act = seg && seg.querySelector("[aria-pressed=true]");
+  const marca = seg && seg.querySelector(".marca");
+  if (!act || !marca) return;
+  const mueve = () => {
+    if (!act.offsetWidth) return;      // el panel aún no está a la vista
+    marca.style.width = act.offsetWidth + "px";
+    marca.style.transform = `translateX(${act.offsetLeft - 3}px)`;
+    marca.style.opacity = "1";
+  };
+  mueve();
+  // Con la fuente aún cargando los botones miden otra cosa: se repasa después.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(mueve);
+}
+
+/* ---------- la tira de la semana ----------
+   Siete días a la vista, que es como se piensa un microciclo. Las flechas
+   mueven semana a semana y se apagan cuando ya no hay nada más que enseñar,
+   que es mejor que dejarte avanzar por meses vacíos. */
+function pintaTira(todas, candidatas) {
+  const caja = $("#tiraSemana");
+  if (!caja) return;
+  if (!caja.firstChild) {
+    caja.innerHTML = `<button type="button" class="fl" id="semAnt" aria-label="Semana anterior">‹</button>
+      <div class="tiraVer"><div class="tira" id="tiraSes"></div></div>
+      <button type="button" class="fl" id="semSig" aria-label="Semana siguiente">›</button>
+      <button type="button" class="chip verTodas" id="verTodas" aria-expanded="false">Todas</button>`;
+    $("#semAnt").onclick = () => saltaSemana(-1);
+    $("#semSig").onclick = () => saltaSemana(1);
+    $("#verTodas").onclick = () => { abreLista(!LISTA_ABIERTA); };
+    $("#tiraSes").onclick = e => {
+      const bt = e.target.closest("[data-id]");
+      if (!bt) return;
+      F.fecha = bt.dataset.id; F.semanaFijada = false;
+      poblarFechas(); recordar(); pintar();
+    };
+  }
+  const fin = masDias(F.semana, 6);
+  const dentro = candidatas.filter(r => r.fechaISO >= F.semana && r.fechaISO <= fin)
+    .sort((a, b) => a.fecha - b.fecha);
+  $("#tiraSes").innerHTML = dentro.length ? dentro.map(r => {
+    const id = idSesion(r), md = etiquetaMD(r.md), nom = r.sesion || r.split || "Sesión";
+    return `<button type="button" class="ses" data-id="${esc(id)}"
+        aria-pressed="${id === F.fecha}" title="${esc(nom)}">
+        <s>${esc(diaTira(r.fecha))}</s>
+        <b>${esc(nom)}</b>
+        ${md ? `<span class="md${r.esPartido ? " p" : ""}">${esc(md)}</span>` : ""}
+      </button>`;
+  }).join("") : `<p class="sinSes">Ninguna sesión${
+    F.tipo === "partido" ? " de partido" : F.tipo === "entreno" ? " de entreno" : ""} esta semana</p>`;
+
+  // Hasta dónde se puede pasear: el lunes de la primera y de la última semana.
+  const hay = candidatas.length ? candidatas : todas;
+  const topes = hay.length
+    ? [lunesDe(hay[hay.length - 1].fecha), lunesDe(hay[0].fecha)] : [F.semana, F.semana];
+  $("#semAnt").disabled = F.semana <= topes[0];
+  $("#semSig").disabled = F.semana >= topes[1];
+  const et = $("#semEt");
+  if (et) {
+    const d0 = new Date(F.semana + "T12:00:00"), d1 = new Date(fin + "T12:00:00");
+    const mismoMes = d0.getMonth() === d1.getMonth();
+    et.textContent = `${d0.getDate()}${mismoMes ? "" : " " + d0.toLocaleDateString("es-ES", { month:"short" }).replace(".", "")}`
+      + ` – ${d1.getDate()} ${d1.toLocaleDateString("es-ES", { month:"short" }).replace(".", "")}`;
+  }
+  // La tira se desplaza sola hasta la sesión abierta si se ha ido de pantalla.
+  const act = $("#tiraSes [aria-pressed=true]");
+  if (act && act.scrollIntoView) act.scrollIntoView({ block:"nearest", inline:"nearest" });
+}
+
+function saltaSemana(n) {
+  F.semana = masDias(F.semana, n * 7);
+  F.semanaFijada = true;      // mientras paseas, la tira no vuelve sola
+  poblarFechas();
+}
+
+/* ---------- la lista completa ----------
+   Agrupada por semana cuando miras las últimas cuatro, y por mes cuando abres
+   el historial: con dos temporadas cargadas, "hace 37 semanas" no dice nada y
+   "Septiembre 2026" sí. */
+let LISTA_ABIERTA = false;
+
+function abreLista(v) {
+  LISTA_ABIERTA = v;
+  const pop = $("#popSes"), bt = $("#verTodas");
+  if (!pop) return;
+  pop.hidden = !v;
+  if (bt) bt.setAttribute("aria-expanded", String(v));
+  if (v) {
+    poblarFechas();
+    const act = pop.querySelector("[aria-selected=true]");
+    if (act && act.scrollIntoView) act.scrollIntoView({ block:"center" });
+  }
+}
+
+function pintaLista(todas, candidatas) {
+  const pop = $("#popSes");
+  if (!pop) return;
+  if (!pop.firstChild) {
+    pop.innerHTML = `<div class="popCab">
+        <div class="segmento" id="segTramo">
+          <span class="marca"></span>
+          <button type="button" data-hist="false" aria-pressed="false">Últimas 4 semanas</button>
+          <button type="button" data-hist="true" aria-pressed="false">Historial</button>
+        </div></div>
+      <div class="popLista" id="popLista"></div>`;
+    pop.querySelectorAll("[data-hist]").forEach(bt => bt.onclick = () => {
+      F.historial = bt.dataset.hist === "true";
+      poblarFechas(); recordar();
+    });
+    pop.querySelector("#popLista").onclick = e => {
+      const fila = e.target.closest("[data-id]");
+      if (!fila) return;
+      F.fecha = fila.dataset.id; F.semanaFijada = false;
+      abreLista(false);
+      poblarFechas(); recordar(); pintar();
+    };
+  }
+  pop.querySelectorAll("[data-hist]").forEach(bt =>
+    bt.setAttribute("aria-pressed", String(String(F.historial) === bt.dataset.hist)));
+  if (LISTA_ABIERTA) colocaMarca($("#segTramo"));
+  if (!LISTA_ABIERTA) return;
+
+  const semActual = todas.length ? lunesDe(todas[0].fecha) : lunesDe(new Date());
+  let lista = candidatas;
+  if (!F.historial) {
+    const corte = masDias(semActual, -7 * (SEMANAS_RECIENTE - 1));
+    lista = candidatas.filter(r => r.fechaISO >= corte);
+  }
+  // En el historial se agrupa por mes; en las últimas semanas, por semana.
+  const grupos = new Map();
+  for (const r of lista) {
+    const k = F.historial ? r.fechaISO.slice(0, 7) : lunesDe(r.fecha);
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(r);
+  }
+  const tit = k => {
+    if (F.historial) return mesLargo(new Date(k + "-01T12:00:00"));
+    const n = Math.round((new Date(semActual + "T12:00:00") - new Date(k + "T12:00:00")) / 6048e5);
+    return n <= 0 ? "Esta semana" : n === 1 ? "Semana pasada" : `Hace ${n} semanas`;
+  };
+  $("#popLista").innerHTML = [...grupos.keys()].sort().reverse().map(k => {
+    const filas = grupos.get(k).sort((a, b) => b.fecha - a.fecha).map(r => {
+      const id = idSesion(r), md = etiquetaMD(r.md), nom = r.sesion || r.split || "Sesión";
+      return `<button type="button" class="fila" data-id="${esc(id)}"
+          aria-selected="${id === F.fecha}">
+          <span class="d">${esc(r.fecha.toLocaleDateString("es-ES", { weekday:"short", day:"numeric" }).replace(".", ""))}</span>
+          <span class="n">${esc(nom)}</span>
+          ${md ? `<span class="md${r.esPartido ? " p" : ""}">${esc(md)}</span>` : ""}
+        </button>`;
+    }).join("");
+    return `<div class="sem">${esc(tit(k))}</div>${filas}`;
+  }).join("") || `<p class="sinSes">No hay sesiones con este filtro.</p>`;
+}
+
 const sesion = () => DATOS.filter(r => r.squad === F.squad && idSesion(r) === F.fecha);
 
 /* ---------- pintado ---------- */
@@ -1291,6 +1524,10 @@ function separaCaras(reales, r, carteles, lim) {
   return d;
 }
 
+/* Los puntos del último cuadrante pintado, para poder enganchar el tooltip
+   cuando ya está en el DOM: dentro del SVG no hay dónde guardarlos. */
+let PTS_SC = [];
+
 function scatter(filas) {
   const puestos = gruposDe(filas);
   const hayX = filas.some(r => F.sc.x in r.crudo), hayY = filas.some(r => F.sc.y in r.crudo);
@@ -1302,9 +1539,13 @@ function scatter(filas) {
     for (const r of rs) {
       pts.push({ nom:r.jugador, pos:p, c:tonoGrupo(p, puestos).base,
                  a:Math.abs(r.crudo[F.sc.x] || 0) / mx * 100,
-                 b:Math.abs(r.crudo[F.sc.y] || 0) / my * 100 });
+                 b:Math.abs(r.crudo[F.sc.y] || 0) / my * 100,
+                 // Los valores de verdad, que el % solo dice "comparado con los suyos".
+                 vx:Math.abs(r.crudo[F.sc.x] || 0), vy:Math.abs(r.crudo[F.sc.y] || 0),
+                 min:r.minutos, puesto:r.posicion });
     }
   }
+  PTS_SC = pts;
   const W = 1180, H = 330, L = 56, R = 16, T = 14, B = 36;
   const iw = W - L - R, ih = H - T - B;
   // Los dos ejes van simétricos alrededor del 100%, así el cruce cae siempre
@@ -1353,9 +1594,14 @@ function scatter(filas) {
   const carteles = [];
   for (const [k, col, qx, qy, qw, qh, ax, ay] of quads) {
     const t = TX[k];
-    const rot = t.fle;
-    const an = Math.min(qw - 12, rot.length * 5.9 + 20), al = 21;
-    if (an < 70) continue;
+    // El cartel lleva el nombre de la zona con su emoji, no la descripción:
+    // el "↑ esto ↓ lo otro" ya está escrito debajo, en la leyenda, y repetirlo
+    // dentro del gráfico dejaba las esquinas sin decir de qué zona son.
+    const rot = `${t.emo} ${t.tit}`;
+    const an = Math.min(qw - 12, rot.length * 6.4 + 26), al = 21;
+    // El corte mira el cuadrante, no el cartel: con el texto corto de ahora,
+    // medir el cartel hacía desaparecer justo los nombres más breves.
+    if (qw < 82) continue;
     const px0 = ax === "izq" ? qx + 6 : qx + qw - an - 6;
     const py0 = ay === "arr" ? qy + 6 : qy + qh - al - 6;
     carteles.push({ x:px0, y:py0, w:an, h:al });
@@ -1398,7 +1644,7 @@ function scatter(filas) {
             <circle cx="${reales[i].x.toFixed(1)}" cy="${reales[i].y.toFixed(1)}" r="2" fill="${p.c}"/>`;
     }
     const f = fotoDe(p.nom), id = `fc${i}`, ini = iniciales(p.nom);
-    g += `<g class="ptFoto">${tit}
+    g += `<g class="ptFoto" data-i="${i}">${tit}
       <circle cx="${cx}" cy="${cy}" r="${(rp + 2.2).toFixed(1)}" fill="#FFFFFF"/>`;
     if (f) {
       g += `<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${rp}"/></clipPath>
@@ -1470,9 +1716,12 @@ function leyendaCuadrantes() {
   const cols = [["verde", "#1F5E5C"], ["amar", "#9A6B12"], ["nara", "#B4602A"], ["rojo", "#C0392B"]];
   return `<div class="leyCuad">${cols.map(([k, col]) => {
     const t = TX[k];
+    // Las flechas van aquí, debajo del nombre, y sustituyen a la frase: decían
+    // lo mismo que la descripción pero de un vistazo. Antes vivían dentro del
+    // gráfico, donde tapaban de qué zona era cada esquina.
     return `<div style="border-top:2px solid ${col}">
       <b style="color:${col}">${t.emo} ${esc(t.tit)}</b>
-      <span>${esc(t.desc.join(" "))}.</span>
+      <span class="fle" style="color:${col}">${esc(t.fle)}</span>
       <i>Foco en ${esc(t.foco.join(" "))}.</i></div>`;
   }).join("")}</div>`;
 }
@@ -1607,6 +1856,44 @@ function colocaNombres(svg, ocupadas, limites) {
         `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px.toFixed(1)}" y2="${fin.toFixed(1)}"/>`);
     }
   }
+}
+
+/**
+ * Al pasar por encima de una cara, sus datos. El % solo dice "comparado con
+ * los de su puesto", así que al lado va el valor de verdad: 654 m no es lo
+ * mismo que 96%, y para hablar con el jugador hace falta el número.
+ */
+function tipsScatter() {
+  const tip = $("#tipJug");
+  if (!tip) return;
+  const caras = document.querySelectorAll("#cuadrante .ptFoto");
+  if (!caras.length || !PTS_SC.length) return;
+  const decX = decimales(PTS_SC.map(p => p.vx)), decY = decimales(PTS_SC.map(p => p.vy));
+  caras.forEach(cara => {
+    const p = PTS_SC[+cara.dataset.i];
+    if (!p) return;
+    cara.style.cursor = "pointer";
+    cara.onmouseenter = () => {
+      const linea = (col, v, pct, dec) => `<span class="fl">
+        <em>${esc(nombreCorto(col))}</em>
+        <span class="v">${esc(fmt(col, v, dec))}${
+          unidad(col) ? ` <i>${esc(unidad(col))}</i>` : ""}</span>
+        <span class="pc">${nf(pct, 0)}%</span></span>`;
+      tip.innerHTML = `<b>${esc(p.nom)}</b>
+        <em>${esc(p.puesto || p.pos)}${p.min ? ` · ${nf(p.min)} min` : ""}</em>
+        <div class="filasTip">
+          ${linea(F.sc.x, p.vx, p.a, decX)}
+          ${linea(F.sc.y, p.vy, p.b, decY)}
+        </div>
+        <em class="pie">El % es sobre la media de ${lasLos()} de su puesto</em>`;
+      tip.style.opacity = 1;
+    };
+    cara.onmousemove = e => {
+      tip.style.left = Math.min(e.clientX + 14, innerWidth - 240) + "px";
+      tip.style.top = (e.clientY - 10) + "px";
+    };
+    cara.onmouseleave = () => { tip.style.opacity = 0; };
+  });
 }
 
 function ajustaCarteles() {
@@ -4686,6 +4973,7 @@ function pintar() {
       <span>El 100% del scatter es la media de la línea del jugador, no la del equipo</span>
     </div>`;
   ajustaCarteles();
+  tipsScatter();
   document.querySelectorAll(".chM").forEach(b => b.onclick = () => {
     const c = b.dataset.c;
     F.matriz = F.matriz.includes(c) ? F.matriz.filter(x => x !== c) : F.matriz.concat(c);
@@ -4713,7 +5001,15 @@ function pintar() {
 /* ---------- eventos ---------- */
 function eventos() {
   $("#fSquad").onchange = e => { F.squad = e.target.value; poblarFechas(); pintar(); };
-  $("#fFecha").onchange = e => { F.fecha = e.target.value; pintar(); };
+  // La lista se cierra al pinchar fuera o con Escape, como cualquier menú.
+  document.addEventListener("click", e => {
+    if (!LISTA_ABIERTA) return;
+    if (e.target.closest("#popSes") || e.target.closest("#verTodas")) return;
+    abreLista(false);
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && LISTA_ABIERTA) abreLista(false);
+  });
   $("#fJugador").onchange = e => { FJ.jugador = e.target.value; FJ.marcadas = []; pintar(); };
   $("#btnPdf").onclick = () => window.print();
   document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
@@ -5292,6 +5588,7 @@ function recordar() {
   try {
     localStorage.setItem(GUARDA, JSON.stringify({
       squad:F.squad, fecha:F.fecha, metricas:F.metricas, matriz:F.matriz, sc:F.sc,
+      tipo:F.tipo, historial:F.historial,
       pestana:F.pestana, escenario:FR.escenario, referencia:FR,
       metricaAcwr:FA.metrica, semana:FA, jugador:FJ,
       parejas:PAREJAS, bip:{ vista:FB.vista, parte:FB.parte, sel:FB.sel, temp:FB.temp }, ordenDrill:FD.orden, drill:{ met:FD.met, grupo:FD.grupo }
@@ -5303,6 +5600,8 @@ function recuperar() {
     const p = JSON.parse(localStorage.getItem(GUARDA) || "{}");
     if (p.squad) F.squad = p.squad;
     if (p.fecha) F.fecha = p.fecha;
+    if (p.tipo) F.tipo = p.tipo;
+    if (typeof p.historial === "boolean") F.historial = p.historial;
     if (Array.isArray(p.metricas) && p.metricas.length) F.metricas = p.metricas;
     if (Array.isArray(p.matriz) && p.matriz.length) F.matriz = p.matriz;
     if (p.sc && p.sc.x && p.sc.y) F.sc = p.sc;
