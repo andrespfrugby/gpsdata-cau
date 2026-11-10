@@ -102,10 +102,13 @@ aside .tab[aria-selected=true]::before{content:"";position:absolute;left:-12px;t
 /* El día del microciclo en un cuadrado delante del nombre. Rojo solo el
    partido: es el ancla de la semana y lo demás cuelga de él. */
 .titSes{display:flex;align-items:center;gap:13px}
-.cuaMD{width:56px;height:56px;flex:none;border-radius:13px;display:grid;place-items:center;
-  background:var(--ink-800);border:1px solid var(--ink-700);line-height:1}
-.cuaMD b{font-family:'Chivo Mono';font-size:16px;font-weight:700;color:var(--teal);letter-spacing:-.03em}
-.cuaMD.p{background:var(--cau-rojo);border-color:var(--cau-rojo)}
+.cuaMD{--c:var(--teal);width:56px;height:56px;flex:none;border-radius:13px;display:grid;
+  place-items:center;line-height:1;background:var(--ink-800);border:1px solid var(--ink-700);
+  background:color-mix(in srgb, var(--c) 12%, #fff);
+  border-color:color-mix(in srgb, var(--c) 30%, var(--ink-700))}
+.cuaMD b{font-family:'Chivo Mono';font-size:16px;font-weight:700;color:var(--c);letter-spacing:-.03em}
+/* El partido va macizo: es el único día que manda sobre el resto de la semana. */
+.cuaMD.p{background:var(--c);border-color:var(--c)}
 .cuaMD.p b{color:#fff}
 .cab h2{font-size:23px;line-height:1.2;margin:0}
 .cab .meta{display:block;font-size:12.5px;color:var(--text-3);margin-top:3px}
@@ -268,21 +271,41 @@ aside .tab[aria-selected=true]::before{content:"";position:absolute;left:-12px;t
 .dCab{font-size:9.5px;color:var(--text-3);letter-spacing:.06em;padding-left:2px;font-weight:600}
 .dCab i{font-style:normal;text-transform:uppercase;margin-right:4px;color:var(--text-2)}
 .dia.vacio .dCab{opacity:.55}
-.dia .hueco{flex:1;min-height:40px;border-radius:10px;border:1px dashed var(--ink-700);
-  background:repeating-linear-gradient(135deg,transparent 0 5px,var(--ink-800) 5px 10px);opacity:.6}
-.ses{flex:1;text-align:left;background:var(--ink-800);border:1px solid var(--ink-700);
-  border-radius:10px;padding:6px 8px 7px;height:auto;line-height:1.25;cursor:pointer;min-width:0;
-  transition:opacity .15s}
-.ses b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis}
-.ses:hover:not([aria-pressed=true]){border-color:var(--ink-600)}
+/* El día off lleva su palabra y su color, azul. Un día de descanso es parte
+   del microciclo, no un agujero en los datos: en blanco parecía que faltaba
+   algo por cargar. */
+.dia .hueco{flex:1;min-height:40px;border-radius:10px;display:grid;place-items:center;
+  font-size:10px;font-weight:700;letter-spacing:.16em;color:#6B7FB8;
+  background:rgba(59,91,165,.07);border:1px dashed rgba(59,91,165,.32)}
+/* Cada tarjeta lleva el color de su día de microciclo en el canto izquierdo
+   y en el fondo, muy suave: se lee el tipo de día sin leer el número. */
+.ses{--c:var(--teal);flex:1;text-align:left;border-radius:10px;padding:6px 9px 7px;height:auto;
+  line-height:1.25;cursor:pointer;min-width:0;position:relative;overflow:hidden;
+  background:var(--ink-800);
+  background:color-mix(in srgb, var(--c) 9%, #fff);
+  border:1px solid color-mix(in srgb, var(--c) 26%, var(--ink-700));
+  transition:opacity .15s,filter .15s,box-shadow .15s}
+.ses::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+.ses b{display:block;font-size:12.5px;font-weight:700;letter-spacing:-.01em;color:var(--c);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ses.esP b{font-weight:600;color:var(--text)}
+.ses:hover:not([aria-pressed=true]){box-shadow:0 0 0 2px color-mix(in srgb, var(--c) 18%, transparent)}
 .ses[aria-pressed=true]{background:var(--cau-tinta);border-color:var(--cau-tinta)}
 .ses[aria-pressed=true] b{color:#fff}
+.ses[aria-pressed=true]::before{background:var(--c)}
 .ses[aria-pressed=true] .md{background:rgba(255,255,255,.17);color:#fff}
 .ses:focus-visible{outline:2px solid var(--cau-rojo);outline-offset:2px}
-/* Apagada, no escondida: el filtro destaca lo que buscas sin borrar el resto. */
-.ses.apagada{opacity:.34}
-.ses.apagada:hover{opacity:.65}
+/* Al filtrar se enciende lo que buscas en vez de apagar el resto: el tipo
+   elegido pasa a macizo con su color y lo demás se queda como estaba. */
+.ses.destaca{background:var(--c);border-color:var(--c);
+  box-shadow:0 2px 8px color-mix(in srgb, var(--c) 30%, transparent)}
+.ses.destaca b{color:#fff}
+.ses.destaca .md{background:rgba(255,255,255,.2);color:#fff}
+.ses.destaca::before{background:rgba(255,255,255,.55)}
+/* Lo que no toca no se apaga ni se vuelve gris: conserva su color y solo se
+   difumina un punto, para que el encendido gane sin que nadie desaparezca. */
+.ses.difusa{opacity:.5}
+.ses.difusa:hover{opacity:1}
 /* La etiqueta del microciclo. El partido en rojo porque es el ancla de la semana. */
 .md{display:inline-block;margin-top:3px;font-size:8.5px;font-weight:700;letter-spacing:.04em;
   padding:1px 5px;border-radius:5px;background:rgba(31,94,92,.12);color:var(--teal)}
@@ -1244,7 +1267,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261110i"></script>
-<script src="app.js?v=20261110i"></script>
+<script src="config.js?v=20261110m"></script>
+<script src="app.js?v=20261110m"></script>
 </body>
 </html>
