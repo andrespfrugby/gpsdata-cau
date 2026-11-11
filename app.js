@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261111g";   // se muestra abajo en el lateral
+const VERSION = "20261111h";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
