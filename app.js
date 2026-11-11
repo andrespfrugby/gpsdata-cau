@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261111a";   // se muestra abajo en el lateral
+const VERSION = "20261111f";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -1823,12 +1823,31 @@ const CLARO = {
   "Player Load":"carga", "Impacts":"contactos", "Top Speed (m/s)":"velocidad punta",
   "Distance Per Min (m/min)":"metros por minuto"
 };
+/* El "|" es un corte de línea sugerido: en la leyenda se junta todo con
+   espacios y en el gráfico se reparte a lo ancho de la caja. Entre paréntesis
+   van los ejemplos de juego, que es lo que hace que la frase signifique algo
+   en el campo y no solo en la pantalla. */
 const FOCO = {
-  [HMLD]:"sumar metros de distancia explosiva:|con, sin y alrededor del balón",
-  "Power Plays":"repetir esfuerzos|de alta intensidad",
-  "Sprint Distance (m)":"buscar los metros|a alta velocidad",
-  [ACC3]:"arrancar más veces|desde parada",
-  [DEC3]:"frenar y recolocarse|más veces"
+/* Los dos ejes de siempre son la distancia explosiva y los power plays, así
+   que son los que llevan los ejemplos más trabajados, y cada uno con los
+   suyos: si dijeran lo mismo, el cuadrante no distinguiría una cosa de la
+   otra. */
+  [HMLD]:"sumar metros de distancia explosiva|con, sin y alrededor del balón|(presión tras patada, recolocaciones|rápidas ofensivas y defensivas,|apoyo tras ruptura)",
+  // El power play salta al pasar de 20 W/kg más de un segundo: en rugby eso
+  // casi nunca es un sprint largo, sino el arranque corto antes del choque.
+  // Mide casi lo mismo que las aceleraciones, así que los dos piden las
+  // mismas acciones: arrancar fuerte. Los ejemplos son los que se pueden
+  // pedir y repetir en el entreno; si no se entrenan tal cual, el dato no
+  // se mueve.
+  "Power Plays":"repetir arranques de alta intensidad|(arrancadas de parado y en carrera,|levantarse rápido del suelo,|subir a presionar)",
+  "Sprint Distance (m)":"buscar los metros a alta velocidad|(perseguir la patada, apoyo largo,|romper y seguir corriendo)",
+  [ACC3]:"arrancar más veces de parado y en carrera|(acelerar ante el contacto,|levantarse rápido del suelo,|subir a presionar)",
+  [DEC3]:"frenar y recolocarse más veces|(reciclar y volver a la línea)",
+  "Distance (metres)":"sumar metros de trabajo|(apoyar más y volver antes a la línea)",
+  "Player Load":"aguantar el ritmo todo el partido|(menos paradas entre acciones)",
+  "Impacts":"entrar en más contactos|(limpiar el ruck, placar,|llevar el balón al choque)",
+  "Top Speed (m/s)":"llegar más veces a velocidad punta|(contraataque, apoyo largo)",
+  "Distance Per Min (m/min)":"no bajar el ritmo entre acciones|(volver trotando, no andando)"
 };
 const claro = c => CLARO[c] || etiquetaChip(c).toLowerCase();
 const foco = c => FOCO[c] || ("sumar " + claro(c));
@@ -1850,16 +1869,16 @@ function textosCuadrante() {
   return {
     verde:{ emo:"🏎️", tit:"F1", fle:`↑ ${Y}   ↑ ${X}`,
             desc:envuelve(cap(ex) + " y " + ey + " por encima de lo normal en tu puesto"),
-            foco:envuelve("ser consistente con este motor") },
+            foco:envuelve("ser consistente para seguir conduciendo un F1") },
     amar: { emo:"🏍️", tit:"Moto", fle:`↑ ${Y}   ↓ ${X}`,
             desc:envuelve("Más " + ey + ", menos " + ex),
-            foco:envuelve(foco(F.sc.x).replace("|", " ")) },
+            foco:envuelve(foco(F.sc.x).replace(/\|/g, " ")) },
     nara: { emo:"🚤", tit:"Lancha", fle:`↑ ${X}   ↓ ${Y}`,
             desc:envuelve("Más " + ex + ", menos " + ey),
-            foco:envuelve(foco(F.sc.y).replace("|", " ")) },
+            foco:envuelve(foco(F.sc.y).replace(/\|/g, " ")) },
     rojo: { emo:"⛽", tit:"Entrar en juego", fle:`↓ ${Y}   ↓ ${X}`,
             desc:envuelve(cap(ex) + " y " + ey + " por debajo de lo normal en tu puesto"),
-            foco:envuelve("aparecer en más jugadas: apoyo, patada y recolocación") }
+            foco:envuelve("aparecer en más acciones de alta intensidad (apoyos, patadas, recolocaciones, subidas a presión)") }
   };
 }
 
@@ -2044,9 +2063,41 @@ const FR = {
 };
 const FC = FR;   // antes el escenario vivía en FC; se mantiene el nombre
 
-const NIVELES = [["jugadora", "Ella misma"], ["posicion", "Su posición"], ["equipo", "El equipo"]];
-const MODOS = [["media", "Media de la ventana"], ["alto", "Perfil alto (p90)"],
-               ["maximo", "Máximo"], ["z", "Z-score"], ["demandas", "Demandas 25/26"]];
+/* Contra qué se compara el dato de hoy. El primero es la propia jugadora,
+   así que el rótulo va en masculino o femenino según el equipo. */
+const niveles = () => [["jugadora", cap(jug())], ["posicion", "Su posición"], ["equipo", "Equipo"]];
+
+/* Qué número de esa referencia se usa. La media lleva escrito en el propio
+   botón de qué ventana se saca: es lo que más se mira y lo que más dudas daba
+   ("media ¿de qué?"). Las demandas 25/26 no salen aquí: son fijas, de otro
+   estudio, y van en su propio botón al lado. */
+/* "últimos 5 partidos" pero "últimas 5 sesiones": el artículo concuerda, así
+   que la ventana se escribe entera en un sitio y la usan el botón y el
+   título del informe. Con el mismo tipo de sesión se dice cuál es, que es lo
+   que de verdad estás mirando ("sus últimos 5 MD-3"). */
+function ventanaEnPalabras(conSu) {
+  const n = FR.ventana;
+  const yo = conSu ? "sus " : "";
+  if (FR.tipo === "partido") return `${yo}últimos ${n} partidos`;
+  if (FR.tipo === "entreno") return `${yo}últimos ${n} entrenos`;
+  if (FR.tipo === "md") {
+    const act = sesion()[0];
+    const md = act ? act.md : null;
+    if (md === 0) return `${yo}últimos ${n} partidos`;
+    if (md != null && md !== "") return `${yo}últimos ${n} ${nombreMD(md)}`;
+    return `${yo}últimas ${n} sesiones del mismo tipo`;
+  }
+  return `${yo}últimas ${n} sesiones`;
+}
+const MODOS = () => {
+  const m = [["media", `Media dinámica · ${ventanaEnPalabras(false)}`],
+             ["alto", "Percentil 90"], ["maximo", "Máximo"]];
+  // El z-score dice lo mismo que el porcentaje pero en desviaciones típicas:
+  // con 5 sesiones de ventana no aporta, así que viene apagado. Enciéndelo
+  // con mostrarZscore: true en config.js.
+  if (C.mostrarZscore === true) m.push(["z", "Z-score"]);
+  return m;
+};
 const TIPOS = [["md", "Mismo tipo de sesión"], ["partido", "Solo partidos"],
                ["entreno", "Solo entrenos"], ["todo", "Todas"]];
 
@@ -2194,6 +2245,9 @@ function notaEventos() {
 
 /* ---------- barra de control y ruedecita ---------- */
 function barraRef() {
+  // Si el z-score quedó guardado de una sesión anterior y ahora está apagado,
+  // su botón no existe: sin esto la barra se queda sin ningún modo marcado.
+  if (FR.modo === "z" && C.mostrarZscore !== true) FR.modo = "media";
   const seg = (grupo, ops, activo) => `<div class="segR" data-g="${grupo}">${
     ops.map(([v, t]) => `<button data-v="${v}" class="${v === activo ? "on" : ""}">${esc(t)}</button>`).join("")
   }</div>`;
@@ -2202,8 +2256,11 @@ function barraRef() {
   const etTipo = FR.tipo === "md" && act ? `Qué sesiones entran · hoy es ${esc(nombreMD(act.md))}` : "Qué sesiones entran";
   return `<section class="barraRef noPdf">
     <div class="filaRef">
-      <div class="campoR"><label>Comparar contra</label>${seg("nivel", NIVELES, FR.nivel)}</div>
-      <div class="campoR"><label>Qué referencia</label>${seg("modo", MODOS, FR.modo)}</div>
+      <div class="campoR"><label>Comparar con</label>${seg("nivel", niveles(), FR.nivel)}</div>
+      <div class="campoR"><label>Qué referencia</label>${seg("modo", MODOS(), FR.modo)}</div>
+      ${D ? `<div class="campoR"><label>Referencia fija</label>
+        <div class="segR" data-g="modo"><button data-v="demandas"${FR.modo === "demandas" ? ' class="on"' : ""
+        }>${esc(D.etiqueta || "Demandas 25/26")}</button></div></div>` : ""}
       ${FR.modo === "demandas" && D ? `<div class="campoR"><label>Escenario</label>
         <select id="fEscenario">${(D.escenarios || []).map(([v, t]) =>
           `<option value="${v}"${v === FR.escenario ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div>` : ""}
@@ -2278,7 +2335,7 @@ function panelCriterios() {
         const act = ORDEN_NIVEL.indexOf(FR.nivel) === i;
         const pie = i === 0 ? `${FR.minObs} sesiones válidas o más` : (i === 1 ? "si ella no llega" : "si la posición tampoco");
         return `${i ? '<span class="fleR">→</span>' : ""}<div class="pasoR${act ? " act" : ""}">
-          <b>${esc(NIVELES[i][1])}</b><s>${esc(pie)}</s></div>`;
+          <b>${esc((niveles().find(x => x[0] === n) || ["", n])[1])}</b><s>${esc(pie)}</s></div>`;
       }).join("")}
     </div>
   </div>`;
@@ -2401,19 +2458,22 @@ function porcentajeCarga() {
   </section>`;
 }
 
+/* El rótulo del botón ya dice la ventana ("últimos 5 partidos"), así que aquí
+   se usa un nombre corto del modo: si no, el título salía diciendo dos veces
+   lo mismo ("media de los últimos 5 partidos de los últimos 5 partidos"). */
+const MODO_CORTO = { media:"media dinámica", alto:"percentil 90", maximo:"máximo", z:"z-score" };
+
 function tituloRef() {
-  const n = NIVELES.find(x => x[0] === FR.nivel)[1];
-  const m = MODOS.find(x => x[0] === FR.modo)[1];
+  const nv = niveles().find(x => x[0] === FR.nivel);
+  const n = nv ? nv[1] : "";
   if (FR.modo === "demandas") {
     const et = ((C.demandas || {}).escenarios || []).find(x => x[0] === FR.escenario);
     return `Demandas de juego · ${et ? et[1] : FR.escenario}`;
   }
-  const act = sesion()[0];
-  const tipo = FR.eventos && FR.eventos.length ? "sesiones elegidas a mano"
-    : FR.tipo === "md" && act ? `${nombreMD(act.md)} anteriores`
-    : FR.tipo === "partido" ? "partidos anteriores"
-    : FR.tipo === "entreno" ? "entrenos anteriores" : "sesiones anteriores";
-  return `${n} · ${m.toLowerCase()} de ${FR.eventos.length ? "" : "los últimos " + FR.ventana + " "}${tipo}`;
+  const m = MODO_CORTO[FR.modo] || FR.modo;
+  const tipo = FR.eventos && FR.eventos.length
+    ? "las sesiones elegidas a mano" : ventanaEnPalabras(true);
+  return `${n} · ${m} de ${tipo}`;
 }
 
 /* ---------- tooltip con la referencia de debajo ---------- */
