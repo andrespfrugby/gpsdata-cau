@@ -54,7 +54,7 @@ window.CAU_CONFIG = {
   /* Lo que sale en el lateral y en la pestaña del navegador. Cámbialo a lo
      que quieras: "Control de carga", "Rendimiento CAU", "Análisis de cargas"… */
   siglas: "CAU",
-  titulo: "Load Clap Dashboard",
+  titulo: "Load Monitoring Dashboard",
   subtitulo: "Temporada 26/27",
 
   /* Los cuatro estados del partido en el cuadrante de balón en juego. Cambia
