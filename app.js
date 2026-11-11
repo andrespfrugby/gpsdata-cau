@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261111h";   // se muestra abajo en el lateral
+const VERSION = "20261111k";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -1839,9 +1839,9 @@ const FOCO = {
   // mismas acciones: arrancar fuerte. Los ejemplos son los que se pueden
   // pedir y repetir en el entreno; si no se entrenan tal cual, el dato no
   // se mueve.
-  "Power Plays":"repetir arranques de alta intensidad|(arrancadas de parado y en carrera,|levantarse rápido del suelo,|subir a presionar)",
+  "Power Plays":"repetir acciones de alta intensidad|(acelerar en el contacto,|levantarse rápido del suelo,|subir a presionar con intensidad)",
   "Sprint Distance (m)":"buscar los metros a alta velocidad|(perseguir la patada, apoyo largo,|romper y seguir corriendo)",
-  [ACC3]:"arrancar más veces de parado y en carrera|(acelerar ante el contacto,|levantarse rápido del suelo,|subir a presionar)",
+  [ACC3]:"arrancar más veces de parado y en carrera|(acelerar en el contacto,|levantarse rápido del suelo,|subir a presionar con intensidad)",
   [DEC3]:"frenar y recolocarse más veces|(reciclar y volver a la línea)",
   "Distance (metres)":"sumar metros de trabajo|(apoyar más y volver antes a la línea)",
   "Player Load":"aguantar el ritmo todo el partido|(menos paradas entre acciones)",
