@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261110m";   // se muestra abajo en el lateral
+const VERSION = "20261111a";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -596,7 +596,7 @@ async function cargar() {
       const j = await cargarPorScript(fuente);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
-      sincronizaFotos(j.fotosSello);
+      sincronizaFotos(j);
       AVISO_BIP = j.bipAviso || "";
       if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
         j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
@@ -626,7 +626,7 @@ async function cargar() {
       const j = JSON.parse(txt);
       if (j.motes) MOTES = j.motes;
       if (j.posiciones) POSICIONES = j.posiciones;
-      sincronizaFotos(j.fotosSello);
+      sincronizaFotos(j);
       AVISO_BIP = j.bipAviso || "";
       if (j.bipCabeceras && j.bipFilas) BIP = normalizaBip(
         j.bipFilas.map(f => Object.fromEntries(j.bipCabeceras.map((c, i) => [c, f[i]]))), "");
@@ -5286,8 +5286,23 @@ const hayEndpoint = () => {
  * El Sheets manda en cada carga solo el sello: qué jugador tiene foto y
  * cuánto ocupa. Si cuadra con lo que ya hay guardado aquí no se baja nada,
  * que serían cientos de kB en cada recarga. Si no cuadra, se piden y punto.
+ *
+ * Si la respuesta ni siquiera trae el sello, el Apps Script que hay publicado
+ * es anterior a las fotos: no las guarda y nunca las va a devolver. Eso había
+ * que decirlo, porque el síntoma era "en mi ordenador se ven y en el otro no"
+ * y desde fuera no hay forma de adivinar por qué.
  */
-async function sincronizaFotos(sello) {
+let SCRIPT_FOTOS = true;
+
+async function sincronizaFotos(j) {
+  const sello = j && j.fotosSello;
+  SCRIPT_FOTOS = !!(j && Object.prototype.hasOwnProperty.call(j, "fotosSello"));
+  if (!SCRIPT_FOTOS) {
+    FOTOS_EST = "";
+    pintaEstadoFotos();
+    if ($("#bloqueFotos")) pintaFotos();
+    return;
+  }
   subirFotosPendientes();
   if (!sello || typeof sello !== "object") return;
   const claves = new Set([...Object.keys(sello), ...Object.keys(FOTOS)]);
@@ -5333,7 +5348,8 @@ function fusionaFotos(remotas) {
 let SUBIENDO = false;
 async function subirFotosPendientes() {
   const destino = hayEndpoint();
-  if (!destino || SUBIENDO) return;
+  // Contra un script viejo cada envío falla: no se intenta, se avisa.
+  if (!destino || SUBIENDO || !SCRIPT_FOTOS) return;
   const pend = Object.keys(FOTOS_PEND);
   if (!pend.length) { FOTOS_EST = ""; return pintaEstadoFotos(); }
   SUBIENDO = true;
@@ -5559,6 +5575,7 @@ function bloqueFotos() {
       </div>
       <select id="fSquadFoto" aria-label="Equipo"></select>
     </div>
+    <div id="avisoFotos"></div>
     <div class="suelta" id="sueltaFotos">
       <b>Arrastra aquí varias fotos a la vez</b>
       <span>Si el archivo se llama como ${esFem() ? "la jugadora" : "el jugador"} (<code>sellau.jpg</code>), se reparten solas y se encuadra la cara.
@@ -5588,7 +5605,40 @@ function pintaFotos() {
   const con = lista.filter(n => fotoDe(n)).length;
   const cab = $("#bloqueFotos .fcab h3");
   if (cab) cab.textContent = `Fotos de ${jugs()} · ${con} de ${lista.length}`;
+  pintaAvisoFotos();
   pintaEstadoFotos();
+}
+
+/**
+ * El aviso de que las fotos no salen de este navegador. Sin esto el fallo es
+ * mudo: aquí se ven perfectamente y en el ordenador de al lado no hay nada.
+ */
+function pintaAvisoFotos() {
+  const caja = $("#avisoFotos");
+  if (!caja) return;
+  const pend = Object.keys(FOTOS_PEND).length;
+  if (!hayEndpoint()) {
+    caja.innerHTML = `<div class="aviso grave"><b>Las fotos solo se guardan en este navegador.</b>
+      No hay una URL <code>/exec</code> en <code>endpoint</code> dentro de <code>config.js</code>,
+      así que no hay dónde subirlas y desde otro ordenador no se verán.</div>`;
+    return;
+  }
+  if (!SCRIPT_FOTOS) {
+    caja.innerHTML = `<div class="aviso grave">
+      <b>Tu Apps Script no guarda las fotos todavía, así que solo están en este ordenador.</b>
+      La versión publicada es anterior a las fotos: no entiende la pestaña <b>Fotos</b> y por eso
+      desde otro equipo no se ve ninguna.<br><br>
+      Para arreglarlo: abre el Apps Script de tu Sheets, pega el <code>Codigo.gs</code> nuevo,
+      y en <b>Implementar → Gestionar implementaciones</b> edita con el lápiz
+      <b>la que ya tienes</b> y elige <b>Nueva versión</b>. No crees una implementación nueva:
+      la URL cambiaría y <code>config.js</code> seguiría apuntando a la vieja.<br><br>
+      ${pend ? `Las <b>${pend}</b> que tienes puestas no se pierden: en cuanto el script esté al día
+      suben solas al recargar.` : ""}</div>`;
+    return;
+  }
+  caja.innerHTML = pend
+    ? `<div class="aviso espera">Quedan <b>${pend}</b> por subir al Sheets. Se reintenta al recargar.</div>`
+    : "";
 }
 
 /** Empareja el nombre del archivo con un jugador. Solo si no hay dudas. */
