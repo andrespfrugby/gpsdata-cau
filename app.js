@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261111k";   // se muestra abajo en el lateral
+const VERSION = "20261111l";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -5872,6 +5872,12 @@ function recuperar() {
   eventos();
   eventosRecorte();
   recuperar();
+  // El nombre del club y el de la pestaña de jugador van antes de pedir los
+  // datos: si no, mientras carga (o si la carga falla) se queda a la vista el
+  // texto de relleno del HTML, que es de la temporada pasada y en femenino.
+  rotulaMarca();
+  const etJug0 = document.querySelector("#tab-jugador .et");
+  if (etJug0) etJug0.textContent = JUG();
   cargarFotosLocal();
   await cargar();
   poblarFiltros();
