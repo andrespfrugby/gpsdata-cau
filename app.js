@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261111f";   // se muestra abajo en el lateral
+const VERSION = "20261111g";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -2203,7 +2203,11 @@ function valorRef(e, r, col) {
   return e.media;
 }
 
-const ETIQUETA_NIVEL = { jugadora:"ella", posicion:"posición", equipo:"equipo" };
+/* La chapita que va al lado del nombre: de dónde ha salido su referencia.
+   Usa las mismas palabras que los botones de arriba, para no tener dos
+   vocabularios para lo mismo. */
+const etiquetaNivel = niv => niv === "jugadora" ? jug()
+                           : niv === "posicion" ? "posición" : "equipo";
 const CLASE_NIVEL = { jugadora:"s-jug", posicion:"s-pos", equipo:"s-eq" };
 
 /* ---------- qué sesiones entran ---------- */
@@ -2420,7 +2424,7 @@ function porcentajeCarga() {
     const niv = e0 ? e0.nivel : "equipo";
     cuerpo += `<tr>
       <td class="nomR">${esc(r.jugador)}<span class="selloR ${CLASE_NIVEL[niv]}"
-        title="Sesiones que hay detrás de su referencia">${ETIQUETA_NIVEL[niv]}${e0 ? " · " + e0.n : ""}</span></td>
+        title="Sesiones que hay detrás de su referencia">${etiquetaNivel(niv)}${e0 ? " · " + e0.n : ""}</span></td>
       <td class="pos">${esc(r.posicion)}</td>
       <td class="n">${nf(r.minutos)}</td>
       ${mets.map(m => celdaRef(r, m)).join("")}</tr>`;
@@ -2491,7 +2495,7 @@ function enganchaTip(raiz) {
         `<div class="tr"><span>${et}</span><b>${nf(v, dec)}</b></div>`;
       caja.innerHTML = `<h5>${esc(d.j)} · ${esc(d.c)}</h5>
         ${fila("Esta sesión", d.v)}
-        ${fila(`Su habitual (${d.niv === "jugadora" ? d.n + " sesiones" : ETIQUETA_NIVEL[d.niv] || "referencia"})`, d.med)}
+        ${fila(`Su habitual (${d.niv === "jugadora" ? d.n + " sesiones" : etiquetaNivel(d.niv) || "referencia"})`, d.med)}
         ${fila("Máximo de la ventana", d.mx)}
         ${fila("Perfil alto (p90)", d.p90)}
         ${fila("Demanda de su puesto", d.dem)}
