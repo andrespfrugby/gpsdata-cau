@@ -54,8 +54,8 @@ window.CAU_CONFIG = {
   /* Lo que sale en el lateral y en la pestaña del navegador. Cámbialo a lo
      que quieras: "Control de carga", "Rendimiento CAU", "Análisis de cargas"… */
   siglas: "CAU",
-  titulo: "Control de carga",
-  subtitulo: "Rugby · temporada 25/26",
+  titulo: "Load Clap Dashboard",
+  subtitulo: "Temporada 26/27",
 
   /* Los cuatro estados del partido en el cuadrante de balón en juego. Cambia
      "tit" por el lenguaje que uséis en el club; "que" es la explicación de
@@ -104,6 +104,12 @@ window.CAU_CONFIG = {
   // es como se lee más rápido. Ponlo en true para encenderlo; el cálculo
   // entero sigue ahí, solo está oculto.
   mostrarMaximo: false,
+
+  // Enseñar el z-score como referencia en el Análisis. Viene apagado: con una
+  // ventana de 5 sesiones dice lo mismo que el porcentaje pero en desviaciones
+  // típicas, y son dos formas de leer el mismo número. El cálculo sigue en el
+  // código; esto solo decide si sale el botón.
+  mostrarZscore: false,
 
   // Diámetro en píxeles de la cara en el cuadrante de alta intensidad. Con
   // foto no se escribe el nombre al lado: la cara ya dice quién es, y catorce
