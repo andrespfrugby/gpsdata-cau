@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261111l";   // se muestra abajo en el lateral
+const VERSION = "20261116d";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -3244,6 +3244,11 @@ function vistaDrill() {
 let BIP = [];                 // fases guardadas, una por secuencia
 let AVISO_BIP = "";           // lo que el Apps Script cuenta si el enlace falla
 const DURACION_PARTE = {};    // "partido|parte" -> segundos reales de esa parte
+/* "partido|parte" -> fases que los rucks nombran. Un ruck lleva escrito a qué
+   fase pertenece, así que si el archivo trae rucks de una fase pero no trae la
+   fila de esa fase, sabemos que la fase existió y que lo que falta es su
+   duración. Solo vive mientras dura la sesión: el Sheets no guarda los rucks. */
+const FASES_CITADAS = {};
 const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloques
              ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
@@ -3727,6 +3732,29 @@ function temporadaDe(f) {
 }
 
 /** Los partidos cargados, en orden, con sus dos partes y sus fases. */
+/**
+ * Partes que el export cronometra (trae su fila "task") pero en las que no hay
+ * ni una fase marcada. Pasa cuando en Catapult se etiquetó solo media parte:
+ * el partido no da error, simplemente cuenta la mitad, y puesto al lado de los
+ * demás parece que ese día se jugó mucho menos.
+ */
+function partesSinFases(partido, fases) {
+  const con = new Set(fases.map(f => f.parte));
+  return Object.keys(DURACION_PARTE)
+    .filter(cl => cl.slice(0, cl.indexOf("|")) === partido)
+    .map(cl => cl.slice(cl.indexOf("|") + 1))
+    .filter(pa => !con.has(pa))
+    .map(pa => {
+      // Si el archivo trae rucks de esa parte, sus fases sí se jugaron: se
+      // puede decir cuántas se nombran y hasta qué número llegaban.
+      const cit = FASES_CITADAS[partido + "|" + pa];
+      if (!cit || !cit.size) return { parte:pa };
+      const nums = [...cit].map(n => parseInt(String(n).replace(/\D+/g, ""), 10))
+                           .filter(n => !isNaN(n));
+      return { parte:pa, citadas:cit.size, hasta:nums.length ? Math.max(...nums) : 0 };
+    });
+}
+
 function datosBip() {
   const nombres = [...new Set(BIP.map(f => f.partido))];
   const filas = nombres.map(nom => {
@@ -3750,6 +3778,7 @@ function datosBip() {
       todo.rest = (h1.rest + h2.rest) / 2;
     }
     return { id:nom, nom, fecha:fases[0].fecha, temp:temporadaDe(fases[0].fecha),
+             faltan:partesSinFases(nom, fases),
              all:todo, h1:h1 || todo, h2:h2 || todo,
              fases:fases.map(f => [parteDe(f), f.duracion, f.rucks || 0]) };
   }).filter(Boolean);
@@ -3784,9 +3813,26 @@ function fechaDesdeGps(rival) {
 }
 
 /** "DHB 1 vs Ponent" se queda en "Ponent": en los ejes cabe y se entiende. */
+/* Hay dos formas de nombrar el partido: "DHB 2 vs Toro", donde los nuestros
+   van delante, y la del export crudo, "… El Toro R.C. vs CAU", donde van
+   detrás. Quedarse siempre con el segundo trozo ponía "CAU" de rival. Se
+   descarta el lado que somos nosotros, y si no se reconoce ninguno se deja el
+   último, que es lo de antes. */
 function rivalDe(nom) {
-  const partes = String(nom).split(/\s+(?:vs\.?|v\.?|contra|@)\s+/i);
-  return (partes.length > 1 ? partes[partes.length - 1] : nom).trim() || String(nom);
+  const t = String(nom);
+  const partes = t.split(/\s+(?:vs\.?|v\.?|contra|@)\s+/i).map(x => x.trim()).filter(Boolean);
+  if (partes.length < 2) return t.trim() || t;
+  const sig = String(C.siglas || "CAU").toLowerCase();
+  const nuestro = x => {
+    const b = x.toLowerCase();
+    return b === sig || new RegExp(`\\b${sig}\\b`).test(b);
+  };
+  const otros = partes.filter(x => !nuestro(x));
+  const r = otros.length === 1 ? otros[0] : partes[partes.length - 1];
+  // "Universidad de Mallorca El Toro R.C." no cabe en una tarjeta: fuera el
+  // tipo de club, que no distingue a nadie.
+  return r.replace(/\s*\b(r\.?\s?c\.?|c\.?\s?r\.?|r\.?f\.?c\.?|rugby(\s+club)?)\s*$/i, "")
+          .trim() || r;
 }
 const etPartido = r => r.corto;
 /** Día y mes para la tarjeta del partido; vacío si no hay fecha fiable. */
@@ -3807,7 +3853,28 @@ function panelBip() {
   // La tira de partidos es el selector: cada tarjeta lleva la fecha, el rival
   // y su % de balón en juego, así que elegir y comparar es el mismo gesto.
   const tope = Math.max(...D.map(r => r.all.pct || 0), .01);
+  // Un partido al que le falta media parte no se puede comparar con los demás
+  // ni promediar con ellos, y callarlo es peor que enseñarlo: el número sale
+  // bajo y parece que ese día se jugó poco.
+  const cojos = D.filter(r => r.faltan && r.faltan.length);
+  const linea = fa => {
+    if (fa.citadas) return `${esc(fa.parte)} · faltan sus filas de fase: los rucks nombran
+      <b>${fa.citadas}</b> y llegan hasta la <b>BIP ${fa.hasta}</b>, así que se jugaron, pero sin
+      esas filas no hay duración`;
+    return `${esc(fa.parte)} · ninguna fase en el archivo`;
+  };
+  const avisoCojo = cojos.length ? `<div class="aviso grave">
+    <b>${cojos.length === 1 ? "A este partido le falta una parte en el archivo."
+                             : "A estos partidos les falta alguna parte en el archivo."}</b>
+    Hay cronómetro de esa parte (fila <code>task</code>) pero no llega ninguna fila
+    <code>entity_type = bip</code> dentro de ella, y la duración de cada fase solo está ahí.
+    Lo que ves es solo el resto del partido, y la media de la temporada se va hacia abajo.
+    <ul class="lCojo">${cojos.map(r => `<li><b>${esc(r.corto)}</b> · ${
+      r.faltan.map(linea).join("; ")}</li>`).join("")}</ul>
+    Para arreglarlo, vuelve a sacar el archivo con las filas de fase de esa parte y cárgalo otra vez.
+    </div>` : "";
   return `
+  ${avisoCojo}
   <section class="barraRef noPdf">
     <div class="supBip">
       <div class="segmento" id="segParte" aria-label="Parte del partido">
@@ -3830,10 +3897,13 @@ function panelBip() {
         <s>Todos</s><b>${D.length} partidos</b></button>
       ${D.map(r => {
         const pc = (r.all.pct || 0) * 100;
-        return `<button type="button" class="pCard${FB.sel === r.id ? " on" : ""}" data-p="${esc(r.id)}"
-          title="${esc(r.nom)}">
+        const cojo = r.faltan && r.faltan.length;
+        return `<button type="button" class="pCard${FB.sel === r.id ? " on" : ""}${cojo ? " cojo" : ""}"
+          data-p="${esc(r.id)}"
+          title="${esc(r.nom)}${cojo ? ` · faltan las fases de: ${
+            r.faltan.map(x => x.parte).join(", ")}` : ""}">
           <s>${esc(fechaChip(r.fecha))}</s>
-          <b>${esc(r.corto)}</b>
+          <b>${esc(r.corto)}${cojo ? ` <i class="inc" aria-label="incompleto">!</i>` : ""}</b>
           <span class="bar"><i style="width:${(pc / (tope * 100) * 100).toFixed(0)}%"></i></span>
           <span class="pc">${nf(pc, 1)}% BiP</span>
         </button>`;
@@ -4410,7 +4480,23 @@ function normalizaBip(objetos, partido) {
 
     if (tipo === "task") {
       const d = num(m.durationseconds);
-      if (nomPartido && d > 0) DURACION_PARTE[nomPartido + "|" + parte] = d;
+      // Un export puede traer la misma parte dos veces (un trozo suelto mal
+      // etiquetado, de segundos). Si se quedara la última, el reloj de esa
+      // parte sería ese trozo y el % saldría disparado: vale la más larga.
+      if (nomPartido && d > 0) {
+        const cl = nomPartido + "|" + parte;
+        DURACION_PARTE[cl] = Math.max(DURACION_PARTE[cl] || 0, d);
+      }
+      continue;
+    }
+    if (tipo === "ruck") {
+      // El ruck no es una fase y no se guarda, pero deja constancia de que esa
+      // fase existió: es la única prueba cuando la fila de la fase no viene.
+      const nf = String(m.bipname || m.bipid || "").trim();
+      if (nomPartido && nf) {
+        const cl = nomPartido + "|" + parte;
+        (FASES_CITADAS[cl] || (FASES_CITADAS[cl] = new Set())).add(nf);
+      }
       continue;
     }
     if (tipo !== "bip") continue;
