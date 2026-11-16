@@ -63,12 +63,14 @@ window.CAU_CONFIG = {
        mucho    = muchas fases y largas
        continuo = pocas fases pero largas
        cortado  = muchas fases y cortas
-       poco     = pocas fases y cortas                                        */
+       poco     = pocas fases y cortas
+     Las de fases largas se llaman BURN y las de fases cortas FIRE, así que
+     el nombre ya dice en qué mitad del cuadrante cae cada una.               */
   zonasBip: {
     mucho:    { tit: "LONG BURN" },
     continuo: { tit: "SLOW BURN" },
-    cortado:  { tit: "PLAY FAST, FOR LONG" },
-    poco:     { tit: "FAST BURN" }
+    cortado:  { tit: "REPEATED FIRE" },
+    poco:     { tit: "QUICK FIRE" }
   },
 
   generoEquipo: { "DHb": "m", "Femenino": "f" },
