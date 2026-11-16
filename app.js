@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261116e";   // se muestra abajo en el lateral
+const VERSION = "20261116h";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -4065,16 +4065,29 @@ function mediaPanelBip(D, sel) {
    lado de la raya horizontal está cada una; lo que las separa dentro de su
    pareja es cuántas fases hubo. */
 const ZONAS_BASE = [
-  { k:"mucho",   tit:"LONG BURN",           emo:"🪨", col:"#2F615C", tin:"#E8F2F0",
+  { k:"mucho",   tit:"LONG BURN",           emo:"🔥", col:"#2F615C", tin:"#E8F2F0",
     que:"Muchas fases y largas." },
   { k:"continuo",tit:"SLOW BURN",           emo:"🌊", col:"#454C92", tin:"#EDEEF9",
     que:"Pocas fases pero largas." },
+  /* La ametralladora no es un emoji: no existe el de ametralladora y el de
+     pistola sale como pistola de agua en iPhone y Android. Hay dos versiones:
+     "img" es la imagen que elegiste, y "ico" una silueta dibujada que toma el
+     color de la zona y aguanta mejor el tamaño pequeño. Manda la imagen; para
+     volver a la silueta, pon cuadranteDibujado: true en config.js. */
   { k:"cortado", tit:"REPEATED FIRE",       emo:"⚡", col:"#9A6B12", tin:"#FBF6EA",
-    que:"Muchas fases y cortas." },
-  { k:"poco",    tit:"QUICK FIRE",          emo:"💨", col:"#6E6459", tin:"#F2F0EB",
+    que:"Muchas fases y cortas.",
+    img:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAAA0CAMAAAB8UGDgAAAASFBMVEUAAABmYmUgOVExRlrrjTT5+vqIbFqlo65xcXGXoao7O3xRXW1mdIOkpaWSnaZ3hZBIVmLj6OisdT26tMBreYZ4g48xeXnEu8OEwE8RAAAAGHRSTlMA+/39/w/+/QReA43sDJisb1P//6HsA//0boz5AAAFBklEQVR42sVZi3LjIAwUUDDUr9h13P//05MEOGCD46S9qeZu0uZsWFbLSnAA1ej1BBoD/jAsgFDD34LQvRZSiulvQcCgpFSj/uNkSMlU9EWe+h4sPmTtun6exY944GR0UrV6DTOudn1nUPt2Qi2BUE2jVAUkjozI3ODGpT2NQf8gGwhCIAiW5uScu93cwBN2IoS6FMJdY6KQSfsZQaj9hPKl4FXAu2xEEMdhwwovhpT35xC0HuBWiFYFJuoTGorCV1vg7wJHIMc7C9oHlWTKoIkwtNgGfjGQu6fp0DdVzeY3gXh92gMKcc4EGZGSHS+5yYM16ZnIorgFitkg9gIKjK4Y+D1tYmSi+W5Qhl/N1xYIAn2CLTNnwggvzkSn/NRZPNlRavIgSkwIWd0F6kGQSgCU5uI14Eh1V8FknYIo7wlmowF+COipSLuQxUTR4+ajEjiAIB8JyY8vhdUjRFXdDMihX1rGRG0n4+M84cx/PnJAzER1d8gkFfnmNEEukfH69CZiBp7OGCk+RE4LWSrujq66Wu+PezNiEKqgiZNN6kEIg+ziRwpCyo7SUd68050SonK7foyKG4riy2viKQhKgyAQEleQggAplxMTm6DzXIf0Z4mS902+8iqIgMD430IgN2PoDQphYSLWRzI0dxvHNoWjZOruiTeldWMvzHkDYTIQw5mfO1q8yBoZBDSMbZsKU0l1URNeFLt8IIjbeS2XbPvYQtm8rRsSNUpVqTyZIfGEgmVJsr4IAnOAiPF5TT3v1t5Sqwkwor/BNwWb1cMNpf8rvYSijvBzzvMxpyBOui3AhqLBRtcVOBq55kVfHbD5w29vN6qFahyXZcRvu/tmuUQLy0AInHSmj0sgfKM7LdQLHBvsMc1BCpOYox6lxXd1zL1gSsRctG1TXGbs01GWHbqpauE5CNvT6cODAFi5NewjCGT/PrCpmRdBgO6oLQNy9vXQF2E6xN2HYBAJE3SQdvTaAwSyMnGJFS+B6KH31S3UuCMIL0z0/D0I7PAnWgBEEDwEaCZDmZeYaJVatCVhFE6BxETsjA5MaH1XcQERBHVwemAy5msgtO1Zlr0OS1uPIHaaSJmw6LQCiciZIKljOTrAOGOCs4ovLspbe1WY6gACdCOoyaeFmwjC8vFWw0EacxmE1s5pzMag6bCpZItZOaYj8YkchFiwFmCHMIgwnaGGoedDNo3N0hDnIHBGfK6jVqOnTAZZHYX5zQ0x5CA6GRtTXjE7JduRDWf9g0LLZmWZRwTBx2nNxl0S5tbUpCAgaa2VAG6icK1L9Bqfl4VICjDmcu3AbAp+SlAKuQ7sr2sOZpUUWucabtVGp8FLU6WlGFjmDzZmWRKdV0VHxx5Shq9EB2Em/UTGRHLLgrEwiL3X9KSZxSdshhxi/r4eWofq8JN1O8Ma+ZRQECbq38b04w+4iNIu5H2i26gbbnQLKOzjJxzrcI1YBZHFihtc+gpesl2YBn9cKoMIdbSv/tuorqTD0v3fHD1zl3B2L067avS1qy+4KMzdMgIIU78coF72zYu1+hYtgoBKPuBHd6RsVvEsKk5BmNDWuHJ2NV5MvgllTE9gVSZgA2HoOtT+6mXvJ3XbFzQBMR101hMafvWCmipK0s539eEjCEzH8stMsDtj78WBXUJN3VEThvrLqf+vN/XVHUYg/A0GlqFfJyKb2J6dn5Qvp63+//8xUofq7riBsAg9sYR/VehA46QnHYcAAAAASUVORK5CYII=",
+    ico:`<rect x="0" y="5.6" width="8.2" height="1.4" rx=".4"/>
+         <rect x="7.6" y="3.9" width="10.6" height="3.7" rx=".6"/>
+         <rect x="17.9" y="3.5" width="5.6" height="4.5" rx=".9"/>
+         <rect x="10.5" y="7.6" width="2.3" height="4.7" rx=".5"/>
+         <path d="M15.3 7.6h2.2l-1.2 3.3h-2.1z"/>
+         <path d="M4.3 6.9h1l1.7 3.5h-1.1z"/><path d="M5.3 6.9h1l-1.6 3.5h-1.1z"/>` },
+  { k:"poco",    tit:"SMALL BURST",         emo:"⚡", col:"#6E6459", tin:"#F2F0EB",
     que:"Pocas fases y cortas." }
 ];
-const ZONAS_BIP = ZONAS_BASE.map(z => Object.assign({}, z, (C.zonasBip || {})[z.k] || {}));
+const ZONAS_BIP = ZONAS_BASE.map(z => Object.assign({}, z, (C.zonasBip || {})[z.k] || {}))
+  .map(z => C.cuadranteDibujado === true ? Object.assign({}, z, { img:"" }) : z);
 
 function cuadranteBip(D, sel) {
   const W = 580, H = 320, L = 58, R = 16, T = 14, B = 50, iw = W - L - R, ih = H - T - B;
@@ -4120,15 +4133,27 @@ function cuadranteBip(D, sel) {
   // Pastillas de esquina con el nombre de la zona.
   const puestas = [];
   marcos.forEach(([z, qx, qy, qw, qh, ax2, ay2]) => {
-    const rot = `${z.emo} ${z.tit}`, an = rot.length * 5.5 + 16, al = 20;
+    const ANI = 21;                       // lo que ocupa la ametralladora
+    const dib = z.img || z.ico;
+    const rot = dib ? z.tit : `${z.emo} ${z.tit}`;
+    const an = rot.length * 5.5 + 16 + (dib ? ANI : 0), al = 20;
     if (qw < an + 8 || qh < al + 10) return;
     const px0 = ax2 === "izq" ? qx + 5 : qx + qw - an - 5;
     const py0 = ay2 === "arr" ? qy + 5 : qy + qh - al - 5;
     puestas.push({ x:px0, y:py0, w:an, h:al });
     s += `<rect x="${px0.toFixed(1)}" y="${py0.toFixed(1)}" width="${an.toFixed(1)}" height="${al}" rx="10"
-            fill="#FFFFFF" opacity=".94" stroke="#D4D8D6"/>
-          <text x="${(px0 + an / 2).toFixed(1)}" y="${(py0 + 14).toFixed(1)}" fill="${z.col}" font-size="9.5"
-            font-weight="700" text-anchor="middle" letter-spacing=".01em">${esc(rot)}</text>`;
+            fill="#FFFFFF" opacity=".94" stroke="#D4D8D6"/>`;
+    const txt = tx => `<text x="${tx}" y="${(py0 + 14).toFixed(1)}" fill="${z.col}" font-size="9.5"
+           font-weight="700" letter-spacing=".01em">${esc(rot)}</text>`;
+    s += z.img
+      ? `<image href="${z.img}" x="${(px0 + 6).toFixed(1)}" y="${(py0 + 5.8).toFixed(1)}"
+           width="19" height="8.4" preserveAspectRatio="xMidYMid meet"/>
+         ${txt((px0 + 6 + ANI).toFixed(1))}`
+      : z.ico
+      ? `<g fill="${z.col}" transform="translate(${(px0 + 7).toFixed(1)},${(py0 + 6.6).toFixed(1)}) scale(.58)">
+           ${z.ico}</g>${txt((px0 + 7 + ANI).toFixed(1))}`
+      : `<text x="${(px0 + an / 2).toFixed(1)}" y="${(py0 + 14).toFixed(1)}" fill="${z.col}" font-size="9.5"
+           font-weight="700" text-anchor="middle" letter-spacing=".01em">${esc(rot)}</text>`;
   });
 
   // Los puntos, y los nombres colocados donde quepan.
@@ -4159,7 +4184,11 @@ function cuadranteBip(D, sel) {
   return `<section class="panel"><h3>Tipo de partido <span class="uni">fases y duración media</span></h3>
     <p class="sub">El cruce de las líneas es la media de los partidos cargados.</p>${s}
     <div class="leyCuad">${ZONAS_BIP.map(z => `<div style="border-top:2px solid ${z.col}">
-      <b style="color:${z.col}">${z.emo} ${esc(z.tit)}</b>
+      <b style="color:${z.col}">${z.img
+        ? `<img class="icoZona" src="${z.img}" alt="">`
+        : z.ico
+        ? `<svg class="icoZona" viewBox="0 0 24 13" fill="currentColor" aria-hidden="true">${z.ico}</svg>`
+        : z.emo} ${esc(z.tit)}</b>
       <span>${esc(z.que)}</span></div>`).join("")}</div>
     <div class="leyenda"><span>El más largo de secuencia: ${esc(etPartido(cont))} (${nf(Sb(cont).media, 0)} s de media)</span>
       <span>El de más fases: ${esc(etPartido(cut))} (${Sb(cut).n})</span></div></section>`;
