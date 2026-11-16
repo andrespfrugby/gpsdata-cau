@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261116d";   // se muestra abajo en el lateral
+const VERSION = "20261116e";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -4061,14 +4061,17 @@ function mediaPanelBip(D, sel) {
  * config.js con zonasBip, que es lenguaje de cuerpo técnico y cada club
  * tiene el suyo.
  */
+/* Las largas son BURN y las cortas FIRE, así que el nombre ya dice de qué
+   lado de la raya horizontal está cada una; lo que las separa dentro de su
+   pareja es cuántas fases hubo. */
 const ZONAS_BASE = [
   { k:"mucho",   tit:"LONG BURN",           emo:"🪨", col:"#2F615C", tin:"#E8F2F0",
     que:"Muchas fases y largas." },
   { k:"continuo",tit:"SLOW BURN",           emo:"🌊", col:"#454C92", tin:"#EDEEF9",
     que:"Pocas fases pero largas." },
-  { k:"cortado", tit:"PLAY FAST, FOR LONG", emo:"⚡", col:"#9A6B12", tin:"#FBF6EA",
+  { k:"cortado", tit:"REPEATED FIRE",       emo:"⚡", col:"#9A6B12", tin:"#FBF6EA",
     que:"Muchas fases y cortas." },
-  { k:"poco",    tit:"FAST BURN",           emo:"💨", col:"#6E6459", tin:"#F2F0EB",
+  { k:"poco",    tit:"QUICK FIRE",          emo:"💨", col:"#6E6459", tin:"#F2F0EB",
     que:"Pocas fases y cortas." }
 ];
 const ZONAS_BIP = ZONAS_BASE.map(z => Object.assign({}, z, (C.zonasBip || {})[z.k] || {}));
