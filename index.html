@@ -449,6 +449,19 @@ table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,2
 .aviso.grave{background:rgba(175,13,26,.07);color:var(--text-1);line-height:1.55;max-width:88ch;
   box-shadow:inset 3px 0 0 var(--cau-rojo);padding-left:16px}
 .aviso.grave b{color:var(--cau-rojo)}
+.selB{font-family:inherit;font-size:12.5px;background:var(--ink-800);border:1px solid var(--ink-700);
+  border-radius:9px;padding:6px 10px;color:var(--text-1);max-width:280px}
+.drillsJ .nomb{display:flex;align-items:center;gap:8px;--av:26px;text-align:left}
+.drillsJ .nomb span{flex:0 1 auto;text-align:left}
+/* El avatar lleva margin auto para el podio: dentro de un flex ese auto se
+   come el hueco libre y separa la cara del nombre media celda. */
+.drillsJ .nomb .av{margin:0;flex:0 0 auto}
+.drillsJ td .nb{display:inline-block;margin-left:5px;font-size:10px;color:var(--text-3);
+  text-decoration:none;font-weight:600}
+.lectura{font-size:12.5px;line-height:1.5;color:var(--text-1);margin:10px 0 0;padding-top:9px;
+  border-top:1px solid var(--ink-800);max-width:86ch}
+.lectura b{font-weight:650}
+.leyenda + .lectura{margin-top:6px;padding-top:7px;border-top:0}
 .leyCuad .icoZona{width:19px;height:auto;max-height:11px;object-fit:contain;vertical-align:-1px;margin-right:1px}
 .aviso.grave .lCojo{margin:7px 0 7px;padding-left:18px}
 .aviso.grave .lCojo li{margin:2px 0}
@@ -1278,7 +1291,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261116h"></script>
-<script src="app.js?v=20261116h"></script>
+<script src="config.js?v=20261119a"></script>
+<script src="app.js?v=20261119a"></script>
 </body>
 </html>
