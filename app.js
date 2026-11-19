@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261119a";   // se muestra abajo en el lateral
+const VERSION = "20261119c";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -2988,12 +2988,36 @@ function vistaSemana() {
 }
 
 /* ---------- análisis por bloques ---------- */
+/* dec = decimales por minuto; dec0 = en totales, donde el número es grande y
+   los decimales solo estorban. */
 const METRICAS_DRILL = [
-  { id:"Distance (metres)",   lbl:"TD / min",   dec:1 },
-  { id:"Sprint Distance (m)", lbl:"HSR / min",  dec:2 },
-  { id:HMLD,                  lbl:"HMLD / min", dec:2 },
-  { id:"__acdc",              lbl:"ACC+DECC / min", dec:2 }
+  { id:"Distance (metres)",   lbl:"TD",       dec:1, dec0:0 },
+  { id:"Sprint Distance (m)", lbl:"HSR",      dec:2, dec0:0 },
+  { id:HMLD,                  lbl:"HMLD",     dec:2, dec0:0 },
+  { id:"__acdc",              lbl:"ACC+DECC", dec:2, dec0:0 }
 ];
+
+/* Por minuto compara tareas de duración distinta; en total dice cuánto
+   trabajo hubo de verdad. Un rondo de 4 minutos puede ir al ritmo del partido
+   y aun así no sumar nada: hacen falta las dos lecturas. */
+const enTotal = () => FD.unidad === "total";
+const etMet = m => m.lbl + (enTotal() ? "" : " / min");
+const decMet = m => enTotal() ? m.dec0 : m.dec;
+const crudoDe = (r, m) => m.id === "__acdc"
+  ? Math.abs(r.crudo[ACC3] || 0) + Math.abs(r.crudo[DEC3] || 0)
+  : Math.abs(r.crudo[m.id] || 0);
+
+/* El total se reparte entre jugadores, no entre filas: así un bloque dice lo
+   que hizo cada uno de los que lo jugaron, y la fila de un jugador con varios
+   bloques dice su total de la sesión. */
+function totalesDrill(filas) {
+  const njug = new Set(filas.map(r => r.jugador)).size || 1;
+  const vals = {};
+  for (const m of METRICAS_DRILL)
+    vals[m.id] = filas.reduce((t, r) => t + crudoDe(r, m), 0) / njug;
+  return vals;
+}
+const valsDrill = filas => enTotal() ? totalesDrill(filas) : porMinuto(filas);
 
 /**
  * Escala divergente: azul por debajo de la media de la columna, blanco en la
@@ -3015,13 +3039,72 @@ function tinte(v, lo, hi, media) {
  * ese mismo MD, se calcula su intensidad media y se saca la mediana entre
  * sesiones. La mediana y no la media, para que una sesión rara no la mueva.
  */
+/* Cuántas sesiones anteriores del mismo tipo forman "lo típico". Cinco es el
+   punto donde la mediana ya aguanta una sesión rara sin moverse y todavía
+   sigue al momento de forma; con "temporada" entran todas. */
+const VENT_TIPICO = 5;
+const ventanaTipico = () => FD.ref === "temporada" ? 999 : VENT_TIPICO;
+
+/**
+ * Lo que se suele hacer en un tipo de sesión. Devuelve la mediana de cada
+ * métrica y el rango (mín-máx) de esas sesiones, que es lo que de verdad dice
+ * si la de hoy se ha salido o no: una mediana sola no tiene escala.
+ *   fuente "sesion"  -> el GPS de principio a fin
+ *   fuente "bloques" -> solo los splits de tarea, sin calentamiento ni paradas
+ */
+function resumenMD(md, excluirSesion, fuente, grupo) {
+  if (md === undefined) return null;
+  const orig = fuente === "bloques" ? BLOQUES : DATOS;
+  const suyas = orig.filter(r => r.squad === F.squad && r.md === md
+    && idSesion(r) !== excluirSesion
+    && (!grupo || grupoDe(r.posicion) === grupo));
+  if (!suyas.length) return null;
+  // Las últimas N por fecha, no las N primeras que aparezcan en el archivo.
+  const ids = [...new Set(suyas.map(idSesion))]
+    .sort((a, b) => (suyas.find(r => idSesion(r) === a).fechaMs)
+                  - (suyas.find(r => idSesion(r) === b).fechaMs))
+    .slice(-ventanaTipico());
+  if (ids.length < 2) return null;
+
+  const porSesion = ids.map(id => {
+    const f = suyas.filter(r => idSesion(r) === id);
+    const njug = new Set(f.map(r => r.jugador)).size || 1;
+    return { vals:valsDrill(f),
+             min: enTotal() ? f.reduce((t, r) => t + r.minutos, 0) / njug
+                            : f.reduce((t, r) => t + r.minutos, 0) / f.length };
+  });
+  const med = l => {
+    const o = l.slice().sort((a, b) => a - b), k = Math.floor(o.length / 2);
+    return o.length % 2 ? o[k] : (o[k - 1] + o[k]) / 2;
+  };
+  const vals = {}, lo = {}, hi = {};
+  for (const m of METRICAS_DRILL) {
+    const v = porSesion.map(x => x.vals[m.id]);
+    vals[m.id] = med(v); lo[m.id] = Math.min(...v); hi[m.id] = Math.max(...v);
+  }
+  const mins = porSesion.map(x => x.min);
+  return { vals, lo, hi, min:med(mins), minLo:Math.min(...mins), minHi:Math.max(...mins), n:ids.length };
+}
+
+/** Lo de hoy, con la misma receta que resumenMD para que sean comparables. */
+function hoyMD(fuente, grupo) {
+  const orig = fuente === "bloques" ? BLOQUES : DATOS;
+  const f = orig.filter(r => r.squad === F.squad && idSesion(r) === F.fecha && r.minutos > 0
+    && (!grupo || grupoDe(r.posicion) === grupo));
+  if (!f.length) return null;
+  const njug = new Set(f.map(r => r.jugador)).size || 1;
+  return { vals:valsDrill(f),
+           min: enTotal() ? f.reduce((t, r) => t + r.minutos, 0) / njug
+                          : f.reduce((t, r) => t + r.minutos, 0) / f.length };
+}
+
 function tipicoMD(md, excluirSesion) {
   if (md == null) return null;
   const suyas = DATOS.filter(r => r.squad === F.squad && r.md === md && idSesion(r) !== excluirSesion);
   const sesiones = [...new Set(suyas.map(r => idSesion(r)))];
   if (sesiones.length < 2) return null;
 
-  const porSesion = sesiones.map(id => porMinuto(suyas.filter(r => idSesion(r) === id)));
+  const porSesion = sesiones.map(id => valsDrill(suyas.filter(r => idSesion(r) === id)));
   const mediana = lista => {
     const o = lista.slice().sort((a, b) => a - b);
     const m = Math.floor(o.length / 2);
@@ -3066,7 +3149,7 @@ function ritmoPartido(col, grupo) {
   return porMinuto(ult)[col];
 }
 
-function barrasTareas(bloques, grupo, todos) {
+function barrasTareas(bloques, grupo) {
   let m = METRICAS_DRILL.find(x => x.id === FD.met) || METRICAS_DRILL[2];
   // Si la métrica elegida viene a cero en todos los bloques (datos sin esa
   // columna), se pasa a la primera que sí traiga números en vez de pintar
@@ -3075,7 +3158,9 @@ function barrasTareas(bloques, grupo, todos) {
     const alt = METRICAS_DRILL.find(x => bloques.some(b => b.vals[x.id] > 0));
     if (alt) m = alt;
   }
-  const part = ritmoPartido(m.id, grupo);
+  // En totales la vara del partido no sirve: un bloque de ocho minutos nunca
+  // va a sumar lo de ochenta. La línea solo aparece midiendo por minuto.
+  const part = enTotal() ? null : ritmoPartido(m.id, grupo);
   /* Tres lecturas distintas de la misma sesión: en qué orden se hicieron las
      tareas (¿pusiste lo más duro al final?), cuáles aprietan más y cuáles
      menos. El orden por intensidad depende de la métrica elegida arriba. */
@@ -3099,7 +3184,7 @@ function barrasTareas(bloques, grupo, todos) {
   }
   if (part) {
     s += `<rect x="${(px(part) - 1).toFixed(1)}" y="${TOP}" width="2" height="${lista.length * fh + 4}" fill="#131715" opacity=".55"/>`;
-    s += `<text x="${px(part).toFixed(1)}" y="${TOP - 9}" font-size="10.5" font-weight="600" text-anchor="middle">ritmo del partido · ${nf(part, m.dec)}</text>`;
+    s += `<text x="${px(part).toFixed(1)}" y="${TOP - 9}" font-size="10.5" font-weight="600" text-anchor="middle">ritmo del partido · ${nf(part, decMet(m))}</text>`;
   }
   lista.forEach((b, i) => {
     const y = TOP + 5 + i * fh, v = b.vals[m.id];
@@ -3107,35 +3192,28 @@ function barrasTareas(bloques, grupo, todos) {
     const nom = b.nombre.length > 38 ? b.nombre.slice(0, 37) + "…" : b.nombre;
     s += `<text x="${L - 12}" y="${y + 15}" font-size="12" text-anchor="end">${esc(nom)}</text>`;
     s += `<rect x="${L}" y="${y + 3}" width="${Math.max(px(v) - L, 1).toFixed(1)}" height="16" rx="3" fill="#454C92" opacity="${llega ? .92 : .4}"/>`;
-    s += `<text x="${(px(v) + 8).toFixed(1)}" y="${y + 16}" font-size="11.5" font-weight="600" fill="#5C6462">${nf(v, m.dec)}</text>`;
+    s += `<text x="${(px(v) + 8).toFixed(1)}" y="${y + 16}" font-size="11.5" font-weight="600" fill="#5C6462">${nf(v, decMet(m))}</text>`;
   });
-  s += `<text x="${W - 20}" y="${H - 8}" font-size="10.5" fill="#5C6462" text-anchor="end">${esc(m.lbl)} · por minuto de juego</text>`;
+  s += `<text x="${W - 20}" y="${H - 8}" font-size="10.5" fill="#5C6462" text-anchor="end">${
+    esc(m.lbl)} · ${enTotal() ? `total por ${jug()} y tarea` : "por minuto de juego"}</text>`;
   s += `</svg>`;
 
   const llegan = part ? lista.filter(b => b.vals[m.id] >= part).length : 0;
-  const grupos = gruposDe(todos);
+  const pie = enTotal()
+    ? `Totales: cuánto suma cada tarea. Una tarea puede ir al ritmo del partido y aportar poco
+       si dura cuatro minutos`
+    : part ? `${llegan} de ${lista.length} tareas ${llegan === 1 ? "llega" : "llegan"} al ritmo del partido`
+           : "Todavía no hay partidos con los que fijar el ritmo de referencia";
   return `<section class="panel ancho">
-    <h3>¿Qué tarea llega a la intensidad del partido?</h3>
-    <p class="sub">Todo por minuto, que es la única forma de comparar un bloque de seis minutos con un
-      partido de setenta. La línea vertical es el ritmo medio de los últimos ${FR.ventana} partidos.</p>
+    <h3>${enTotal() ? "¿Cuánto suma cada tarea?" : "¿Qué tarea llega a la intensidad del partido?"}</h3>
     <div class="filaRef noPdf" style="margin:0 0 14px">
-      <div class="campoR"><label>Métrica</label>
-        <div class="segR" data-g="met">${METRICAS_DRILL.map(x =>
-          `<button data-v="${esc(x.id)}" class="${x.id === m.id ? "on" : ""}">${esc(x.lbl)}</button>`).join("")}</div></div>
-      <div class="campoR"><label>Puesto</label>
-        <div class="segR" data-g="grupo"><button data-v="" class="${grupo ? "" : "on"}">Todas</button>${
-          grupos.map(g => `<button data-v="${esc(g)}" class="${g === grupo ? "on" : ""}">${esc(g)}</button>`).join("")}</div></div>
       <div class="campoR"><label>Orden</label>
         <div class="segR" data-g="ordenT">${[["entreno", "En el entreno"], ["intenso", "Más intenso"],
           ["suave", "Menos intenso"]].map(([v, t]) =>
           `<button data-v="${v}" class="${v === ordT ? "on" : ""}">${t}</button>`).join("")}</div></div>
     </div>
     ${s}
-    <div class="leyenda">
-      <span>${part ? `${llegan} de ${lista.length} ${llegan === 1 ? "tarea llega" : "tareas llegan"} al ritmo del partido`
-                   : "Todavía no hay partidos con los que fijar el ritmo de referencia"}</span>
-      <span>Las tareas de contacto no se miden bien con esto: ahí lo que cuenta son los impactos</span>
-    </div>
+    <div class="leyenda"><span>${pie}</span></div>
   </section>`;
 }
 
@@ -3155,7 +3233,7 @@ function tablaJugadores(filas, bloques) {
   const lista = [...new Set(sel.map(r => r.jugador))].map(j => {
     const suyas = sel.filter(r => r.jugador === j);
     return { jugador:j, posicion:suyas[suyas.length - 1].posicion, nb:suyas.length,
-             min:suyas.reduce((t, r) => t + r.minutos, 0), vals:porMinuto(suyas) };
+             min:suyas.reduce((t, r) => t + r.minutos, 0), vals:valsDrill(suyas) };
   });
 
   const o = FD.ordenBJ;
@@ -3171,7 +3249,7 @@ function tablaJugadores(filas, bloques) {
                     media:v.reduce((t, x) => t + x, 0) / v.length };
   }
   const fl = c => o.col === c ? (o.asc ? " ↑" : " ↓") : "";
-  const grupoVals = porMinuto(sel);
+  const grupoVals = valsDrill(sel);
   const grupoMin = lista.reduce((t, x) => t + x.min, 0) / lista.length;
 
   return `<div class="scroll"><table class="datos drills drillsJ">
@@ -3179,7 +3257,7 @@ function tablaJugadores(filas, bloques) {
       <th class="orden" data-c="jugador">${cap(jug())}${fl("jugador")}</th>
       <th class="orden" data-c="posicion">Posición${fl("posicion")}</th>
       <th class="n orden" data-c="min">Min${fl("min")}</th>
-      ${METRICAS_DRILL.map(m => `<th class="n orden" data-c="${esc(m.id)}">${esc(m.lbl)}${fl(m.id)}</th>`).join("")}
+      ${METRICAS_DRILL.map(m => `<th class="n orden" data-c="${esc(m.id)}">${esc(etMet(m))}${fl(m.id)}</th>`).join("")}
     </tr></thead>
     <tbody>${lista.map(x => `<tr>
       <td><div class="nomb">${avatar(x.jugador, x.posicion)}<span>${esc(x.jugador)}</span></div></td>
@@ -3187,14 +3265,14 @@ function tablaJugadores(filas, bloques) {
       <td class="n">${nf(x.min, 1)}${FD.bloque ? "" : `<s class="nb">${x.nb}</s>`}</td>
       ${METRICAS_DRILL.map(m => {
         const v = x.vals[m.id], r = rango[m.id];
-        return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, m.dec)}</td>`;
+        return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, decMet(m))}</td>`;
       }).join("")}
     </tr>`).join("")}</tbody>
     <tfoot><tr class="media">
       <td><div class="nomb">Media del grupo</div></td>
       <td>${lista.length} ${lista.length === 1 ? jug() : jugs()}</td>
       <td class="n">${nf(grupoMin, 1)}</td>
-      ${METRICAS_DRILL.map(m => `<td class="n">${nf(grupoVals[m.id], m.dec)}</td>`).join("")}
+      ${METRICAS_DRILL.map(m => `<td class="n">${nf(grupoVals[m.id], decMet(m))}</td>`).join("")}
     </tr></tfoot>
   </table></div>`;
 }
@@ -3210,14 +3288,15 @@ function lecturaJugadores(filas, bloques, grupo) {
   }
   const sel = FD.bloque ? filas.filter(r => r.split === FD.bloque) : filas;
   const vs = [...new Set(sel.map(r => r.jugador))]
-    .map(j => porMinuto(sel.filter(r => r.jugador === j))[m.id])
+    .map(j => valsDrill(sel.filter(r => r.jugador === j))[m.id])
     .filter(v => v > 0).sort((a, b) => b - a);
   if (vs.length < 3) return "";
   const donde = FD.bloque ? "en este bloque" : "en los bloques de la sesión";
-  const part = ritmoPartido(m.id, grupo);
+  // En totales no hay ritmo con el que comparar: lo que se mira es la brecha.
+  const part = enTotal() ? null : ritmoPartido(m.id, grupo);
   if (part) {
     const llegan = vs.filter(v => v >= part).length;
-    return `<b>${llegan} de ${vs.length} llegan al ritmo de partido en ${esc(m.lbl)}
+    return `<b>${llegan} de ${vs.length} llegan al ritmo de partido en ${esc(etMet(m))}
       ${donde}.</b> ${llegan === vs.length
         ? "La tarea les exige a todos: así es como se transfiere."
         : llegan === 0
@@ -3225,11 +3304,117 @@ function lecturaJugadores(filas, bloques, grupo) {
         : "Los que no llegan están haciendo otra tarea distinta dentro de la misma tarea."}`;
   }
   const brecha = vs[vs.length - 1] ? vs[0] / vs[vs.length - 1] : 0;
+  if (enTotal()) {
+    return brecha >= 1.6
+      ? `<b>El que más trabaja suma ${nf(brecha, 1)} veces lo del que menos ${donde}.</b>
+         Mismo entreno, dos cargas distintas: míralo antes de dar la sesión por buena para todos.`
+      : `<b>El trabajo está repartido ${donde}.</b> Nadie se queda a medias ni se come la sesión
+         entera: la carga del grupo vale como carga de cada uno.`;
+  }
   return brecha >= 1.6
     ? `<b>El que más trabaja hace ${nf(brecha, 1)} veces lo del que menos ${donde}.</b>
        Con esa diferencia, el promedio del bloque no representa a casi nadie.`
     : `<b>Los ${vs.length} se mueven en un rango estrecho ${donde}.</b>
        La tarea reparte parejo: lo que midas del grupo vale para cada uno.`;
+}
+
+/** El panel del tipo de sesión de hoy: lo típico, lo de hoy y el % entre los dos. */
+/* Qué contar de ese cuadro: lo que se ha salido del rango de las anteriores.
+   Un 103% no es nada; estar fuera del mínimo-máximo de cinco sesiones sí. */
+function lecturaTipico(md, grupo) {
+  const t = resumenMD(md, F.fecha, "sesion", grupo), h = hoyMD("sesion", grupo);
+  if (!t || !h) return "";
+  const et = etiquetaMD(md) || "la sesión";
+  const altas = METRICAS_DRILL.filter(m => h.vals[m.id] > t.hi[m.id]);
+  const bajas = METRICAS_DRILL.filter(m => h.vals[m.id] < t.lo[m.id]);
+  const mins = t.min ? h.min / t.min * 100 : 100;
+  const dur = mins >= 112 ? "más larga de lo normal"
+            : mins <= 88 ? "más corta de lo normal" : "de la duración de siempre";
+  if (!altas.length && !bajas.length) {
+    return `<b>El ${esc(et)} de hoy ha sido un ${esc(et)} de manual.</b>
+      ${cap(dur)}, y ninguna métrica se sale del rango de las ${t.n} anteriores: la sesión
+      ha salido como estaba planificada.`;
+  }
+  const lista = l => l.map(m => esc(m.lbl)).join(", ");
+  if (altas.length && !bajas.length) {
+    return `<b>Hoy se ha pasado de su rango en ${lista(altas)}.</b> ${cap(dur)}, pero por encima
+      del máximo de las ${t.n} ${esc(et)} anteriores: cuenta con que llegan más cargados de lo previsto.`;
+  }
+  if (bajas.length && !altas.length) {
+    return `<b>Hoy se ha quedado por debajo de su rango en ${lista(bajas)}.</b> ${cap(dur)}, y por
+      debajo del mínimo de las ${t.n} anteriores: si no era descarga buscada, falta trabajo que meter.`;
+  }
+  return `<b>Sesión descompensada: por encima en ${lista(altas)} y por debajo en ${lista(bajas)}.</b>
+    ${cap(dur)}. No es un ${esc(et)} más duro ni más blando, es uno distinto.`;
+}
+
+function panelTipico(md, grupo) {
+  const et = etiquetaMD(md) || "Sesión sin MD";
+  const bloque = (fuente, titulo, pie) => {
+    const t = resumenMD(md, F.fecha, fuente, grupo), h = hoyMD(fuente, grupo);
+    if (!t || !h) return `<tr class="grupoT"><td colspan="${METRICAS_DRILL.length + 2}">
+      ${esc(titulo)} · todavía no hay ${t ? "datos de hoy" : "sesiones anteriores de este tipo"}</td></tr>`;
+    const celdaT = (v, lo, hi, dec) => `<td class="n"><b>${nf(v, dec)}</b>
+      <s class="rg">${nf(lo, dec)}–${nf(hi, dec)}</s></td>`;
+    const pct = (a, b) => b ? a / b * 100 : null;
+    return `<tr class="grupoT"><td colspan="${METRICAS_DRILL.length + 2}">${esc(titulo)}
+        <span>${esc(pie)}</span></td></tr>
+      <tr class="tipi"><td>${esc(et)} típico <s class="vent">(${t.n === 1 ? "1 sesión"
+        : (FD.ref === "temporada" ? t.n + " sesiones, toda la temporada" : "últimas " + t.n + " sesiones")})</s></td>
+        ${celdaT(t.min, t.minLo, t.minHi, 1)}
+        ${METRICAS_DRILL.map(m => celdaT(t.vals[m.id], t.lo[m.id], t.hi[m.id], decMet(m))).join("")}</tr>
+      <tr class="hoy"><td>Hoy</td>
+        <td class="n">${nf(h.min, 1)}</td>
+        ${METRICAS_DRILL.map(m => `<td class="n">${nf(h.vals[m.id], decMet(m))}</td>`).join("")}</tr>
+      <tr class="pc"><td>Hoy sobre lo típico</td>
+        ${[["min", t.min, h.min, t.minLo, t.minHi]].concat(METRICAS_DRILL.map(m =>
+          [m.id, t.vals[m.id], h.vals[m.id], t.lo[m.id], t.hi[m.id]])).map(([, tv, hv, lo, hi]) => {
+          const p = pct(hv, tv);
+          if (p == null) return `<td class="n">–</td>`;
+          // Fuera del rango de las anteriores: eso es lo que de verdad llama
+          // la atención, no un 103% que es ruido de un día a otro.
+          /* Sin semáforo: en un MD-3, pasarse no es "bueno" ni quedarse corto
+             "malo". Solo se marca lo que se sale del rango de las anteriores,
+             en rojo por arriba y azul por abajo. */
+          const fuera = hv > hi ? "alto" : hv < lo ? "bajo" : "";
+          return `<td class="n${fuera ? " fuera " + fuera : ""}">${nf(p, 0)}%${
+            fuera ? `<s class="fu">${fuera === "alto" ? "↑" : "↓"}</s>` : ""}</td>`;
+        }).join("")}</tr>`;
+  };
+  return `<section class="panel">
+    <h3>${esc(et)} típico <span class="uni">lo que se suele hacer en este tipo de sesión, y lo de hoy</span></h3>
+    <div class="scroll"><table class="datos tipicoT">
+      <thead><tr><th></th><th class="n">Min</th>
+        ${METRICAS_DRILL.map(m => `<th class="n">${esc(etMet(m))}</th>`).join("")}</tr></thead>
+      <tbody>
+        ${bloque("sesion", "Sesión completa", "el GPS de principio a fin")}
+        ${bloque("bloques", "Solo los bloques de tarea", "sin calentamiento ni paradas")}
+      </tbody>
+    </table></div>
+    ${lectura(lecturaTipico(md, grupo))}
+  </section>`;
+}
+
+/** La lista de todos los tipos de sesión, para ver la forma del microciclo. */
+function panelPerfil(mdHoy, grupo) {
+  const mds = [...new Set(DATOS.filter(r => r.squad === F.squad && r.md != null).map(r => r.md))]
+    .sort((a, b) => b - a);   // MD, MD-1, MD-2… de más cerca del partido a más lejos
+  const filas = mds.map(md => ({ md, t:resumenMD(md, null, "sesion", grupo) })).filter(x => x.t);
+  if (filas.length < 2) return "";
+  return `<section class="panel">
+    <h3>Lo normal por tipo de sesión <span class="uni">mediana de ${
+      FD.ref === "temporada" ? "toda la temporada" : "las últimas " + VENT_TIPICO + " de cada tipo"} · sesión completa</span></h3>
+    <div class="scroll"><table class="datos tipicoT perfilT">
+      <thead><tr><th>Tipo</th><th class="n">Min</th>
+        ${METRICAS_DRILL.map(m => `<th class="n">${esc(etMet(m))}</th>`).join("")}</tr></thead>
+      <tbody>${filas.map(({ md, t }) => `<tr${md === mdHoy ? ' class="suyo"' : ""}>
+        <td><span class="md${md === 0 ? " p" : ""}">${esc(etiquetaMD(md))}</span>
+          <s class="vent">${t.n} ${t.n === 1 ? "sesión" : "sesiones"}</s></td>
+        <td class="n">${nf(t.min, 1)}</td>
+        ${METRICAS_DRILL.map(m => `<td class="n">${nf(t.vals[m.id], decMet(m))}</td>`).join("")}
+      </tr>`).join("")}</tbody>
+    </table></div>
+  </section>`;
 }
 
 function drillAnalysis() {
@@ -3250,7 +3435,7 @@ function drillAnalysis() {
   const bloques = [...new Set(filas.map(r => r.split))].map(nombre => {
     const suyas = filas.filter(r => r.split === nombre);
     const min = suyas.reduce((t, r) => t + r.minutos, 0) / suyas.length;
-    return { nombre, min, jugadores:suyas.length, vals: porMinuto(suyas),
+    return { nombre, min, jugadores:suyas.length, vals: valsDrill(suyas),
              ord: Math.min(...suyas.map(r => r.orden ?? 0)) };
   });
 
@@ -3271,31 +3456,34 @@ function drillAnalysis() {
   // Filas de referencia: esta sesión completa y el MD típico del histórico.
   const completas = sesion();
   const fila = (titulo, sub, filasRef) => {
-    const v = porMinuto(filasRef);
+    const v = valsDrill(filasRef);
     const min = filasRef.reduce((t, r) => t + r.minutos, 0) / filasRef.length;
     return `<tr class="media">
       <td><div class="nomb">${esc(titulo)}</div>
         <div class="dur"><span>${esc(sub)}</span></div></td>
       <td class="n">${nf(min, 1)}</td>
-      ${METRICAS_DRILL.map(m => `<td class="n">${nf(v[m.id], m.dec)}</td>`).join("")}
+      ${METRICAS_DRILL.map(m => `<td class="n">${nf(v[m.id], decMet(m))}</td>`).join("")}
     </tr>`;
   };
 
   // Qué es lo normal en ese día de microciclo, según el histórico.
   const md = completas.length ? completas[0].md : null;
   const tipico = tipicoMD(md, F.fecha);
-  const hoy = completas.length ? porMinuto(completas) : null;
+  const hoy = completas.length ? valsDrill(completas) : null;
   const minHoy = completas.length
     ? completas.reduce((t, r) => t + r.minutos, 0) / completas.length : 0;
 
+  // El "típico" y el "hoy sobre lo típico" se fueron al panel de arriba: aquí
+  // solo se quedan si ese panel no ha podido calcularse.
+  const hayPanel = !!resumenMD(md, F.fecha, "sesion", grupo);
   const pieSesion = `<tfoot>
     ${completas.length ? fila("Sesión completa",
       nf(minHoy, 1) + " min · " + completas.length + " jug.", completas) : ""}
-    ${tipico ? `<tr class="media tipico">
+    ${tipico && !hayPanel ? `<tr class="media tipico">
       <td><div class="nomb">${esc(etiquetaMD(md) || "Sin MD")} típico</div>
         <div class="dur"><span>mediana de ${tipico.n} sesiones anteriores</span></div></td>
       <td class="n">${nf(tipico.min, 1)}</td>
-      ${METRICAS_DRILL.map(m => `<td class="n">${nf(tipico.vals[m.id], m.dec)}</td>`).join("")}
+      ${METRICAS_DRILL.map(m => `<td class="n">${nf(tipico.vals[m.id], decMet(m))}</td>`).join("")}
     </tr>
     <tr class="media dif">
       <td><div class="nomb">Hoy sobre lo típico</div></td>
@@ -3308,6 +3496,26 @@ function drillAnalysis() {
       }).join("")}
     </tr>` : ""}
   </tfoot>`;
+
+  /* Una sola barra arriba con lo que afecta a toda la pestaña. Lo que solo
+     cambia un panel (el orden de las barras, bloques o jugadores) se queda
+     dentro de su panel: si está todo mezclado, no sabes qué mueve qué. */
+  const barraTab = `<section class="barraRef noPdf"><div class="filaRef">
+    <div class="campoR"><label>Unidad</label>
+      <div class="segR" data-g="unidad">
+        <button data-v="min" class="${enTotal() ? "" : "on"}">Por minuto</button>
+        <button data-v="total" class="${enTotal() ? "on" : ""}">Total</button></div></div>
+    <div class="campoR"><label>Métrica</label>
+      <div class="segR" data-g="met">${METRICAS_DRILL.map(x =>
+        `<button data-v="${esc(x.id)}" class="${x.id === FD.met ? "on" : ""}">${esc(x.lbl)}</button>`).join("")}</div></div>
+    <div class="campoR"><label>Puesto</label>
+      <div class="segR" data-g="grupo"><button data-v="" class="${grupo ? "" : "on"}">Todas</button>${
+        gruposDe(todos).map(g => `<button data-v="${esc(g)}" class="${g === grupo ? "on" : ""}">${esc(g)}</button>`).join("")}</div></div>
+    <div class="campoR"><label>Comparar con</label>
+      <div class="segR" data-g="ref">
+        <button data-v="ventana" class="${FD.ref === "temporada" ? "" : "on"}">Últimas ${VENT_TIPICO} del mismo tipo</button>
+        <button data-v="temporada" class="${FD.ref === "temporada" ? "on" : ""}">Toda la temporada</button></div></div>
+  </div></section>`;
 
   const porJug = FD.vista === "jugadores";
   const cab = `<div class="filaRef noPdf" style="margin:0 0 12px">
@@ -3323,17 +3531,21 @@ function drillAnalysis() {
       </select></div>` : ""}
   </div>`;
 
+  const paneles = `${panelTipico(md, grupo)}${barrasTareas(bloques, grupo)}`;
+  const perfil = panelPerfil(md, grupo);
+
   if (porJug) {
-    return `${barrasTareas(bloques, grupo, todos)}
+    return `${barraTab}${paneles}
     <section class="panel">
-      <h3>${FD.bloque ? esc(FD.bloque) : "Todos los bloques"} <span class="uni">por ${jug()}, por minuto</span></h3>
+      <h3>${FD.bloque ? esc(FD.bloque) : "Todos los bloques"} <span class="uni">por ${jug()}, ${
+        enTotal() ? "en total" : "por minuto"}</span></h3>
       ${cab}
       ${tablaJugadores(filas, bloques)}
       ${lectura(lecturaJugadores(filas, bloques, grupo))}
-    </section>`;
+    </section>${perfil}`;
   }
 
-  return `${barrasTareas(bloques, grupo, todos)}
+  return `${barraTab}${paneles}
   <section class="panel">
     <h3>Bloques de la sesión</h3>
     ${cab}
@@ -3341,7 +3553,7 @@ function drillAnalysis() {
       <thead><tr>
         <th class="orden" data-c="nombre">Bloque${flecha("nombre")}</th>
         <th class="n orden" data-c="min">Min${flecha("min")}</th>
-        ${METRICAS_DRILL.map(m => `<th class="n orden" data-c="${esc(m.id)}">${esc(m.lbl)}${flecha(m.id)}</th>`).join("")}
+        ${METRICAS_DRILL.map(m => `<th class="n orden" data-c="${esc(m.id)}">${esc(etMet(m))}${flecha(m.id)}</th>`).join("")}
       </tr></thead>
       <tbody>${bloques.map(b => `<tr>
         <td><div class="nomb">${esc(b.nombre)}</div>
@@ -3350,12 +3562,12 @@ function drillAnalysis() {
         <td class="n">${nf(b.min, 1)}</td>
         ${METRICAS_DRILL.map(m => {
           const v = b.vals[m.id], r = rango[m.id];
-          return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, m.dec)}</td>`;
+          return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, decMet(m))}</td>`;
         }).join("")}
       </tr>`).join("")}</tbody>
       ${pieSesion}
     </table></div>
-  </section>`;
+  </section>${perfil}`;
 }
 
 function vistaDrill() {
@@ -3395,7 +3607,8 @@ const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloq
              ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
              ordenBJ:{ col:"min", asc:false },      // orden del desglose por jugador
              vista:"bloques", bloque:"",            // bloques o jugadores, y de qué bloque
-             ordenT:"intenso",                      // orden de las barras de tareas
+             ordenT:"intenso", unidad:"min",        // orden de las barras y en qué unidad
+             ref:"ventana",                         // típico: últimas N o toda la temporada
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
 const FB = { partido:"", vista:"panel", sesionGps:"", metrica:"Distance (metres)",
              parte:"all", sel:"", temp:"" };   // panel de temporada
