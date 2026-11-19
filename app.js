@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261116h";   // se muestra abajo en el lateral
+const VERSION = "20261119a";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -430,6 +430,10 @@ function normaliza(brutas) {
     calcular(crudo, minutos);
 
     salida.push({
+      // El export saca los splits en el orden en que ocurrieron, así que la
+      // posición en el archivo es el orden del entrenamiento. No hay hora de
+      // inicio en el CSV: esto es lo más fiel que se puede ser.
+      orden: salida.length,
       crudo, esCompleto, esRespaldo,
       squad: String(get("squad") || EQUIPO_CARGA || "Senior").trim(),
       fecha, fechaMs: fecha.getTime(), fechaISO: iso(fecha), sesion, jugador, alias, split, md, esPartido,
@@ -3072,7 +3076,14 @@ function barrasTareas(bloques, grupo, todos) {
     if (alt) m = alt;
   }
   const part = ritmoPartido(m.id, grupo);
-  const lista = bloques.slice().sort((a, b) => b.vals[m.id] - a.vals[m.id]);
+  /* Tres lecturas distintas de la misma sesión: en qué orden se hicieron las
+     tareas (¿pusiste lo más duro al final?), cuáles aprietan más y cuáles
+     menos. El orden por intensidad depende de la métrica elegida arriba. */
+  const ordT = FD.ordenT || "intenso";
+  const lista = bloques.slice().sort((a, b) =>
+    ordT === "entreno" ? a.ord - b.ord
+    : ordT === "suave" ? a.vals[m.id] - b.vals[m.id]
+    : b.vals[m.id] - a.vals[m.id]);
   if (!lista.length) return "";
 
   const W = 1180, L = 268, R = 78, fh = 34, TOP = 28;
@@ -3114,6 +3125,10 @@ function barrasTareas(bloques, grupo, todos) {
       <div class="campoR"><label>Puesto</label>
         <div class="segR" data-g="grupo"><button data-v="" class="${grupo ? "" : "on"}">Todas</button>${
           grupos.map(g => `<button data-v="${esc(g)}" class="${g === grupo ? "on" : ""}">${esc(g)}</button>`).join("")}</div></div>
+      <div class="campoR"><label>Orden</label>
+        <div class="segR" data-g="ordenT">${[["entreno", "En el entreno"], ["intenso", "Más intenso"],
+          ["suave", "Menos intenso"]].map(([v, t]) =>
+          `<button data-v="${v}" class="${v === ordT ? "on" : ""}">${t}</button>`).join("")}</div></div>
     </div>
     ${s}
     <div class="leyenda">
@@ -3122,6 +3137,99 @@ function barrasTareas(bloques, grupo, todos) {
       <span>Las tareas de contacto no se miden bien con esto: ahí lo que cuenta son los impactos</span>
     </div>
   </section>`;
+}
+
+/**
+ * El mismo trabajo visto por jugador en vez de por bloque. La tabla de arriba
+ * promedia a todos los que hicieron la tarea, y ese promedio esconde lo que
+ * suele importar: que en el mismo rondo uno va al 90% del ritmo de partido y
+ * otro se queda en la mitad. Con un bloque elegido son los datos de esa tarea;
+ * con "todos", lo que hizo cada ${jug()} en los bloques de la sesión.
+ */
+function tablaJugadores(filas, bloques) {
+  const nombres = bloques.map(b => b.nombre);
+  if (FD.bloque && !nombres.includes(FD.bloque)) FD.bloque = "";
+  const sel = FD.bloque ? filas.filter(r => r.split === FD.bloque) : filas;
+  if (!sel.length) return "";
+
+  const lista = [...new Set(sel.map(r => r.jugador))].map(j => {
+    const suyas = sel.filter(r => r.jugador === j);
+    return { jugador:j, posicion:suyas[suyas.length - 1].posicion, nb:suyas.length,
+             min:suyas.reduce((t, r) => t + r.minutos, 0), vals:porMinuto(suyas) };
+  });
+
+  const o = FD.ordenBJ;
+  lista.sort((a, b) => o.col === "jugador" ? a.jugador.localeCompare(b.jugador) * (o.asc ? 1 : -1)
+    : o.col === "posicion" ? String(a.posicion).localeCompare(String(b.posicion)) * (o.asc ? 1 : -1)
+    : o.col === "min" ? (a.min - b.min) * (o.asc ? 1 : -1)
+    : (a.vals[o.col] - b.vals[o.col]) * (o.asc ? 1 : -1));
+
+  const rango = {};
+  for (const m of METRICAS_DRILL) {
+    const v = lista.map(x => x.vals[m.id]);
+    rango[m.id] = { lo:Math.min(...v), hi:Math.max(...v),
+                    media:v.reduce((t, x) => t + x, 0) / v.length };
+  }
+  const fl = c => o.col === c ? (o.asc ? " ↑" : " ↓") : "";
+  const grupoVals = porMinuto(sel);
+  const grupoMin = lista.reduce((t, x) => t + x.min, 0) / lista.length;
+
+  return `<div class="scroll"><table class="datos drills drillsJ">
+    <thead><tr>
+      <th class="orden" data-c="jugador">${cap(jug())}${fl("jugador")}</th>
+      <th class="orden" data-c="posicion">Posición${fl("posicion")}</th>
+      <th class="n orden" data-c="min">Min${fl("min")}</th>
+      ${METRICAS_DRILL.map(m => `<th class="n orden" data-c="${esc(m.id)}">${esc(m.lbl)}${fl(m.id)}</th>`).join("")}
+    </tr></thead>
+    <tbody>${lista.map(x => `<tr>
+      <td><div class="nomb">${avatar(x.jugador, x.posicion)}<span>${esc(x.jugador)}</span></div></td>
+      <td>${esc(x.posicion || "")}</td>
+      <td class="n">${nf(x.min, 1)}${FD.bloque ? "" : `<s class="nb">${x.nb}</s>`}</td>
+      ${METRICAS_DRILL.map(m => {
+        const v = x.vals[m.id], r = rango[m.id];
+        return `<td class="n" style="${tinte(v, r.lo, r.hi, r.media)}">${nf(v, m.dec)}</td>`;
+      }).join("")}
+    </tr>`).join("")}</tbody>
+    <tfoot><tr class="media">
+      <td><div class="nomb">Media del grupo</div></td>
+      <td>${lista.length} ${lista.length === 1 ? jug() : jugs()}</td>
+      <td class="n">${nf(grupoMin, 1)}</td>
+      ${METRICAS_DRILL.map(m => `<td class="n">${nf(grupoVals[m.id], m.dec)}</td>`).join("")}
+    </tr></tfoot>
+  </table></div>`;
+}
+
+/* La línea de debajo del desglose: cuántos llegan al ritmo del partido en la
+   métrica que está elegida arriba, y cuánto se abren entre ellos. El promedio
+   del bloque no dice nada de esto. */
+function lecturaJugadores(filas, bloques, grupo) {
+  let m = METRICAS_DRILL.find(x => x.id === FD.met) || METRICAS_DRILL[2];
+  if (!bloques.some(b => b.vals[m.id] > 0)) {
+    const alt = METRICAS_DRILL.find(x => bloques.some(b => b.vals[x.id] > 0));
+    if (alt) m = alt;
+  }
+  const sel = FD.bloque ? filas.filter(r => r.split === FD.bloque) : filas;
+  const vs = [...new Set(sel.map(r => r.jugador))]
+    .map(j => porMinuto(sel.filter(r => r.jugador === j))[m.id])
+    .filter(v => v > 0).sort((a, b) => b - a);
+  if (vs.length < 3) return "";
+  const donde = FD.bloque ? "en este bloque" : "en los bloques de la sesión";
+  const part = ritmoPartido(m.id, grupo);
+  if (part) {
+    const llegan = vs.filter(v => v >= part).length;
+    return `<b>${llegan} de ${vs.length} llegan al ritmo de partido en ${esc(m.lbl)}
+      ${donde}.</b> ${llegan === vs.length
+        ? "La tarea les exige a todos: así es como se transfiere."
+        : llegan === 0
+        ? "A este ritmo la tarea no prepara a nadie para el sábado, por buena que sea técnicamente."
+        : "Los que no llegan están haciendo otra tarea distinta dentro de la misma tarea."}`;
+  }
+  const brecha = vs[vs.length - 1] ? vs[0] / vs[vs.length - 1] : 0;
+  return brecha >= 1.6
+    ? `<b>El que más trabaja hace ${nf(brecha, 1)} veces lo del que menos ${donde}.</b>
+       Con esa diferencia, el promedio del bloque no representa a casi nadie.`
+    : `<b>Los ${vs.length} se mueven en un rango estrecho ${donde}.</b>
+       La tarea reparte parejo: lo que midas del grupo vale para cada uno.`;
 }
 
 function drillAnalysis() {
@@ -3142,7 +3250,8 @@ function drillAnalysis() {
   const bloques = [...new Set(filas.map(r => r.split))].map(nombre => {
     const suyas = filas.filter(r => r.split === nombre);
     const min = suyas.reduce((t, r) => t + r.minutos, 0) / suyas.length;
-    return { nombre, min, jugadores:suyas.length, vals: porMinuto(suyas) };
+    return { nombre, min, jugadores:suyas.length, vals: porMinuto(suyas),
+             ord: Math.min(...suyas.map(r => r.orden ?? 0)) };
   });
 
   const orden = FD.orden;
@@ -3200,9 +3309,34 @@ function drillAnalysis() {
     </tr>` : ""}
   </tfoot>`;
 
+  const porJug = FD.vista === "jugadores";
+  const cab = `<div class="filaRef noPdf" style="margin:0 0 12px">
+    <div class="campoR"><label>Ver</label>
+      <div class="segR" data-g="vista">
+        <button data-v="bloques" class="${porJug ? "" : "on"}">Bloques</button>
+        <button data-v="jugadores" class="${porJug ? "on" : ""}">${cap(jugs())}</button></div></div>
+    ${porJug ? `<div class="campoR"><label>De qué bloque</label>
+      <select class="selB" data-g="bloque">
+        <option value=""${FD.bloque ? "" : " selected"}>Todos los bloques</option>
+        ${bloques.map(b => `<option value="${esc(b.nombre)}"${
+          b.nombre === FD.bloque ? " selected" : ""}>${esc(b.nombre)}</option>`).join("")}
+      </select></div>` : ""}
+  </div>`;
+
+  if (porJug) {
+    return `${barrasTareas(bloques, grupo, todos)}
+    <section class="panel">
+      <h3>${FD.bloque ? esc(FD.bloque) : "Todos los bloques"} <span class="uni">por ${jug()}, por minuto</span></h3>
+      ${cab}
+      ${tablaJugadores(filas, bloques)}
+      ${lectura(lecturaJugadores(filas, bloques, grupo))}
+    </section>`;
+  }
+
   return `${barrasTareas(bloques, grupo, todos)}
   <section class="panel">
     <h3>Bloques de la sesión</h3>
+    ${cab}
     <div class="scroll"><table class="datos drills">
       <thead><tr>
         <th class="orden" data-c="nombre">Bloque${flecha("nombre")}</th>
@@ -3230,11 +3364,19 @@ function vistaDrill() {
   $("#selectores").innerHTML = "";
   $("#paneles").innerHTML = ""; $("#cuadrante").innerHTML = "";
   $("#tabla").innerHTML = drillAnalysis();
-  document.querySelectorAll(".drills .orden").forEach(th => th.onclick = () => {
+  document.querySelectorAll(".drills:not(.drillsJ) .orden").forEach(th => th.onclick = () => {
     const c = th.dataset.c;
     FD.orden = { col:c, asc: FD.orden.col === c ? !FD.orden.asc : false };
     pintar();
   });
+  document.querySelectorAll(".drillsJ .orden").forEach(th => th.onclick = () => {
+    const c = th.dataset.c;
+    FD.ordenBJ = { col:c, asc: FD.ordenBJ.col === c ? !FD.ordenBJ.asc
+                                                    : (c === "jugador" || c === "posicion") };
+    pintar();
+  });
+  document.querySelectorAll("#tabla select[data-g]").forEach(se =>
+    se.onchange = () => { FD[se.dataset.g] = se.value; recordar(); pintar(); });
   document.querySelectorAll("#tabla .segR").forEach(sg => sg.querySelectorAll("button").forEach(b => {
     b.onclick = () => { FD[sg.dataset.g] = b.dataset.v; recordar(); pintar(); };
   }));
@@ -3251,6 +3393,9 @@ const DURACION_PARTE = {};    // "partido|parte" -> segundos reales de esa parte
 const FASES_CITADAS = {};
 const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloques
              ordenJug:{ col:"", asc:false },        // orden de la tabla de jugadores
+             ordenBJ:{ col:"min", asc:false },      // orden del desglose por jugador
+             vista:"bloques", bloque:"",            // bloques o jugadores, y de qué bloque
+             ordenT:"intenso",                      // orden de las barras de tareas
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
 const FB = { partido:"", vista:"panel", sesionGps:"", metrica:"Distance (metres)",
              parte:"all", sel:"", temp:"" };   // panel de temporada
@@ -3755,6 +3900,11 @@ function partesSinFases(partido, fases) {
     });
 }
 
+/* La línea de debajo de un gráfico. Regla: interpreta, y no repite ningún
+   número que ya esté en pantalla, ni en las tarjetas de arriba ni escrito
+   sobre las barras. Si no hay nada que decir, no sale nada. */
+const lectura = h => h ? `<p class="lectura">${h}</p>` : "";
+
 function datosBip() {
   const nombres = [...new Set(BIP.map(f => f.partido))];
   const filas = nombres.map(nom => {
@@ -3986,11 +4136,19 @@ function evolucionPanelBip(D, sel) {
     s += `<text x="${cx.toFixed(1)}" y="${H - 8}" font-size="11" font-weight="600" text-anchor="middle">${esc(r.corto)}</text></g>`;
   });
   s += `</svg>`;
-  const hi = D.reduce((p, r) => Sb(r).bip > Sb(p).bip ? r : p), lo = D.reduce((p, r) => Sb(r).bip < Sb(p).bip ? r : p);
-  return `<section class="panel"><h3>Evolución del balón en juego <span class="uni">minutos y % del tiempo</span></h3>
-    <p class="sub">La línea de puntos es la media de los partidos cargados.</p>${s}
-    <div class="leyenda"><span>Más juego: ${esc(etPartido(hi))} (${mmss(Sb(hi).bip)}, ${nf(Sb(hi).pct * 100, 1)}%)</span>
-      <span>Menos: ${esc(etPartido(lo))} (${mmss(Sb(lo).bip)}, ${nf(Sb(lo).pct * 100, 1)}%)</span></div></section>`;
+  // El máximo y el mínimo ya están escritos sobre sus barras y en las tarjetas
+  // de arriba. Lo que no se ve es la horquilla: cuánto separa a los extremos.
+  const pc = D.map(r => Sb(r).pct * 100).sort((a, b) => a - b);
+  const horq = pc[pc.length - 1] - pc[0];
+  const lec = D.length < 3 ? ""
+    : horq <= 6
+    ? `<b>Los ${D.length} partidos caben en ${nf(horq, 1)} puntos de balón en juego.</b>
+       El volumen apenas cambia de un rival a otro: lo que decide el partido es cómo se reparte ese
+       tiempo, no cuánto hay.`
+    : `<b>${nf(horq, 1)} puntos separan al partido de más juego del de menos.</b>
+       Con esa horquilla, preparar la semana con la media engaña: cuenta más contra quién juegas.`;
+  return `<section class="panel"><h3>Evolución del balón en juego <span class="uni">minutos y % del tiempo</span></h3>${s}
+    ${lectura(lec)}</section>`;
 }
 
 /**
@@ -4039,14 +4197,22 @@ function mediaPanelBip(D, sel) {
   s += `</svg>`;
   const hi = D.reduce((p, r) => Sb(r).media > Sb(p).media ? r : p);
   const nmed = D.reduce((t, r) => t + Sb(r).n, 0) / D.length;
-  return `<section class="panel"><h3>Evolución de la secuencia <span class="uni">duración media de fase</span></h3>
-    <p class="sub">La línea de puntos es la media de todas las fases en los partidos cargados.
-      Debajo de cada partido, cuántas fases hubo: la misma media con 30 fases o con 60 es otro partido.</p>${s}
+  // Lo interesante no es quién tuvo la media más alta, que se ve en la barra,
+  // sino si sube por fases largas o por cantidad de fases: son dos partidos
+  // distintos y se entrenan distinto.
+  const hiN = D.reduce((p, r) => Sb(r).n > Sb(p).n ? r : p);
+  const lec = D.length < 2 ? ""
+    : hi.id !== hiN.id
+    ? `<b>El partido de fases más largas no es el que más fases tuvo.</b>
+       La media sube por duración, no por cantidad: son dos maneras distintas de que un partido
+       canse, y se entrenan distinto.`
+    : `<b>El que más fases tuvo es además el de fases más largas.</b>
+       Ese día se jugó más de todo: el desgaste vino por los dos lados a la vez.`;
+  return `<section class="panel"><h3>Evolución de la secuencia <span class="uni">duración media de fase</span></h3>${s}
     <div class="leyenda">
       <span><i class="sw" style="background:#2F615C"></i>Todas las fases</span>
-      <span><i class="sw" style="background:#9A6B12"></i>Solo las de más de 30 s</span>
-      <span>Donde más duraban las fases: ${esc(etPartido(hi))} (${mmss(Sb(hi).media)} de media)</span>
-      <span>${nf(nmed, 0)} fases por partido de media</span></div></section>`;
+      <span><i class="sw" style="background:#9A6B12"></i>Solo las de más de 30 s</span></div>
+    ${lectura(lec)}</section>`;
 }
 
 /**
@@ -4125,10 +4291,14 @@ function cuadranteBip(D, sel) {
         <text x="${(L + iw / 2).toFixed(0)}" y="${H - 6}" font-size="10.5" fill="#8A9290" text-anchor="middle">Número de fases</text>
         <text x="${L}" y="${H - 6}" font-size="10.5" font-weight="600" fill="#3F4846">← pocas</text>
         <text x="${W - R}" y="${H - 6}" font-size="10.5" font-weight="600" fill="#3F4846" text-anchor="end">muchas →</text>
-        <text transform="translate(15,${(T + ih * .26).toFixed(0)}) rotate(-90)" font-size="10.5"
-          font-weight="600" fill="#3F4846" text-anchor="middle">LONG &amp; SLOW ↑</text>
-        <text transform="translate(15,${(T + ih * .76).toFixed(0)}) rotate(-90)" font-size="10.5"
-          font-weight="600" fill="#3F4846" text-anchor="middle">↓ SHORT &amp; SHARP</text>`;
+        <!-- Girado -90 el texto se lee de abajo arriba, así que la flecha que
+             apunta hacia arriba en pantalla es la "→" y la de abajo la "←". -->
+        <text transform="translate(15,${(T + 2).toFixed(0)}) rotate(-90)" font-size="10.5"
+          font-weight="600" fill="#3F4846" text-anchor="end">largas →</text>
+        <text transform="translate(15,${(T + ih / 2).toFixed(0)}) rotate(-90)" font-size="10.5"
+          fill="#8A9290" text-anchor="middle">Duración media de fase</text>
+        <text transform="translate(15,${(T + ih - 2).toFixed(0)}) rotate(-90)" font-size="10.5"
+          font-weight="600" fill="#3F4846">← cortas</text>`;
 
   // Pastillas de esquina con el nombre de la zona.
   const puestas = [];
@@ -4179,10 +4349,27 @@ function cuadranteBip(D, sel) {
   });
   s += `</svg>`;
 
-  const cont = D.reduce((p, r) => Sb(r).media > Sb(p).media ? r : p);
-  const cut = D.reduce((p, r) => Sb(r).n > Sb(p).n ? r : p);
+  /* En qué esquina cae cada partido, con los mismos cortes que dibuja el
+     gráfico (ax = media de fases, ay = media de duración). Saber dónde vivís
+     la mayoría de los domingos es lo que decide cómo se entrena la semana. */
+  const zonaDe = r => {
+    const much = Sb(r).n >= ax, larg = Sb(r).media >= ay;
+    return larg ? (much ? ZONAS_BIP[0] : ZONAS_BIP[1]) : (much ? ZONAS_BIP[2] : ZONAS_BIP[3]);
+  };
+  const cuenta = {};
+  D.forEach(r => { const z = zonaDe(r); cuenta[z.k] = (cuenta[z.k] || 0) + 1; });
+  const manda = ZONAS_BIP.reduce((p, z) => (cuenta[z.k] || 0) > (cuenta[p.k] || 0) ? z : p);
+  const cuantos = cuenta[manda.k] || 0;
+  const QUE_HACER = {
+    mucho:    "Series largas y poco descanso: ahí lo que falla es aguantar dentro de la fase.",
+    continuo: "El día se gana dentro de la fase, no repitiendo: series largas y descanso completo.",
+    cortado:  "Lo que decide es volver a arrancar: series cortas, muchas, con poco descanso entre ellas.",
+    poco:     "El balón para mucho: entrenad entrar fuerte cada vez que se juega, más que aguantar."
+  };
+  const lec = cuantos < 2 ? ""
+    : `<b>${cuantos} de ${D.length} partidos caen en ${esc(manda.tit)}.</b> ${QUE_HACER[manda.k] || ""}`;
   return `<section class="panel"><h3>Tipo de partido <span class="uni">fases y duración media</span></h3>
-    <p class="sub">El cruce de las líneas es la media de los partidos cargados.</p>${s}
+    ${s}
     <div class="leyCuad">${ZONAS_BIP.map(z => `<div style="border-top:2px solid ${z.col}">
       <b style="color:${z.col}">${z.img
         ? `<img class="icoZona" src="${z.img}" alt="">`
@@ -4190,8 +4377,7 @@ function cuadranteBip(D, sel) {
         ? `<svg class="icoZona" viewBox="0 0 24 13" fill="currentColor" aria-hidden="true">${z.ico}</svg>`
         : z.emo} ${esc(z.tit)}</b>
       <span>${esc(z.que)}</span></div>`).join("")}</div>
-    <div class="leyenda"><span>El más largo de secuencia: ${esc(etPartido(cont))} (${nf(Sb(cont).media, 0)} s de media)</span>
-      <span>El de más fases: ${esc(etPartido(cut))} (${Sb(cut).n})</span></div></section>`;
+    ${lectura(lec)}</section>`;
 }
 
 function distribucionBip(D, sel) {
@@ -4204,13 +4390,13 @@ function distribucionBip(D, sel) {
   const tot = bk.map((_, i) => D.reduce((t, r) => t + Sb(r).dist[i], 0));
   const N = tot.reduce((a, b) => a + b, 0) || 1;
   return `<section class="panel"><h3>Distribución de secuencias <span class="uni">cuántas fases de cada duración</span></h3>
-    <p class="sub">Y qué peso tiene cada tramo dentro del partido.</p>
+
     <div class="scroll"><table class="semBip"><thead><tr><th></th>${bk.map(b => `<th>${esc(b)}</th>`).join("")}</tr></thead>
       <tbody>${D.map(r => fila(etPartido(r), Sb(r).n + " fases", Sb(r).dist, Sb(r).n,
         sel ? (sel.id === r.id ? "sel" : "dim") : "")).join("")}
       ${fila("Todos los partidos", N + " fases", tot, N, "tot")}</tbody></table></div>
-    <div class="leyenda"><span>${nf(tot[0] / N * 100, 0)}% de las fases duran 30 s o menos</span>
-      <span>Fases de más de 90 s: ${tot.slice(3).reduce((a, b) => a + b, 0)}</span></div></section>`;
+    ${lectura(`<b>${nf(tot[0] / N * 100, 0)}% de las fases se acaban antes de los 30 s.</b>
+      Lo que decide no es aguantar una fase larga, es estar listo para la siguiente.`)}</section>`;
 }
 
 function peorCasoBip(D, sel) {
@@ -4241,11 +4427,11 @@ function peorCasoBip(D, sel) {
   s += `</svg>`;
   const hp = D.reduce((p, r) => Sb(r).p5 > Sb(p).p5 ? r : p), hm = D.reduce((p, r) => Sb(r).mx > Sb(p).mx ? r : p);
   return `<section class="panel"><h3>Peor caso <span class="uni">el pico, no la media</span></h3>
-    <p class="sub">Rojo: en los 5 minutos de reloj más duros, cuánto tiempo estuvo el balón en juego, sumando
-      varias fases. Azul: la fase más larga sin parar.</p>${s}
+    ${s}
     <div class="leyenda"><span><i class="sw" style="background:#A8323F"></i>Juego en los 5 min más duros</span>
-      <span><i class="sw" style="background:#454C92"></i>Fase más larga</span>
-      <span>Lo exigente es ${mmss(Sb(hp).p5)} en 5 min (${esc(hp.corto)}) y ${mmss(Sb(hm).mx)} seguidos (${esc(hm.corto)})</span></div></section>`;
+      <span><i class="sw" style="background:#454C92"></i>Fase más larga</span></div>
+    ${lectura(`<b>El peor rato de ${esc(hp.corto)} es el que hay que poder repetir en el entreno.</b>
+      La media de un partido no la prepara nadie: lo que revienta es el tramo que no para.`)}</section>`;
 }
 
 /**
@@ -4279,14 +4465,26 @@ function rucksPanelBip(D, sel) {
           <text x="${cx.toFixed(1)}" y="${H - 8}" font-size="11" font-weight="600" text-anchor="middle">${esc(r.corto)}</text></g>`;
   });
   s += `</svg>`;
-  const porFase = D.map(r => Sb(r).n ? Sb(r).rk / Sb(r).n : 0);
-  const hi = D.reduce((p, r, i) => porMin[i] > porMin[D.indexOf(p)] ? r : p, D[0]);
-  return `<section class="panel"><h3>Contacto <span class="uni">rucks por partido</span></h3>
-    <p class="sub">La barra es el total. Debajo del número, cuántos rucks por minuto de balón en juego:
-      eso es lo que compara partidos que han durado cosas distintas.</p>${s}
-    <div class="leyenda">
-      <span>Media de ${nf(porFase.reduce((a, b) => a + b, 0) / D.length, 2)} rucks por fase</span>
-      <span>El de más densidad: ${esc(etPartido(hi))} (${nf(Math.max(...porMin), 2)} por minuto)</span></div></section>`;
+  /* A partir de cuántos rucks una fase se vuelve larga. Se busca el primer
+     número de rucks cuyas fases duran el doble que la fase media: ese es el
+     punto en el que la fase deja de ser un trámite y empieza a desgastar.
+     Sale del dato, no de una regla fija, así que se mueve con la temporada. */
+  const fs = BIP.filter(f => f.duracion > 0);
+  const medFase = fs.length ? fs.reduce((a, f) => a + f.duracion, 0) / fs.length : 0;
+  let umbral = 0, cuota = 0;
+  for (let k = 2; k <= 8 && medFase; k++) {
+    const sub = fs.filter(f => (f.rucks || 0) >= k);
+    if (sub.length < 8) break;
+    if (sub.reduce((a, f) => a + f.duracion, 0) / sub.length >= medFase * 2) {
+      umbral = k; cuota = sub.length / fs.length * 100; break;
+    }
+  }
+  const lec = umbral
+    ? `<b>Una fase de ${umbral} rucks o más ya es larga:</b> duran el doble que la fase media y son
+       solo ${nf(cuota, 0)} de cada 100. Esas son las que hay que saber jugar enteras.`
+    : "";
+  return `<section class="panel"><h3>Contacto <span class="uni">rucks por partido</span></h3>${s}
+    ${lectura(lec)}</section>`;
 }
 
 /**
@@ -4324,12 +4522,18 @@ function partesPanelBip(D, sel) {
   const caidas = D.map(r => r.h1.bip ? (r.h2.bip / r.h1.bip - 1) * 100 : 0);
   const media = caidas.reduce((a, b) => a + b, 0) / caidas.length;
   return `<section class="panel"><h3>Primera frente a segunda parte <span class="uni">minutos de balón en juego</span></h3>
-    <p class="sub">El porcentaje de debajo es cuánto cambia la segunda respecto a la primera. Se pinta
-      en color solo cuando pasa del 8%, que por debajo de eso es ruido.</p>${s}
+    ${s}
     <div class="leyenda">
       <span><i class="sw" style="background:#9FBEBB"></i>1ª parte</span>
-      <span><i class="sw" style="background:#2F615C"></i>2ª parte</span>
-      <span>De media, la segunda parte ${media < 0 ? "cae" : "sube"} un ${nf(Math.abs(media), 0)}%</span></div></section>`;
+      <span><i class="sw" style="background:#2F615C"></i>2ª parte</span></div>
+    ${lectura(Math.abs(media) < 8
+      ? `<b>Las dos partes se parecen.</b> El juego no se cae después del descanso: lo que falle al
+         final no es por falta de gasolina.`
+      : media < 0
+      ? `<b>De media la segunda parte cae un ${nf(Math.abs(media), 0)}%.</b> O el rival aprieta, o
+         vosotros dejáis de jugar: míralo partido a partido antes de echarle la culpa al físico.`
+      : `<b>De media la segunda parte sube un ${nf(media, 0)}%.</b> Salís a jugar más después del
+         descanso: eso aguanta si la semana trae trabajo de repetir, no solo de aguantar.`)}</section>`;
 }
 
 function secuenciasBip(D, sel) {
