@@ -449,6 +449,25 @@ table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,2
 .aviso.grave{background:rgba(175,13,26,.07);color:var(--text-1);line-height:1.55;max-width:88ch;
   box-shadow:inset 3px 0 0 var(--cau-rojo);padding-left:16px}
 .aviso.grave b{color:var(--cau-rojo)}
+.tipicoT td,.tipicoT th{padding:7px 10px}
+.tipicoT td.n b{font-weight:650}
+.tipicoT .rg{display:block;text-decoration:none;font-size:10px;color:var(--text-3);
+  font-family:'Chivo Mono',ui-monospace,monospace;margin-top:1px}
+.tipicoT .vent{display:inline-block;text-decoration:none;font-size:10.5px;color:var(--text-3);margin-left:6px}
+.tipicoT tr.grupoT td{background:var(--ink-800);color:var(--text-2);font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;border-bottom:0}
+.tipicoT tr.grupoT td span{text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-3);margin-left:7px}
+.tipicoT tr.tipi td{background:rgba(31,94,92,.05)}
+.tipicoT tr.hoy td{font-weight:650}
+.tipicoT tr.pc td{color:var(--text-2);font-size:12px;border-bottom:1px solid var(--ink-700)}
+.tipicoT tr.pc td.fuera{font-weight:700}
+.tipicoT tr.pc td.fuera.alto{background:rgba(168,50,63,.10);color:#9B2F3A}
+.tipicoT tr.pc td.fuera.bajo{background:rgba(47,110,168,.10);color:#2F6EA8}
+.tipicoT .fu{text-decoration:none;margin-left:3px}
+.tipicoT .md{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;
+  background:rgba(31,94,92,.12);color:var(--teal);min-width:38px;text-align:center}
+.tipicoT .md.p{background:rgba(175,13,26,.11);color:var(--cau-rojo)}
+.perfilT tr.suyo td{background:rgba(69,76,146,.07);font-weight:600}
 .selB{font-family:inherit;font-size:12.5px;background:var(--ink-800);border:1px solid var(--ink-700);
   border-radius:9px;padding:6px 10px;color:var(--text-1);max-width:280px}
 .drillsJ .nomb{display:flex;align-items:center;gap:8px;--av:26px;text-align:left}
@@ -1291,7 +1310,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261119a"></script>
-<script src="app.js?v=20261119a"></script>
+<script src="config.js?v=20261119c"></script>
+<script src="app.js?v=20261119c"></script>
 </body>
 </html>
