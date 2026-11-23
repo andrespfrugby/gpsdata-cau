@@ -449,6 +449,57 @@ table.datos tfoot tr.media.global td{color:var(--text);background:rgba(160,167,2
 .aviso.grave{background:rgba(175,13,26,.07);color:var(--text-1);line-height:1.55;max-width:88ch;
   box-shadow:inset 3px 0 0 var(--cau-rojo);padding-left:16px}
 .aviso.grave b{color:var(--cau-rojo)}
+/* ---------- ficha de partido, cara a cara y ranking ---------- */
+.heroP{display:flex;align-items:center;gap:13px;margin:0 0 16px;flex-wrap:wrap}
+.heroP .big{font-size:29px;font-weight:700;letter-spacing:-.02em}
+.heroP .fec{font-size:12px;color:var(--text-3);margin-left:auto}
+.zb{font-size:10.5px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:6px;white-space:nowrap}
+.cuerpoP{display:grid;grid-template-columns:352px 1fr;gap:24px;align-items:center}
+@media(max-width:860px){.cuerpoP{grid-template-columns:1fr}}
+.penta svg{width:100%;max-width:352px;display:block}
+.pleg{display:flex;gap:15px;justify-content:center;flex-wrap:wrap;margin-top:2px}
+.pleg span{font-size:11px;color:var(--text-2)}
+.pleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.kps{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.kps .kp:nth-child(5){grid-column:1 / -1}
+.kp{border-radius:12px;padding:11px 13px 12px;background:var(--ink-800);border:1px solid var(--ink-700)}
+.kp>span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--text-3);font-weight:600}
+.kp b{display:block;font-size:25px;font-weight:700;letter-spacing:-.025em;margin:2px 0 8px}
+.kp b i{font-style:normal;font-size:14px;color:var(--text-3)}
+.kbar{position:relative;height:5px;border-radius:3px;background:linear-gradient(90deg,#E6ECEA,#CBD7D4)}
+.kbar u{position:absolute;top:-3px;width:11px;height:11px;border-radius:50%;transform:translateX(-5px);
+  border:2px solid #fff}
+.kp s{display:block;text-decoration:none;font-size:11px;margin-top:7px;font-weight:600}
+.kp s.up{color:#A8323F}.kp s.dn{color:#2F6EA8}.kp s.eq{color:var(--text-3)}
+.cabCara{display:grid;grid-template-columns:1fr 150px 1fr;align-items:end;gap:10px;margin:0 0 12px}
+.cabCara .lado s{display:block;text-decoration:none;font-size:10.5px;font-weight:700;
+  letter-spacing:.05em;color:var(--c);margin-top:3px}
+.cabCara .lado.izq{text-align:right}
+.cabCara select{font-family:inherit;font-size:15px;font-weight:700;color:var(--c);border:0;
+  background:none;cursor:pointer;max-width:100%}
+.cabCara .lado.izq select{text-align:right;direction:rtl}
+.cabCara .lado.izq select option{direction:ltr}
+.cabCara .vs{text-align:center;font-size:11.5px;color:var(--text-3)}
+.cfila{display:grid;grid-template-columns:78px 1fr 150px 1fr 78px;align-items:center;gap:10px;padding:5px 0}
+.cfila .cb{height:17px;display:flex}
+.cfila .cb.izq{justify-content:flex-end}
+.cfila .cb i{display:block;height:100%;border-radius:4px}
+.cfila .cl{text-align:center;font-size:12px;color:var(--text-2)}
+.cfila .cv{font-family:'Chivo Mono',ui-monospace,monospace;font-size:13.5px;color:var(--text-2)}
+.cfila .cv.izq{text-align:right}
+.cfila .cv.gana{font-weight:700;color:var(--text-1)}
+.rfila{display:grid;grid-template-columns:26px 1fr 132px 2fr 60px 120px;align-items:center;gap:11px;
+  padding:7px 0;border-bottom:1px solid var(--ink-800)}
+.rfila:last-child{border-bottom:0}
+.rfila .pos{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;
+  font-size:12px;font-weight:700}
+.rfila .rn{font-weight:650;font-size:13.5px}
+.rfila .rbar{height:15px;background:var(--ink-800);border-radius:4px}
+.rfila .rbar i{display:block;height:100%;border-radius:4px}
+.rfila .rv{font-family:'Chivo Mono',ui-monospace,monospace;font-size:14px;font-weight:700;text-align:right}
+.rfila .rs{font-size:11.5px;color:var(--text-3);text-align:right}
+@media(max-width:860px){.rfila{grid-template-columns:26px 1fr 60px}.rfila .zb,.rfila .rbar,.rfila .rs{display:none}}
 .tipicoT td,.tipicoT th{padding:7px 10px}
 .tipicoT td.n b{font-weight:650}
 .tipicoT .rg{display:block;text-decoration:none;font-size:10px;color:var(--text-3);
@@ -1310,7 +1361,7 @@ button.sec:hover{border-color:var(--teal);color:var(--teal)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- El ?v= obliga al navegador a bajarse el archivo nuevo en vez de
      servir el que tiene en caché. Se sube cada vez que cambian. -->
-<script src="config.js?v=20261119c"></script>
-<script src="app.js?v=20261119c"></script>
+<script src="config.js?v=20261123d"></script>
+<script src="app.js?v=20261123d"></script>
 </body>
 </html>
