@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261123d";   // se muestra abajo en el lateral
+const VERSION = "20261123e";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -2058,6 +2058,7 @@ const FR = {
   modo:"media",         // media | alto | maximo | z | demandas
   objetivo:70,
   ventana:5,            // cuántas sesiones entran en la referencia
+  vista:"tabla",        // tabla de porcentajes o mapa de calor
   minObs:5,             // por debajo de esto la referencia baja de nivel sola
   minZ:8,               // sesiones mínimas para que el z-score se pinte
   tipo:"md",            // partido | md | entreno | todo
@@ -2268,6 +2269,8 @@ function barraRef() {
   const etTipo = FR.tipo === "md" && act ? `Qué sesiones entran · hoy es ${esc(nombreMD(act.md))}` : "Qué sesiones entran";
   return `<section class="barraRef noPdf">
     <div class="filaRef">
+      <div class="campoR"><label>Vista</label>${seg("vista", [["tabla", "Tabla"],
+        ["calor", "Mapa de calor"]], FR.vista)}</div>
       <div class="campoR"><label>Comparar con</label>${seg("nivel", niveles(), FR.nivel)}</div>
       <div class="campoR"><label>Qué referencia</label>${seg("modo", MODOS(), FR.modo)}</div>
       ${D ? `<div class="campoR"><label>Referencia fija</label>
@@ -2403,6 +2406,37 @@ function celdaRef(r, col) {
     ${nf(p, 0)}%<i>${nf(v, 0)}</i></td>`;
 }
 
+/* ---------- mapa de calor ---------- */
+/* Cinco pasos en torno al 100%: el color dice de un vistazo quién se sale de
+   su referencia y hacia dónde. Azul por debajo, rojo por encima, gris en lo
+   suyo. Rojo no es "malo": es "por encima de lo suyo", y si eso está bien o
+   mal depende del día de microciclo, no del color. */
+const PASOS_CALOR = [
+  { max:80,  bg:"#2A5E96", fg:"#FFFFFF", lab:"muy por debajo" },
+  { max:92,  bg:"#8FB4D6", fg:"#132A3E", lab:"por debajo" },
+  { max:108, bg:"#E7ECEA", fg:"#5C6462", lab:"en lo suyo" },
+  { max:120, bg:"#E79AA3", fg:"#45121A", lab:"por encima" },
+  { max:1e9, bg:"#A8323F", fg:"#FFFFFF", lab:"muy por encima" }
+];
+const pasoCalor = p => PASOS_CALOR.find(x => p < x.max) || PASOS_CALOR[4];
+
+function celdaCalor(r, col) {
+  const v = Math.abs(r.crudo[col] || 0);
+  const e = referencia(r, col);
+  const ref = valorRef(e, r, col);
+  if (!ref) return `<td><div class="tj vacio" title="Sin referencia todavía">
+    <b>${nf(v, 0)}</b><s>sin ref.</s></div></td>`;
+  const p = v / ref * 100;
+  const z = e && e.sd ? (v - e.media) / e.sd : null;
+  const c = pasoCalor(p);
+  const pie = FR.modo === "z" && z != null
+    ? `z ${z > 0 ? "+" : ""}${nf(z, 1)}` : `${nf(p, 0)}%`;
+  const tip = `${r.jugador} · ${nombreCorto(col)}\n${nf(v, 0)} · ${nf(p, 0)}% de su referencia${
+    z != null ? ` · z ${z > 0 ? "+" : ""}${nf(z, 1)}` : ""}`;
+  return `<td><div class="tj" style="background:${c.bg};color:${c.fg}" title="${esc(tip)}">
+    <b>${nf(v, 0)}</b><s>${pie}</s></div></td>`;
+}
+
 function porcentajeCarga() {
   const filas = sesion();
   if (!filas.length) return `<p class="empty">Elige una sesión con datos.</p>`;
@@ -2436,6 +2470,39 @@ function porcentajeCarga() {
       <td class="pos">${esc(r.posicion)}</td>
       <td class="n">${nf(r.minutos)}</td>
       ${mets.map(m => celdaRef(r, m)).join("")}</tr>`;
+  }
+
+  // ---- la misma tabla, pintada ----
+  if (FR.vista === "calor") {
+    let gr = "", cuerpoC = "";
+    for (const r of jugadoras) {
+      const g = grupoDe(r.posicion);
+      if (g !== gr) {
+        gr = g;
+        cuerpoC += `<tr class="grupoRef" style="color:${tonoGrupo(g, orden).papel}">
+          <td colspan="${2 + mets.length}">${esc(g.toUpperCase())}</td></tr>`;
+      }
+      const e0 = referencia(r, mets[0]);
+      const niv = e0 ? e0.nivel : "equipo";
+      cuerpoC += `<tr><td class="nomC">${esc(r.jugador)}
+        <s>${esc(r.posicion)} · ${nf(r.minutos)}'</s>
+        <span class="selloR ${CLASE_NIVEL[niv]}" title="Con qué se compara">${
+          etiquetaNivel(niv)}${e0 ? " · " + e0.n : ""}</span></td>
+        ${mets.map(m => celdaCalor(r, m)).join("")}</tr>`;
+    }
+    return `<section class="panel">
+      <div class="row"><div><h3>${esc(tituloRef())}</h3>
+        <p class="sub" style="margin:0">Cada cuadro, cuánto se separa de su referencia · dentro,
+          el valor y ${FR.modo === "z" ? "su z" : "el % de esa referencia"}</p></div></div>
+      <div class="scroll"><table class="calorT">
+        <thead><tr><th></th>${mets.map(m =>
+          `<th>${esc(nombreCorto(m))}</th>`).join("")}</tr></thead>
+        <tbody>${cuerpoC}</tbody></table></div>
+      <div class="leyenda">${PASOS_CALOR.map(c =>
+        `<span><i class="sw" style="background:${c.bg}"></i>${c.lab}</span>`).join("")}
+        <span>Rojo es por encima de lo suyo, no necesariamente malo</span></div>
+      ${notaEventos()}
+    </section>`;
   }
 
   const u = cortes();
