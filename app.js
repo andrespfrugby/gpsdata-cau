@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261119c";   // se muestra abajo en el lateral
+const VERSION = "20261123d";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -995,12 +995,16 @@ function bipDeSesion() {
 function bloqueBipReporte() {
   const d = bipDeSesion();
   if (!d) return "";
-  const r = resumirBip(d.fases);
+  // agregaBip en vez de resumirBip: trae los rucks, el reloj de verdad de cada
+  // parte (la fila "task" del export) y el máximo, que es justo lo que va aquí.
+  const r = agregaBip(d.fases);
+  if (!r) return "";
+  const p1 = agregaBip(d.fases.filter(f => parteDe(f) === 1));
+  const p2 = agregaBip(d.fases.filter(f => parteDe(f) === 2));
   const t0 = Math.min(...d.fases.map(f => f.inicio || 0));
   const finMs = Math.max(...d.fases.map(f => (f.inicio || 0) + f.duracion * 1000));
   const reloj = Math.max(1, (finMs - t0) / 60000);
   const larga = d.fases.reduce((a, b) => b.duracion > a.duracion ? b : a, d.fases[0]);
-  const minLarga = (larga.inicio - t0) / 60000;
 
   const W = 1180, L = 14, T = 26, carril = 46, iw = W - L - 18, H = T + carril + 48;
   const px = m => L + m / reloj * iw;
@@ -1017,25 +1021,25 @@ function bloqueBipReporte() {
   for (let m = 0; m <= reloj; m += pasoMin) {
     s += `<text x="${px(m).toFixed(1)}" y="${T + carril + 18}" font-size="10" fill="#8A9290" text-anchor="middle">${m}'</text>`;
   }
-  s += `<text x="${L}" y="${T - 9}" font-size="10.5" fill="#5C6462">cada bloque es una secuencia de juego · en color pleno las que pasan de 1 min 20 s</text>`;
+  s += `<text x="${L}" y="${T - 9}" font-size="10.5" fill="#8A9290">cada bloque es una secuencia · en color pleno, las de más de 1:20</text>`;
   s += `</svg>`;
 
   return `<section class="panel ancho bipReporte">
     <h3>Balón en juego <span class="uni">${esc(d.partido)}</span></h3>
-    <div class="celdas cuatro" style="margin:10px 0 4px">
-      <div class="c dest"><span>Balón en juego</span><b>${mmss(r.total)}</b>
-        <span>de ${nf(reloj, 0)} minutos de reloj</span></div>
-      <div class="c"><span>Secuencias</span><b>${r.n}</b>
-        <span>una cada ${nf(reloj / r.n, 1)} min</span></div>
+    <div class="celdas cinco" style="margin:10px 0 4px">
+      <div class="c dest"><span>Balón en juego</span><b>${mmss(r.bip)}</b>
+        <span>${nf(r.pct * 100, 1)}% de ${nf(r.raw / 60, 0)} min de reloj</span></div>
+      <div class="c"><span>Por parte</span><b>${p1 && p2 ? `${mmss(p1.bip)} · ${mmss(p2.bip)}`
+        : mmss(r.bip)}</b><span>${p1 && p2
+        ? `${nf(p1.pct * 100, 0)}% y ${nf(p2.pct * 100, 0)}%` : "una sola parte en el archivo"}</span></div>
       <div class="c"><span>Duración media</span><b>${nf(r.media, 0)} s</b>
-        <span>la más larga, ${mmss(larga.duracion)} en el minuto ${nf(minLarga, 0)}</span></div>
-      <div class="c"><span>Ratio juego : parada</span><b>1:${nf(r.mediaDescanso / (r.media || 1), 2)}</b>
-        <span>${nf(r.mediaDescanso, 0)} s de parada de media</span></div>
+        <span>${r.n} secuencias</span></div>
+      <div class="c"><span>La más larga</span><b>${mmss(r.mx)}</b>
+        <span>${parteDe(larga) === 2 ? "en la 2ª parte" : "en la 1ª parte"}</span></div>
+      <div class="c"><span>Rucks</span><b>${r.rk}</b>
+        <span>${nf(r.rk / r.n, 1)} por secuencia</span></div>
     </div>
     ${s}
-    <p class="sub" style="margin:4px 0 0">Para ${lasLos()} ${jugs()}: jugamos ${mmss(r.total)} de balón en juego
-      en secuencias de ${nf(r.media, 0)} segundos de media. Por eso el acondicionamiento se trabaja en
-      bloques cortos y repetidos, y no corriendo veinte minutos seguidos.</p>
   </section>`;
 }
 
@@ -3611,6 +3615,7 @@ const FD = { orden:{ col:"min", asc:false },        // orden de la tabla de bloq
              ref:"ventana",                         // típico: últimas N o toda la temporada
              met:HMLD, grupo:"" };                  // gráfico de tareas contra partido
 const FB = { partido:"", vista:"panel", sesionGps:"", metrica:"Distance (metres)",
+             carA:"", carB:"",                  // los dos del cara a cara
              parte:"all", sel:"", temp:"" };   // panel de temporada
 const PAREJAS = {};   // partido de BiP -> sesión de GPS que le corresponde
 
@@ -3709,6 +3714,139 @@ function donutBip(pct) {
   </svg>`;
 }
 
+/* ---------- ficha, cara a cara y ranking ---------- */
+/* Las cinco que describen un partido. Se sacan todas de r.all para que la
+   ficha, el cara a cara y el ranking hablen siempre del mismo número. */
+const MET_FICHA = [
+  { k:"pct",   lbl:"% balón en juego", uni:"%", dec:1, v:a => a.pct * 100 },
+  { k:"media", lbl:"Duración media",   uni:"s", dec:1, v:a => a.media },
+  { k:"n",     lbl:"Secuencias",       uni:"",  dec:0, v:a => a.n },
+  { k:"rest",  lbl:"Pausa media",      uni:"s", dec:1, v:a => a.rest },
+  { k:"rk",    lbl:"Rucks",            uni:"",  dec:0, v:a => a.rk }
+];
+
+/** En qué esquina del cuadrante cae un partido, con los cortes de la temporada. */
+function zonaBip(r, D) {
+  if (!D.length) return ZONAS_BIP[0];
+  const ax = D.reduce((t, x) => t + x.all.n, 0) / D.length;
+  const ay = D.reduce((t, x) => t + x.all.media, 0) / D.length;
+  const much = r.all.n >= ax, larg = r.all.media >= ay;
+  return larg ? (much ? ZONAS_BIP[0] : ZONAS_BIP[1]) : (much ? ZONAS_BIP[2] : ZONAS_BIP[3]);
+}
+
+/** El pentágono: la forma del partido contra el más completo del año. */
+function pentagono(r, D, col) {
+  const R = 104, CX = 140, CY = 140;
+  const ran = m => {
+    const v = D.map(x => m.v(x.all));
+    return { lo:Math.min(...v), hi:Math.max(...v) };
+  };
+  const punto = (a, i, m) => {
+    const { lo, hi } = ran(m);
+    // Suelo del 18%: sin él, el peor partido del año se dibuja como un punto
+    // en el centro y la figura deja de tener forma.
+    const u = 0.18 + (hi > lo ? (m.v(a) - lo) / (hi - lo) : .5) * 0.82;
+    const g = -Math.PI / 2 + i * 2 * Math.PI / 5;
+    return [CX + Math.cos(g) * u * R, CY + Math.sin(g) * u * R];
+  };
+  const poli = (a, stroke, fill, w) => `<polygon points="${
+    MET_FICHA.map((m, i) => punto(a, i, m).map(n => n.toFixed(1)).join(",")).join(" ")
+  }" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/>`;
+
+  // El techo de la temporada: el partido con más balón en juego.
+  const techo = D.reduce((p, x) => x.all.pct > p.all.pct ? x : p, D[0]);
+  let g = "";
+  for (const k of [.4, .7, 1]) {
+    g += `<polygon points="${[0, 1, 2, 3, 4].map(i => {
+      const an = -Math.PI / 2 + i * 2 * Math.PI / 5;
+      return `${(CX + Math.cos(an) * k * R).toFixed(1)},${(CY + Math.sin(an) * k * R).toFixed(1)}`;
+    }).join(" ")}" fill="none" stroke="#EDF1F0"/>`;
+  }
+  MET_FICHA.forEach((m, i) => {
+    const an = -Math.PI / 2 + i * 2 * Math.PI / 5;
+    const x = CX + Math.cos(an) * R, y = CY + Math.sin(an) * R;
+    const lx = CX + Math.cos(an) * (R + 16), ly = CY + Math.sin(an) * (R + 16);
+    const anc = Math.abs(Math.cos(an)) < .3 ? "middle" : (Math.cos(an) > 0 ? "start" : "end");
+    g += `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#E1E7E5"/>
+          <text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="${anc}" font-size="10"
+            fill="#8A9290">${esc(m.lbl)}</text>`;
+  });
+  const mismo = techo.id === r.id;
+  return `<div class="penta">
+    <svg viewBox="-56 -12 392 304">${g}
+      ${mismo ? "" : poli(techo.all, "#B9C2BF", "rgba(185,194,191,.16)", 2)}
+      ${poli(r.all, col, col + "20", 2.6)}</svg>
+    <div class="pleg"><span><i style="background:${col}"></i>este partido</span>
+      ${mismo ? `<span>es el más completo del año</span>`
+              : `<span><i style="background:#B9C2BF"></i>${esc(techo.corto)}, el más completo</span>`}</div>
+  </div>`;
+}
+
+/** La ficha: cabecera, pentágono y las cinco tarjetas con su sitio en el año. */
+function fichaPartido(nom) {
+  const D = datosBip();
+  const r = D.find(x => x.id === nom);
+  if (!r || D.length < 2) return "";
+  const z = zonaBip(r, D);
+  const col = z.col;
+  const med = arr => { const o = arr.slice().sort((a, b) => a - b), k = o.length >> 1;
+    return o.length % 2 ? o[k] : (o[k - 1] + o[k]) / 2; };
+  const tarjetas = MET_FICHA.map(m => {
+    const vs = D.map(x => m.v(x.all));
+    const lo = Math.min(...vs), hi = Math.max(...vs), mm = med(vs), v = m.v(r.all);
+    const p = hi > lo ? (v - lo) / (hi - lo) * 100 : 50;
+    const dif = mm ? (v / mm - 1) * 100 : 0;
+    const cl = dif > 3 ? "up" : dif < -3 ? "dn" : "eq";
+    return `<div class="kp"><span>${esc(m.lbl)}</span>
+      <b>${nf(v, m.dec)}<i>${m.uni}</i></b>
+      <div class="kbar"><u style="left:${p.toFixed(0)}%;background:${col}"></u></div>
+      <s class="${cl}">${dif > 0 ? "+" : ""}${nf(dif, 0)}% sobre lo normal</s></div>`;
+  }).join("");
+  return `<section class="panel fichaP">
+    <div class="heroP"><span class="big">${esc(r.corto)}</span>
+      <span class="zb" style="background:${col}1A;color:${col}">${esc(z.tit)}</span>
+      <span class="fec">${esc(fechaLarga(r.fecha))} · ${mmss(r.all.raw)} de reloj</span></div>
+    <div class="cuerpoP">${pentagono(r, D, col)}<div class="kps">${tarjetas}</div></div>
+  </section>`;
+}
+
+/** Dos partidos enfrentados desde el centro, métrica a métrica. */
+function caraACara() {
+  const D = datosBip();
+  if (D.length < 2) return `<p class="empty">Hacen falta dos partidos cargados para compararlos.</p>`;
+  if (!D.some(x => x.id === FB.carA)) FB.carA = D[D.length - 2].id;
+  if (!D.some(x => x.id === FB.carB) || FB.carB === FB.carA)
+    FB.carB = (D.find(x => x.id !== FB.carA) || D[0]).id;
+  const A = D.find(x => x.id === FB.carA), B = D.find(x => x.id === FB.carB);
+  /* Los dos lados llevan color fijo, no el de su zona: si los dos partidos
+     caen en la misma esquina del cuadrante saldrían del mismo color y no se
+     distinguiría cuál es cuál. La zona se dice con su etiqueta debajo. */
+  const cA = "#2F615C", cB = "#454C92";
+  const sel = (lado, act) => `<select class="selCara" data-l="${lado}">${
+    D.map(x => `<option value="${esc(x.id)}"${x.id === act ? " selected" : ""}>${esc(x.corto)}</option>`).join("")
+  }</select>`;
+  const filas = MET_FICHA.map(m => {
+    const a = m.v(A.all), b = m.v(B.all), mx = Math.max(a, b) || 1;
+    const gana = a === b ? "" : a > b ? "a" : "b";
+    return `<div class="cfila">
+      <span class="cv izq${gana === "a" ? " gana" : ""}">${nf(a, m.dec)}${m.uni}</span>
+      <div class="cb izq"><i style="width:${(a / mx * 100).toFixed(1)}%;background:${cA}"></i></div>
+      <span class="cl">${esc(m.lbl)}</span>
+      <div class="cb"><i style="width:${(b / mx * 100).toFixed(1)}%;background:${cB}"></i></div>
+      <span class="cv${gana === "b" ? " gana" : ""}">${nf(b, m.dec)}${m.uni}</span></div>`;
+  }).join("");
+  return `<section class="panel caraP">
+    <div class="cabCara">
+      <div class="lado izq" style="--c:${cA}">${sel("A", FB.carA)}
+        <s style="color:${zonaBip(A, D).col}">${esc(zonaBip(A, D).tit)}</s></div>
+      <span class="vs">frente a</span>
+      <div class="lado" style="--c:${cB}">${sel("B", FB.carB)}
+        <s style="color:${zonaBip(B, D).col}">${esc(zonaBip(B, D).tit)}</s></div>
+    </div>
+    ${filas}
+  </section>`;
+}
+
 function reporteBip(fases) {
   const r = resumirBip(fases);
   const partes = [...new Set(fases.map(f => f.parte))];
@@ -3731,6 +3869,7 @@ function reporteBip(fases) {
     <td class="n fuerte">1 : ${nf(res.media ? res.mediaDescanso / res.media : 0, 2)}</td></tr>`;
 
   return `
+  ${fichaPartido(fases[0].partido)}
   <div class="repBip">
     <div class="repCol">
       <section class="blq">
@@ -4806,6 +4945,7 @@ function vistaBip() {
     <div class="conmuta">
       ${[["panel","Temporada","Todos los partidos cargados, con chips para aislar uno"],
           ["partido","Reporte del partido","Las fases de un partido al detalle, con sus tramos y sus rucks"],
+          ["cara","Cara a cara","Dos partidos enfrentados métrica a métrica"],
           ["cruce","Cruce con GPS",`Qué hizo cada ${jug()} en los minutos en que el balón estuvo en juego`],
           ["evolucion","BiP vs intensidad","Si cuando se juega más también se corre más fuerte por minuto"],
           ["historico","Histórico","La tabla con todos los partidos, uno por fila"]]
@@ -4816,7 +4956,7 @@ function vistaBip() {
         const r = DATOS.find(x => idSesion(x) === id);
         return `<option value="${esc(id)}"${id === FB.sesionGps ? " selected" : ""}>${esc(fechaLarga(r.fecha))} · ${esc(r.sesion)}</option>`;
       }).join("")}</select>` : ""}
-      ${FB.vista !== "historico" && FB.vista !== "evolucion" && FB.vista !== "panel" && partidos.length ? `<select id="fPartidoBip">${partidos.map(p =>
+      ${FB.vista !== "historico" && FB.vista !== "evolucion" && FB.vista !== "panel" && FB.vista !== "cara" && partidos.length ? `<select id="fPartidoBip">${partidos.map(p =>
         `<option${p === FB.partido ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
       <button id="btnBip">Cargar CSV de BiP</button>
       <input type="file" id="inpBip" accept=".csv" hidden>
@@ -4832,11 +4972,12 @@ function vistaBip() {
     : FB.vista === "panel" ? panelBip()
     : FB.vista === "historico" ? historicoBip()
     : FB.vista === "evolucion" ? evolucionBip()
+    : FB.vista === "cara" ? caraACara()
     : FB.vista === "cruce" ? cruceBip(fases, FB.sesionGps)
     : reporteBip(fases);
 
   $("#tabla").innerHTML = `<div class="bip">${barra}
-    ${BIP.length && FB.vista !== "historico" && FB.vista !== "panel" ? `<div class="cab"><h2>${esc(FB.partido)}</h2>
+    ${BIP.length && !["historico", "panel", "cara"].includes(FB.vista) ? `<div class="cab"><h2>${esc(FB.partido)}</h2>
       <span class="meta">${esc(fechaLarga(fases[0].fecha))} · ${fases.length} fases</span></div>` : ""}
     ${contenido}<div id="salidaBip"></div></div>`;
 
@@ -4844,6 +4985,10 @@ function vistaBip() {
   $("#inpBip").onchange = e => { if (e.target.files[0]) leerBip(e.target.files[0]); };
   const selP = $("#fPartidoBip"); if (selP) selP.onchange = e => { FB.partido = e.target.value; pintar(); };
   const selS = $("#fSesionGps"); if (selS) selS.onchange = e => { FB.sesionGps = e.target.value; pintar(); };
+  document.querySelectorAll(".selCara").forEach(se => se.onchange = () => {
+    FB[se.dataset.l === "A" ? "carA" : "carB"] = se.value;
+    recordar(); pintar();
+  });
   document.querySelectorAll(".conmuta .mini").forEach(b => b.onclick = () => { FB.vista = b.dataset.v; pintar(); });
   document.querySelectorAll(".barraRef [data-g=parte]").forEach(b => b.onclick = () => {
     FB.parte = b.dataset.v; recordar(); pintar();
@@ -4951,7 +5096,15 @@ function normalizaBip(objetos, partido) {
     if (tipo !== "bip") continue;
     if (!m.bipid && !m.bipname) continue;
 
-    const inicio = num(m.starttimeunixms);
+    /* Para colocar las fases en el tiempo manda el segundo relativo al inicio
+       de la actividad, no la hora unix: en tu export la hora unix viene
+       redondeada y sale igual en todas las fases del partido, así que si se
+       usara esa, todas caerían en el mismo instante — la línea de tiempo del
+       reporte sería un bloque macizo y el pico de 5 minutos no mediría nada.
+       La hora unix se queda solo para la fecha, que para eso sí vale. */
+    const unix = num(m.starttimeunixms);
+    const seg = num(m.starttimeseconds);
+    const inicio = seg ? seg * 1000 : unix;
     salida.push({
       partido: nomPartido, parte,
       id: String(m.bipid || "").trim(),
@@ -4960,7 +5113,7 @@ function normalizaBip(objetos, partido) {
       duracion: num(m.durationseconds),
       pre: num(m.predeadballseconds),
       post: num(m.postdeadballseconds),
-      inicio, fecha: inicio ? new Date(inicio) : new Date()
+      inicio, fecha: unix ? new Date(unix) : new Date()
     });
   }
   return salida;
@@ -5698,8 +5851,8 @@ function pintar() {
       ${scatter(filas)}
       ${leyendaCuadrantes()}
     </section>`;
+  // El balón en juego vive en su pestaña: en el reporte de sesión sobraba.
   $("#paneles").innerHTML = `
-    ${bloqueBipReporte()}
     ${matriz(filas)}
     <div class="leyPaneles">
       <span>Cada bloque es una línea, con su color y su media punteada dentro</span>
