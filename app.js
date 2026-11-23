@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const VERSION = "20261123e";   // se muestra abajo en el lateral
+const VERSION = "20261123g";   // se muestra abajo en el lateral
 const C = window.CAU_CONFIG || {};
 
 /* Columnas del export que se pueden visualizar, agrupadas. Solo se ofrecen
@@ -2219,6 +2219,26 @@ const etiquetaNivel = niv => niv === "jugadora" ? jug()
                            : niv === "posicion" ? "posición" : "equipo";
 const CLASE_NIVEL = { jugadora:"s-jug", posicion:"s-pos", equipo:"s-eq" };
 
+/**
+ * Qué cuenta el número de la chapa. No es lo mismo en los tres niveles y eso
+ * confunde: en el suyo son sus propias sesiones, y en posición o equipo son
+ * registros, o sea cada jugador y cada sesión de la ventana por separado.
+ * El título lo dice con todas las letras, y también por qué ha bajado de nivel.
+ */
+function tituloSello(r, e) {
+  if (!e) return "Todavía no hay con qué compararle";
+  const v = FR.ventana;
+  const base = e.nivel === "jugadora"
+    ? `Su propia media: ${e.n} ${e.n === 1 ? "sesión suya" : "sesiones suyas"}`
+    : e.nivel === "posicion"
+    ? `Media de ${r.posicion}: ${e.n} registros — cada ${jug()} de la posición en cada una de las últimas ${v} sesiones`
+    : `Media del equipo: ${e.n} registros de las últimas ${v} sesiones`;
+  const porque = e.nivel === "jugadora" ? ""
+    : `\nNo llega a ${FR.minObs} sesiones propias, así que se compara con ${
+        e.nivel === "posicion" ? "su posición" : "el equipo"}.`;
+  return base + porque + (e.flojo ? "\nNi así hay suficientes: tómalo con pinzas." : "");
+}
+
 /* ---------- qué sesiones entran ---------- */
 /** Las candidatas de la ventana para el equipo, de la más vieja a la más nueva. */
 function candidatasRef() {
@@ -2383,9 +2403,25 @@ function tinteZ(z) {
   return a >= 2 ? "background:rgba(168,50,63,.16)" : "background:rgba(168,50,63,.09)";
 }
 
+/**
+ * Cuántos decimales lleva el valor de una columna en esta sesión. Con 0 fijos,
+ * las métricas por minuto se iban todas a "1" y la columna no decía nada;
+ * con 2 fijos, la distancia salía como "4.168,30". Se decide mirando los
+ * números que hay: recuentos enteros sin decimales, y los demás según su
+ * tamaño.
+ */
+function decCol(col) {
+  const v = sesion().map(r => Math.abs(r.crudo[col] || 0)).filter(x => x > 0);
+  if (!v.length) return 0;
+  if (v.every(Number.isInteger)) return 0;
+  const mx = Math.max(...v);
+  return mx >= 100 ? 0 : mx >= 10 ? 1 : 2;
+}
+
 function celdaRef(r, col) {
   const v = Math.abs(r.crudo[col] ?? NaN);
   if (isNaN(v)) return `<td class="n">–</td>`;
+  const d = decCol(col);
   const e = referencia(r, col);
   const ref = valorRef(e, r, col);
   const tip = JSON.stringify({
@@ -2398,12 +2434,12 @@ function celdaRef(r, col) {
     const z = (v - e.media) / e.sd;
     const flojo = e.n < FR.minZ;
     return `<td class="n${flojo ? " flojo" : ""}" style="${flojo ? "" : tinteZ(z)}" data-tip='${esc(tip)}'>
-      ${z > 0 ? "+" : ""}${nf(z, 2)}<i>${nf(v, 0)}</i></td>`;
+      ${z > 0 ? "+" : ""}${nf(z, 2)}<i>${nf(v, d)}</i></td>`;
   }
-  if (!ref) return `<td class="n" data-tip='${esc(tip)}'>–<i>${nf(v, 0)}</i></td>`;
+  if (!ref) return `<td class="n" data-tip='${esc(tip)}'>–<i>${nf(v, d)}</i></td>`;
   const p = v / ref * 100;
   return `<td class="n${p >= FR.objetivo ? " llega" : ""}" style="${tintePct(p)}" data-tip='${esc(tip)}'>
-    ${nf(p, 0)}%<i>${nf(v, 0)}</i></td>`;
+    ${nf(p, 0)}%<i>${nf(v, d)}</i></td>`;
 }
 
 /* ---------- mapa de calor ---------- */
@@ -2421,20 +2457,20 @@ const PASOS_CALOR = [
 const pasoCalor = p => PASOS_CALOR.find(x => p < x.max) || PASOS_CALOR[4];
 
 function celdaCalor(r, col) {
-  const v = Math.abs(r.crudo[col] || 0);
+  const v = Math.abs(r.crudo[col] || 0), d = decCol(col);
   const e = referencia(r, col);
   const ref = valorRef(e, r, col);
   if (!ref) return `<td><div class="tj vacio" title="Sin referencia todavía">
-    <b>${nf(v, 0)}</b><s>sin ref.</s></div></td>`;
+    <b>${nf(v, d)}</b><s>sin ref.</s></div></td>`;
   const p = v / ref * 100;
   const z = e && e.sd ? (v - e.media) / e.sd : null;
   const c = pasoCalor(p);
   const pie = FR.modo === "z" && z != null
     ? `z ${z > 0 ? "+" : ""}${nf(z, 1)}` : `${nf(p, 0)}%`;
-  const tip = `${r.jugador} · ${nombreCorto(col)}\n${nf(v, 0)} · ${nf(p, 0)}% de su referencia${
+  const tip = `${r.jugador} · ${nombreCorto(col)}\n${nf(v, d)} · ${nf(p, 0)}% de su referencia${
     z != null ? ` · z ${z > 0 ? "+" : ""}${nf(z, 1)}` : ""}`;
   return `<td><div class="tj" style="background:${c.bg};color:${c.fg}" title="${esc(tip)}">
-    <b>${nf(v, 0)}</b><s>${pie}</s></div></td>`;
+    <b>${nf(v, d)}</b><s>${pie}</s></div></td>`;
 }
 
 function porcentajeCarga() {
@@ -2466,7 +2502,7 @@ function porcentajeCarga() {
     const niv = e0 ? e0.nivel : "equipo";
     cuerpo += `<tr>
       <td class="nomR">${esc(r.jugador)}<span class="selloR ${CLASE_NIVEL[niv]}"
-        title="Sesiones que hay detrás de su referencia">${etiquetaNivel(niv)}${e0 ? " · " + e0.n : ""}</span></td>
+        title="${esc(tituloSello(r, e0))}">${etiquetaNivel(niv)}${e0 ? " · " + e0.n : ""}</span></td>
       <td class="pos">${esc(r.posicion)}</td>
       <td class="n">${nf(r.minutos)}</td>
       ${mets.map(m => celdaRef(r, m)).join("")}</tr>`;
@@ -2486,7 +2522,7 @@ function porcentajeCarga() {
       const niv = e0 ? e0.nivel : "equipo";
       cuerpoC += `<tr><td class="nomC">${esc(r.jugador)}
         <s>${esc(r.posicion)} · ${nf(r.minutos)}'</s>
-        <span class="selloR ${CLASE_NIVEL[niv]}" title="Con qué se compara">${
+        <span class="selloR ${CLASE_NIVEL[niv]}" title="${esc(tituloSello(r, e0))}">${
           etiquetaNivel(niv)}${e0 ? " · " + e0.n : ""}</span></td>
         ${mets.map(m => celdaCalor(r, m)).join("")}</tr>`;
     }
@@ -2500,7 +2536,8 @@ function porcentajeCarga() {
         <tbody>${cuerpoC}</tbody></table></div>
       <div class="leyenda">${PASOS_CALOR.map(c =>
         `<span><i class="sw" style="background:${c.bg}"></i>${c.lab}</span>`).join("")}
-        <span>Rojo es por encima de lo suyo, no necesariamente malo</span></div>
+        <span>Rojo es por encima de lo suyo, no necesariamente malo</span>
+        <span>La etiqueta del nombre dice con qué se le compara; pasa el ratón por encima</span></div>
       ${notaEventos()}
     </section>`;
   }
@@ -2531,7 +2568,7 @@ function porcentajeCarga() {
            <span><i class="sw" style="background:rgba(31,94,92,.12)"></i>${u[1]}-${u[0]}%</span>
            <span><i class="sw" style="background:rgba(154,107,18,.12)"></i>${u[2]}-${u[1]}%</span>
            <span><i class="sw" style="background:rgba(168,50,63,.10)"></i>menos del ${u[2]}%</span>`}
-      <span>La etiqueta del nombre dice con qué se compara y cuántas sesiones hay detrás</span>
+      <span>La etiqueta del nombre dice con qué se compara; pasa el ratón para ver qué cuenta el número</span>
     </div>
     ${notaEventos()}
   </section>`;
